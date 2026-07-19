@@ -227,7 +227,6 @@ func TestApplyCodexOAuthTransform_CompactsOverlongCallIDsWhenPreserveRequested(t
 	require.True(t, ok)
 	output, ok := input[1].(map[string]any)
 	require.True(t, ok)
-
 	compacted, ok := call["call_id"].(string)
 	require.True(t, ok)
 	require.Len(t, compacted, codexCallIDMaxLength)
