@@ -191,8 +191,8 @@ export default {
 
   // Setup Wizard
   setup: {
-    title: 'Sub2API Setup',
-    description: 'Configure your Sub2API instance',
+    title: 'star-X Setup',
+    description: 'Configure your star-X instance',
     database: {
       title: 'Database Configuration',
       description: 'Connect to your PostgreSQL database',
