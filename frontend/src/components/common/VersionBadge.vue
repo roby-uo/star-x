@@ -10,7 +10,7 @@
             ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50'
             : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-800 dark:text-dark-400 dark:hover:bg-dark-700'
         ]"
-        :title="hasUpdate ? t('version.updateAvailable') : t('version.upToDate')"
+        :title="isPrivateBuild ? t('version.privateBuild') : hasUpdate ? t('version.updateAvailable') : t('version.upToDate')"
       >
         <span v-if="currentVersion" class="font-medium">v{{ currentVersion }}</span>
         <span
@@ -107,9 +107,11 @@
                 </div>
                 <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">
                   {{
-                    hasUpdate
-                      ? t('version.latestVersion') + ': v' + latestVersion
-                      : t('version.upToDate')
+                    isPrivateBuild
+                      ? t('version.privateBuildHint')
+                      : hasUpdate
+                        ? t('version.latestVersion') + ': v' + latestVersion
+                        : t('version.upToDate')
                   }}
                 </p>
               </div>
@@ -651,9 +653,9 @@ import {
 import { useClipboard } from '@/composables/useClipboard'
 import Icon from '@/components/icons/Icon.vue'
 
-const GITHUB_REPO = 'Wei-Shaw/sub2api'
-// Docker Hub image published by CI (tags carry no "v" prefix, e.g. weishaw/sub2api:0.1.146)
-const DOCKER_IMAGE = 'weishaw/sub2api'
+// These are shown only in operator-managed release guidance. Private builds disable online updates.
+const GITHUB_REPO = 'roby-uo/star-x'
+const DOCKER_IMAGE = 'ghcr.io/roby-uo/star-x'
 
 const { t } = useI18n()
 
@@ -728,6 +730,8 @@ const activeManualCommand = computed(() =>
   manualTab.value === 'docker' ? dockerRollbackCommand.value : scriptRollbackCommand.value
 )
 
+// Private builds are upgraded by the operator through the source-controlled Docker workflow.
+const isPrivateBuild = computed(() => buildType.value === 'private')
 // Only show update check for release builds (binary/docker deployment)
 const isReleaseBuild = computed(() => buildType.value === 'release')
 

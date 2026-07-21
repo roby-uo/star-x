@@ -22,6 +22,8 @@ export default {
     currentVersion: 'Current Version',
     latestVersion: 'Latest Version',
     upToDate: "You're running the latest version.",
+    privateBuild: 'Private Build',
+    privateBuildHint: 'Online updates are disabled. Upgrade through the star-X source and Docker image.',
     updateAvailable: 'A new version is available!',
     releaseNotes: 'Release Notes',
     noReleaseNotes: 'No release notes',

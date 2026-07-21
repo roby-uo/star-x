@@ -22,6 +22,8 @@ export default {
     currentVersion: '当前版本',
     latestVersion: '最新版本',
     upToDate: '已是最新版本',
+    privateBuild: '本地定制版',
+    privateBuildHint: '在线更新已关闭，请通过 star-X 源码和 Docker 镜像升级',
     updateAvailable: '有新版本可用！',
     releaseNotes: '更新日志',
     noReleaseNotes: '暂无更新日志',

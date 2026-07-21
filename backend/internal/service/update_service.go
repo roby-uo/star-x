@@ -30,7 +30,8 @@ var (
 const (
 	updateCacheKey = "update_check_cache"
 	updateCacheTTL = 1200 // 20 minutes
-	githubRepo     = "Wei-Shaw/sub2api"
+	// Kept only for future operator-managed release tooling. Runtime online updates are disabled.
+	githubRepo     = "roby-uo/star-x"
 
 	// Security: allowed download domains for updates
 	allowedDownloadHost = "github.com"
@@ -129,50 +130,24 @@ type GitHubAsset struct {
 	Size               int64  `json:"size"`
 }
 
-// CheckUpdate checks for available updates
+// CheckUpdate reports the local build only. Private star-X deployments are upgraded
+// by rebuilding and recreating the Docker image, never by replacing the binary in place.
 func (s *UpdateService) CheckUpdate(ctx context.Context, force bool) (*UpdateInfo, error) {
-	// Try cache first
-	if !force {
-		if cached, err := s.getFromCache(ctx); err == nil && cached != nil {
-			return cached, nil
-		}
-	}
-
-	// Fetch from GitHub
-	info, err := s.fetchLatestRelease(ctx)
-	if err != nil {
-		// Return cached on error
-		if cached, cacheErr := s.getFromCache(ctx); cacheErr == nil && cached != nil {
-			cached.Warning = "Using cached data: " + err.Error()
-			return cached, nil
-		}
-		return &UpdateInfo{
-			CurrentVersion: s.currentVersion,
-			LatestVersion:  s.currentVersion,
-			HasUpdate:      false,
-			Warning:        err.Error(),
-			BuildType:      s.buildType,
-		}, nil
-	}
-
-	// Cache result
-	s.saveToCache(ctx, info)
-	return info, nil
+	_ = ctx
+	_ = force
+	return &UpdateInfo{
+		CurrentVersion: s.currentVersion,
+		LatestVersion:  s.currentVersion,
+		HasUpdate:      false,
+		Cached:         true,
+		BuildType:      "private",
+	}, nil
 }
 
-// PerformUpdate downloads and applies the update
-// Uses atomic file replacement pattern for safe in-place updates
+// PerformUpdate is intentionally disabled for private star-X Docker deployments.
 func (s *UpdateService) PerformUpdate(ctx context.Context) error {
-	info, err := s.CheckUpdate(ctx, true)
-	if err != nil {
-		return err
-	}
-
-	if !info.HasUpdate {
-		return ErrNoUpdateAvailable
-	}
-
-	return s.applyReleaseAssets(ctx, info.ReleaseInfo.Assets)
+	_ = ctx
+	return ErrNoUpdateAvailable
 }
 
 // applyReleaseAssets downloads the platform archive from the given release assets,
@@ -303,61 +278,17 @@ func (s *UpdateService) Rollback() error {
 	return nil
 }
 
-// ListRollbackVersions returns up to maxRollbackVersions release versions that are
-// strictly older than the current version (the current version itself is excluded),
-// newest first. Draft and prerelease entries are skipped.
+// ListRollbackVersions is intentionally disabled for private star-X Docker deployments.
 func (s *UpdateService) ListRollbackVersions(ctx context.Context) ([]RollbackVersion, error) {
-	releases, err := s.fetchRollbackCandidates(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	versions := make([]RollbackVersion, 0, len(releases))
-	for _, r := range releases {
-		versions = append(versions, RollbackVersion{
-			Version:     strings.TrimPrefix(r.TagName, "v"),
-			PublishedAt: r.PublishedAt,
-			HTMLURL:     r.HTMLURL,
-		})
-	}
-	return versions, nil
+	_ = ctx
+	return []RollbackVersion{}, nil
 }
 
-// RollbackToVersion downloads and installs a specific older version.
-// The target must be one of the versions returned by ListRollbackVersions;
-// anything else (including the current version) is rejected.
+// RollbackToVersion is intentionally disabled for private star-X Docker deployments.
 func (s *UpdateService) RollbackToVersion(ctx context.Context, version string) error {
-	target := strings.TrimPrefix(strings.TrimSpace(version), "v")
-	if target == "" {
-		return ErrRollbackVersionNotAllowed
-	}
-
-	releases, err := s.fetchRollbackCandidates(ctx)
-	if err != nil {
-		return err
-	}
-
-	var match *GitHubRelease
-	for _, r := range releases {
-		if strings.TrimPrefix(r.TagName, "v") == target {
-			match = r
-			break
-		}
-	}
-	if match == nil {
-		return ErrRollbackVersionNotAllowed
-	}
-
-	assets := make([]Asset, len(match.Assets))
-	for i, a := range match.Assets {
-		assets[i] = Asset{
-			Name:        a.Name,
-			DownloadURL: a.BrowserDownloadURL,
-			Size:        a.Size,
-		}
-	}
-
-	return s.applyReleaseAssets(ctx, assets)
+	_ = ctx
+	_ = version
+	return ErrRollbackVersionNotAllowed
 }
 
 // fetchRollbackCandidates fetches recent releases and keeps the newest
