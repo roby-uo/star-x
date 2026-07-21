@@ -1,31 +1,61 @@
 # star-X
 
-> 你的私有 AI API 网关
+> Self-hosted AI API gateway for teams and individuals.
 
-star-X 用于集中管理已获授权的上游 AI 服务账号、分组、API Key、用量和访问控制，并向你的应用或团队提供兼容的 API 调用入口。
+star-X is a self-hosted, privately branded distribution for managing authorized upstream AI accounts, API keys, routing, quotas, and usage. It is designed to run under your control with Docker Compose.
 
-## 本机运行
+![star-X logo](frontend/public/brand/star-x-logo-original.png)
 
-- 控制台：`http://127.0.0.1:8080`
-- 私有源码：`E:\Projects\sub2api-private`
-- Docker Compose 部署：`E:\DockerData\apps\sub2api`
-- 当前镜像：`local/star-x:0.1.2`（构建完成后启用）
+## Quick start with Docker
 
-## 产品操作链路
+Requirements: Docker Engine / Docker Desktop with Docker Compose v2.
 
-1. 管理员创建分组，用来定义可用模型、额度和访问规则。
-2. 在分组中添加自己拥有授权的上游账号或 API 凭据。
-3. 创建 API Key，并把 Key 分配给用户或应用。
-4. 应用通过兼容 API 调用 star-X；star-X 依据 Key 和分组选择可用上游并记录用量。
+```bash
+git clone https://github.com/roby-uo/star-x.git
+cd star-x/deploy
+cp .env.example .env
+# Edit .env and set the required secrets before the first start.
+docker compose up -d
+docker compose ps
+```
 
-## 私有化开发方式
+Open `http://localhost:8080`. Use the administrator email and password you set in `.env`.
 
-所有产品改动均在本目录完成：编辑源码、构建新的 `local/star-x:<版本>` 镜像、仅重建 `sub2api` 服务、再进行健康和页面检查。数据库与 Redis 数据不包含在镜像内，因此常规前端/后端改版不会清除业务数据。
+The default application image is:
 
-## 上游与版本管理
+```text
+ghcr.io/roby-uo/star-x:latest
+```
 
-当前代码来自上游项目，用作只读参考和后续安全更新来源。下一阶段应为 star-X 创建自己的私有 Git 仓库，并将它设为 `origin`；官方仓库仅保留为只读 `upstream`，禁止向其推送。
+Data is stored in named Docker volumes (`star_x_data`, `postgres_data`, and `redis_data`). Updating the application image does not remove those volumes. For an existing deployment, back up PostgreSQL before changing configuration or upgrading.
 
-## 开源许可
+## First-use chain
 
-本项目包含在 LGPL-3.0 许可下获得的上游代码。`LICENSE` 及适用的版权和许可声明必须保留。对外分发修改版本前，请核对 LGPL-3.0 对该场景的要求。
+1. Sign in as the administrator.
+2. Create a group.
+3. Add only AI-provider accounts and API credentials you are authorized to use.
+4. Create an API key for the desired group.
+5. Call the compatible endpoint through your star-X URL.
+
+An installed gateway cannot forward model requests until an authorized upstream account is configured.
+
+## Development
+
+Build the image locally from the repository root:
+
+```bash
+docker build -t local/star-x:dev .
+```
+
+For public releases, pushing to `main` builds `ghcr.io/roby-uo/star-x:latest`. Pushing a tag such as `v0.1.4` also produces a versioned image and a GitHub Release.
+
+## Security notes
+
+- Never commit `.env`, database dumps, API keys, OAuth tokens, or the `data/` directory.
+- Set strong, unique `POSTGRES_PASSWORD`, `ADMIN_PASSWORD`, `JWT_SECRET`, and `TOTP_ENCRYPTION_KEY` values before first startup.
+- Put the service behind HTTPS and restrict public access before using it outside a trusted network.
+- Respect each upstream provider's terms, account rules, and applicable laws.
+
+## License and attribution
+
+star-X is a modified distribution of [Wei-Shaw/sub2api](https://github.com/Wei-Shaw/sub2api). It remains licensed under the [GNU Lesser General Public License v3.0 or later](LICENSE). The original license and applicable notices are retained.
