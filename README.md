@@ -4,7 +4,7 @@
 
 star-X is a self-hosted, privately branded distribution for managing authorized upstream AI accounts, API keys, routing, quotas, and usage. It is designed to run under your control with Docker Compose.
 
-![star-X logo](frontend/public/brand/star-x-logo-original.png)
+![star-X logo](frontend/public/brand/star-x-logo-original.jpg)
 
 ## Quick start with Docker
 
