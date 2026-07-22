@@ -1,397 +1,142 @@
 <template>
-  <!-- Custom Home Content: Full Page Mode -->
   <div v-if="homeContent" class="min-h-screen">
-    <!-- iframe mode -->
     <iframe
       v-if="isHomeContentUrl"
       :src="homeContent.trim()"
       class="h-screen w-full border-0"
       allowfullscreen
     ></iframe>
-    <!-- HTML mode - SECURITY: homeContent is admin-only setting, XSS risk is acceptable -->
     <div v-else v-html="homeContent"></div>
   </div>
 
-  <!-- Default Home Page -->
-  <div
-    v-else
-    class="relative flex min-h-screen flex-col overflow-hidden bg-gradient-to-br from-gray-50 via-primary-50/30 to-gray-100 dark:from-dark-950 dark:via-dark-900 dark:to-dark-950"
-  >
-    <!-- Background Decorations -->
-    <div class="pointer-events-none absolute inset-0 overflow-hidden">
-      <div
-        class="absolute -right-40 -top-40 h-96 w-96 rounded-full bg-primary-400/20 blur-3xl"
-      ></div>
-      <div
-        class="absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-primary-500/15 blur-3xl"
-      ></div>
-      <div
-        class="absolute left-1/3 top-1/4 h-72 w-72 rounded-full bg-primary-300/10 blur-3xl"
-      ></div>
-      <div
-        class="absolute bottom-1/4 right-1/4 h-64 w-64 rounded-full bg-primary-400/10 blur-3xl"
-      ></div>
-      <div
-        class="absolute inset-0 bg-[linear-gradient(rgba(79,125,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(79,125,255,0.05)_1px,transparent_1px)] bg-[size:64px_64px]"
-      ></div>
-    </div>
+  <div v-else class="star-home">
+    <div class="star-home__grid"></div>
+    <div class="star-home__sunbeam"></div>
 
-    <!-- Header -->
-    <header class="relative z-20 px-6 py-4">
-      <nav class="mx-auto flex max-w-6xl items-center justify-between">
-        <!-- Logo -->
-        <div class="flex items-center">
-          <div class="h-10 w-10 overflow-hidden rounded-xl shadow-md">
-            <img :src="siteLogo || '/logo.png'" alt="Logo" class="h-full w-full object-contain" />
-          </div>
-        </div>
-
-        <!-- Nav Actions -->
-        <div class="flex items-center gap-3">
-          <!-- Language Switcher -->
+    <header class="star-header">
+      <nav class="star-shell star-nav" aria-label="star-X 导航">
+        <span class="star-nav__spacer" aria-hidden="true"></span>
+        <div class="star-nav__actions">
           <LocaleSwitcher />
-
-          <!-- Doc Link -->
           <a
             v-if="docUrl"
             :href="docUrl"
             target="_blank"
             rel="noopener noreferrer"
-            class="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
+            class="star-icon-button"
             :title="t('home.viewDocs')"
           >
             <Icon name="book" size="md" />
           </a>
-
-          <!-- Theme Toggle -->
           <button
-            @click="toggleTheme"
-            class="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
+            class="star-icon-button"
             :title="isDark ? t('home.switchToLight') : t('home.switchToDark')"
+            @click="toggleTheme"
           >
             <Icon v-if="isDark" name="sun" size="md" />
             <Icon v-else name="moon" size="md" />
           </button>
-
-          <!-- Login / Dashboard Button -->
           <router-link
             v-if="isAuthenticated"
             :to="dashboardPath"
-            class="inline-flex items-center gap-1.5 rounded-full bg-gray-900 py-1 pl-1 pr-2.5 transition-colors hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700"
+            class="star-console-button"
           >
-            <span
-              class="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-primary-400 to-primary-600 text-[10px] font-semibold text-white"
-            >
-              {{ userInitial }}
-            </span>
-            <span class="text-xs font-medium text-white">{{ t('home.dashboard') }}</span>
-            <svg
-              class="h-3 w-3 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"
-              />
-            </svg>
+            <span class="star-console-button__avatar">{{ userInitial }}</span>
+            <span>{{ t('home.dashboard') }}</span>
+            <Icon name="externalLink" size="sm" />
           </router-link>
-          <router-link
-            v-else
-            to="/login"
-            class="inline-flex items-center rounded-full bg-gray-900 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700"
-          >
-            {{ t('home.login') }}
+          <router-link v-else to="/login" class="star-console-button">
+            <span class="star-console-button__avatar">A</span>
+            <span>{{ t('home.login') }}</span>
+            <Icon name="externalLink" size="sm" />
           </router-link>
         </div>
       </nav>
     </header>
 
-    <!-- Main Content -->
-    <main class="relative z-10 flex-1 px-6 py-16">
-      <div class="mx-auto max-w-6xl">
-        <!-- Hero Section - Left/Right Layout -->
-        <div class="mb-12 flex flex-col items-center justify-between gap-12 lg:flex-row lg:gap-16">
-          <!-- Left: Text Content -->
-          <div class="flex-1 text-center lg:text-left">
-            <h1
-              class="mb-4 text-4xl font-bold text-gray-900 dark:text-white md:text-5xl lg:text-6xl"
-            >
-              {{ siteName }}
-            </h1>
-            <p class="mb-8 text-lg text-gray-600 dark:text-dark-300 md:text-xl">
-              {{ siteSubtitle }}
-            </p>
+    <main class="star-shell star-main">
+      <section class="star-hero" aria-labelledby="star-hero-title">
+        <div class="star-hero__copy">
+          <p class="star-hero__eyebrow">PRIVATE AI INFRASTRUCTURE</p>
+          <h1 id="star-hero-title">{{ siteName }}</h1>
+          <p class="star-hero__subtitle">{{ siteSubtitle }}</p>
+          <router-link :to="isAuthenticated ? dashboardPath : '/login'" class="star-cta">
+            {{ isAuthenticated ? t('home.goToDashboard') : '进入控制台' }}
+            <Icon name="arrowRight" size="lg" :stroke-width="2" />
+          </router-link>
 
-            <!-- CTA Button -->
-            <div>
-              <router-link
-                :to="isAuthenticated ? dashboardPath : '/login'"
-                class="btn btn-primary px-8 py-3 text-base shadow-lg shadow-primary-500/30"
-              >
-                {{ isAuthenticated ? t('home.goToDashboard') : t('home.getStarted') }}
-                <Icon name="arrowRight" size="md" class="ml-2" :stroke-width="2" />
-              </router-link>
-            </div>
-          </div>
-
-          <!-- Right: Terminal Animation -->
-          <div class="flex flex-1 justify-center lg:justify-end">
-            <div class="terminal-container">
-              <div class="terminal-window">
-                <!-- Window header -->
-                <div class="terminal-header">
-                  <div class="terminal-buttons">
-                    <span class="btn-close"></span>
-                    <span class="btn-minimize"></span>
-                    <span class="btn-maximize"></span>
-                  </div>
-                  <span class="terminal-title">terminal</span>
-                </div>
-                <!-- Terminal content -->
-                <div class="terminal-body">
-                  <div class="code-line line-1">
-                    <span class="code-prompt">$</span>
-                    <span class="code-cmd">curl</span>
-                    <span class="code-flag">-X POST</span>
-                    <span class="code-url">/v1/messages</span>
-                  </div>
-                  <div class="code-line line-2">
-                    <span class="code-comment"># Routing to upstream...</span>
-                  </div>
-                  <div class="code-line line-3">
-                    <span class="code-success">200 OK</span>
-                    <span class="code-response">{ "content": "Hello!" }</span>
-                  </div>
-                  <div class="code-line line-4">
-                    <span class="code-prompt">$</span>
-                    <span class="cursor"></span>
-                  </div>
-                </div>
-              </div>
-            </div>
+          <div class="star-tags" aria-label="产品能力">
+            <span><Icon name="swap" size="sm" />{{ t('home.tags.subscriptionToApi') }}</span>
+            <span><Icon name="shield" size="sm" />{{ t('home.tags.stickySession') }}</span>
+            <span><Icon name="chart" size="sm" />{{ t('home.tags.realtimeBilling') }}</span>
           </div>
         </div>
 
-        <!-- Feature Tags - Centered -->
-        <div class="mb-12 flex flex-wrap items-center justify-center gap-4 md:gap-6">
-          <div
-            class="inline-flex items-center gap-2.5 rounded-full border border-gray-200/50 bg-white/80 px-5 py-2.5 shadow-sm backdrop-blur-sm dark:border-dark-700/50 dark:bg-dark-800/80"
-          >
-            <Icon name="swap" size="sm" class="text-primary-500" />
-            <span class="text-sm font-medium text-gray-700 dark:text-dark-200">{{
-              t('home.tags.subscriptionToApi')
-            }}</span>
+        <div class="star-hero__visual" aria-label="动态 AI API 网络示意图">
+          <div class="star-orb" aria-hidden="true">
+            <div class="star-orb__core"></div>
+            <div class="star-orb__ring star-orb__ring--one"></div>
+            <div class="star-orb__ring star-orb__ring--two"></div>
+            <svg class="star-orb__lightning" viewBox="0 0 460 460" fill="none">
+              <path class="bolt bolt--one" d="M38 239 108 206l-29 47 83-42-36 70 105-72-45 88 113-72-58 108 124-55" />
+              <path class="bolt bolt--two" d="m99 95 51 70-16-44 88 74-27-55 94 69-33-18 88 91" />
+              <path class="bolt bolt--three" d="m109 371 67-70-25 49 101-68-43 67 101-66-29 50 78-33" />
+              <path class="bolt bolt--four" d="m232 35-18 92 35-35-7 112 34-64 8 91" />
+            </svg>
           </div>
-          <div
-            class="inline-flex items-center gap-2.5 rounded-full border border-gray-200/50 bg-white/80 px-5 py-2.5 shadow-sm backdrop-blur-sm dark:border-dark-700/50 dark:bg-dark-800/80"
-          >
-            <Icon name="shield" size="sm" class="text-primary-500" />
-            <span class="text-sm font-medium text-gray-700 dark:text-dark-200">{{
-              t('home.tags.stickySession')
-            }}</span>
-          </div>
-          <div
-            class="inline-flex items-center gap-2.5 rounded-full border border-gray-200/50 bg-white/80 px-5 py-2.5 shadow-sm backdrop-blur-sm dark:border-dark-700/50 dark:bg-dark-800/80"
-          >
-            <Icon name="chart" size="sm" class="text-primary-500" />
-            <span class="text-sm font-medium text-gray-700 dark:text-dark-200">{{
-              t('home.tags.realtimeBilling')
-            }}</span>
+
+          <div class="star-terminal">
+            <div class="star-terminal__header">
+              <span class="terminal-dot terminal-dot--red"></span>
+              <span class="terminal-dot terminal-dot--yellow"></span>
+              <span class="terminal-dot terminal-dot--green"></span>
+              <span class="star-terminal__title">terminal</span>
+            </div>
+            <div class="star-terminal__body">
+              <p><b>$</b> <em>curl</em> -X POST <i>/v1/messages</i></p>
+              <p class="terminal-muted"># Routing to upstream...</p>
+              <p><strong>200 OK</strong> <span>{ "content": "Hello!" }</span></p>
+              <p><b>$</b> <span class="terminal-cursor"></span></p>
+            </div>
           </div>
         </div>
+      </section>
 
-        <!-- Features Grid -->
-        <div class="mb-12 grid gap-6 md:grid-cols-3">
-          <!-- Feature 1: Unified Gateway -->
-          <div
-            class="group rounded-2xl border border-gray-200/50 bg-white/60 p-6 backdrop-blur-sm transition-all duration-300 hover:shadow-xl hover:shadow-primary-500/10 dark:border-dark-700/50 dark:bg-dark-800/60"
-          >
-            <div
-              class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/30 transition-transform group-hover:scale-110"
-            >
-              <Icon name="server" size="lg" class="text-white" />
-            </div>
-            <h3 class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
-              {{ t('home.features.unifiedGateway') }}
-            </h3>
-            <p class="text-sm leading-relaxed text-gray-600 dark:text-dark-400">
-              {{ t('home.features.unifiedGatewayDesc') }}
-            </p>
+      <section class="star-feature-grid" aria-label="star-X 核心能力">
+        <article class="star-feature-card">
+          <div class="star-feature-card__icon star-feature-card__icon--blue"><Icon name="server" size="lg" /></div>
+          <h2>{{ t('home.features.unifiedGateway') }}</h2>
+          <p>{{ t('home.features.unifiedGatewayDesc') }}</p>
+        </article>
+        <article class="star-feature-card">
+          <div class="star-feature-card__icon star-feature-card__icon--violet">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 20v-1.1c0-1.7-1.8-3.1-4-3.1s-4 1.4-4 3.1V20"/><circle cx="12" cy="8" r="3"/><path d="M19 20v-1c0-1.2-.8-2.3-2-2.8M17 5.3a3 3 0 0 1 0 5.4M5 20v-1c0-1.2.8-2.3 2-2.8M7 5.3a3 3 0 0 0 0 5.4"/></svg>
           </div>
+          <h2>{{ t('home.features.multiAccount') }}</h2>
+          <p>{{ t('home.features.multiAccountDesc') }}</p>
+        </article>
+        <article class="star-feature-card">
+          <div class="star-feature-card__icon star-feature-card__icon--purple"><Icon name="creditCard" size="lg" /></div>
+          <h2>{{ t('home.features.balanceQuota') }}</h2>
+          <p>{{ t('home.features.balanceQuotaDesc') }}</p>
+        </article>
+      </section>
 
-          <!-- Feature 2: Account Pool -->
-          <div
-            class="group rounded-2xl border border-gray-200/50 bg-white/60 p-6 backdrop-blur-sm transition-all duration-300 hover:shadow-xl hover:shadow-primary-500/10 dark:border-dark-700/50 dark:bg-dark-800/60"
-          >
-            <div
-              class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 shadow-lg shadow-primary-500/30 transition-transform group-hover:scale-110"
-            >
-              <svg
-                class="h-6 w-6 text-white"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="1.5"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"
-                />
-              </svg>
-            </div>
-            <h3 class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
-              {{ t('home.features.multiAccount') }}
-            </h3>
-            <p class="text-sm leading-relaxed text-gray-600 dark:text-dark-400">
-              {{ t('home.features.multiAccountDesc') }}
-            </p>
-          </div>
-
-          <!-- Feature 3: Billing & Quota -->
-          <div
-            class="group rounded-2xl border border-gray-200/50 bg-white/60 p-6 backdrop-blur-sm transition-all duration-300 hover:shadow-xl hover:shadow-primary-500/10 dark:border-dark-700/50 dark:bg-dark-800/60"
-          >
-            <div
-              class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 shadow-lg shadow-purple-500/30 transition-transform group-hover:scale-110"
-            >
-              <svg
-                class="h-6 w-6 text-white"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="1.5"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z"
-                />
-              </svg>
-            </div>
-            <h3 class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
-              {{ t('home.features.balanceQuota') }}
-            </h3>
-            <p class="text-sm leading-relaxed text-gray-600 dark:text-dark-400">
-              {{ t('home.features.balanceQuotaDesc') }}
-            </p>
-          </div>
+      <section class="star-providers" aria-labelledby="star-providers-title">
+        <h2 id="star-providers-title">{{ t('home.providers.title') }}</h2>
+        <p>{{ t('home.providers.description') }}</p>
+        <div class="star-provider-list">
+          <div class="star-provider"><b class="provider-mark provider-mark--orange">C</b><span>{{ t('home.providers.claude') }}</span><small>{{ t('home.providers.supported') }}</small></div>
+          <div class="star-provider"><b class="provider-mark provider-mark--green">G</b><span>GPT</span><small>{{ t('home.providers.supported') }}</small></div>
+          <div class="star-provider"><b class="provider-mark provider-mark--blue">G</b><span>{{ t('home.providers.gemini') }}</span><small>{{ t('home.providers.supported') }}</small></div>
+          <div class="star-provider"><b class="provider-mark provider-mark--pink">A</b><span>{{ t('home.providers.antigravity') }}</span><small>{{ t('home.providers.supported') }}</small></div>
+          <div class="star-provider star-provider--muted"><b class="provider-mark provider-mark--gray">+</b><span>{{ t('home.providers.more') }}</span><small>{{ t('home.providers.soon') }}</small></div>
         </div>
-
-        <!-- Supported Providers -->
-        <div class="mb-8 text-center">
-          <h2 class="mb-3 text-2xl font-bold text-gray-900 dark:text-white">
-            {{ t('home.providers.title') }}
-          </h2>
-          <p class="text-sm text-gray-600 dark:text-dark-400">
-            {{ t('home.providers.description') }}
-          </p>
-        </div>
-
-        <div class="mb-16 flex flex-wrap items-center justify-center gap-4">
-          <!-- Claude - Supported -->
-          <div
-            class="flex items-center gap-2 rounded-xl border border-primary-200 bg-white/60 px-5 py-3 ring-1 ring-primary-500/20 backdrop-blur-sm dark:border-primary-800 dark:bg-dark-800/60"
-          >
-            <div
-              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-400 to-orange-500"
-            >
-              <span class="text-xs font-bold text-white">C</span>
-            </div>
-            <span class="text-sm font-medium text-gray-700 dark:text-dark-200">{{ t('home.providers.claude') }}</span>
-            <span
-              class="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-medium text-primary-600 dark:bg-primary-900/30 dark:text-primary-400"
-              >{{ t('home.providers.supported') }}</span
-            >
-          </div>
-          <!-- GPT - Supported -->
-          <div
-            class="flex items-center gap-2 rounded-xl border border-primary-200 bg-white/60 px-5 py-3 ring-1 ring-primary-500/20 backdrop-blur-sm dark:border-primary-800 dark:bg-dark-800/60"
-          >
-            <div
-              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-green-500 to-green-600"
-            >
-              <span class="text-xs font-bold text-white">G</span>
-            </div>
-            <span class="text-sm font-medium text-gray-700 dark:text-dark-200">GPT</span>
-            <span
-              class="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-medium text-primary-600 dark:bg-primary-900/30 dark:text-primary-400"
-              >{{ t('home.providers.supported') }}</span
-            >
-          </div>
-          <!-- Gemini - Supported -->
-          <div
-            class="flex items-center gap-2 rounded-xl border border-primary-200 bg-white/60 px-5 py-3 ring-1 ring-primary-500/20 backdrop-blur-sm dark:border-primary-800 dark:bg-dark-800/60"
-          >
-            <div
-              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600"
-            >
-              <span class="text-xs font-bold text-white">G</span>
-            </div>
-            <span class="text-sm font-medium text-gray-700 dark:text-dark-200">{{ t('home.providers.gemini') }}</span>
-            <span
-              class="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-medium text-primary-600 dark:bg-primary-900/30 dark:text-primary-400"
-              >{{ t('home.providers.supported') }}</span
-            >
-          </div>
-          <!-- Antigravity - Supported -->
-          <div
-            class="flex items-center gap-2 rounded-xl border border-primary-200 bg-white/60 px-5 py-3 ring-1 ring-primary-500/20 backdrop-blur-sm dark:border-primary-800 dark:bg-dark-800/60"
-          >
-            <div
-              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-rose-500 to-pink-600"
-            >
-              <span class="text-xs font-bold text-white">A</span>
-            </div>
-            <span class="text-sm font-medium text-gray-700 dark:text-dark-200">{{ t('home.providers.antigravity') }}</span>
-            <span
-              class="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-medium text-primary-600 dark:bg-primary-900/30 dark:text-primary-400"
-              >{{ t('home.providers.supported') }}</span
-            >
-          </div>
-          <!-- More - Coming Soon -->
-          <div
-            class="flex items-center gap-2 rounded-xl border border-gray-200/50 bg-white/40 px-5 py-3 opacity-60 backdrop-blur-sm dark:border-dark-700/50 dark:bg-dark-800/40"
-          >
-            <div
-              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-gray-500 to-gray-600"
-            >
-              <span class="text-xs font-bold text-white">+</span>
-            </div>
-            <span class="text-sm font-medium text-gray-700 dark:text-dark-200">{{ t('home.providers.more') }}</span>
-            <span
-              class="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:bg-dark-700 dark:text-dark-400"
-              >{{ t('home.providers.soon') }}</span
-            >
-          </div>
-        </div>
-      </div>
+      </section>
     </main>
 
-    <!-- Footer -->
-    <footer class="relative z-10 border-t border-gray-200/50 px-6 py-8 dark:border-dark-800/50">
-      <div
-        class="mx-auto flex max-w-6xl flex-col items-center justify-center gap-4 text-center sm:flex-row sm:text-left"
-      >
-        <p class="text-sm text-gray-500 dark:text-dark-400">
-          &copy; {{ currentYear }} {{ siteName }}. {{ t('home.footer.allRightsReserved') }}
-        </p>
-        <div class="flex items-center gap-4">
-          <a
-            v-if="docUrl"
-            :href="docUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-white"
-          >
-            {{ t('home.docs') }}
-          </a>
-        </div>
-      </div>
+    <footer class="star-footer">
+      <p>&copy; {{ currentYear }} {{ siteName }}. {{ t('home.footer.allRightsReserved') }}</p>
     </footer>
   </div>
 </template>
@@ -405,53 +150,34 @@ import Icon from '@/components/icons/Icon.vue'
 import { sanitizeUrl } from '@/utils/url'
 
 const { t } = useI18n()
-
 const authStore = useAuthStore()
 const appStore = useAppStore()
 
-// Site settings - directly from appStore (already initialized from injected config)
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'star-X')
-const siteLogo = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
-const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || '你的私有 AI API 网关')
+const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || '你的私人 AI API 网关')
 const docUrl = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.doc_url || appStore.docUrl || ''))
 const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
-
-// Check if homeContent is a URL (for iframe display)
 const isHomeContentUrl = computed(() => {
   const content = homeContent.value.trim()
   return content.startsWith('http://') || content.startsWith('https://')
 })
 
-// Theme
 const isDark = ref(document.documentElement.classList.contains('dark'))
-
-// Auth state
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const isAdmin = computed(() => authStore.isAdmin)
-const dashboardPath = computed(() => isAdmin.value ? '/admin/dashboard' : '/dashboard')
-const userInitial = computed(() => {
-  const user = authStore.user
-  if (!user || !user.email) return ''
-  return user.email.charAt(0).toUpperCase()
-})
-
-// Current year for footer
+const dashboardPath = computed(() => (isAdmin.value ? '/admin/dashboard' : '/dashboard'))
+const userInitial = computed(() => authStore.user?.email?.charAt(0).toUpperCase() || 'A')
 const currentYear = computed(() => new Date().getFullYear())
 
-// Toggle theme
 function toggleTheme() {
   isDark.value = !isDark.value
   document.documentElement.classList.toggle('dark', isDark.value)
   localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
 }
 
-// Initialize theme
 function initTheme() {
   const savedTheme = localStorage.getItem('theme')
-  if (
-    savedTheme === 'dark' ||
-    (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)
-  ) {
+  if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
     isDark.value = true
     document.documentElement.classList.add('dark')
   }
@@ -459,176 +185,66 @@ function initTheme() {
 
 onMounted(() => {
   initTheme()
-
-  // Check auth state
   authStore.checkAuth()
-
-  // Ensure public settings are loaded (will use cache if already loaded from injected config)
-  if (!appStore.publicSettingsLoaded) {
-    appStore.fetchPublicSettings()
-  }
+  if (!appStore.publicSettingsLoaded) appStore.fetchPublicSettings()
 })
 </script>
 
 <style scoped>
-/* Terminal Container */
-.terminal-container {
+.star-home {
+  --ink: #10152a;
+  --muted: #4d5874;
+  --line: rgba(114, 139, 196, 0.16);
   position: relative;
-  display: inline-block;
-}
-
-/* Terminal Window */
-.terminal-window {
-  width: 420px;
-  background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%);
-  border-radius: 14px;
-  box-shadow:
-    0 25px 50px -12px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(255, 255, 255, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  min-height: 100vh;
   overflow: hidden;
-  transform: perspective(1000px) rotateX(2deg) rotateY(-2deg);
-  transition: transform 0.3s ease;
+  color: var(--ink);
+  background: radial-gradient(circle at 72% 18%, rgba(126, 164, 255, 0.3), transparent 30%), linear-gradient(125deg, #fff 2%, #f7f8ff 42%, #edf1ff 100%);
+  isolation: isolate;
 }
-
-.terminal-window:hover {
-  transform: perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(-4px);
-}
-
-/* Terminal Header */
-.terminal-header {
-  display: flex;
-  align-items: center;
-  padding: 12px 16px;
-  background: rgba(30, 41, 59, 0.8);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.terminal-buttons {
-  display: flex;
-  gap: 8px;
-}
-
-.terminal-buttons span {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-}
-
-.btn-close {
-  background: #ef4444;
-}
-.btn-minimize {
-  background: #eab308;
-}
-.btn-maximize {
-  background: #22c55e;
-}
-
-.terminal-title {
-  flex: 1;
-  text-align: center;
-  font-size: 12px;
-  font-family: ui-monospace, monospace;
-  color: #64748b;
-  margin-right: 52px;
-}
-
-/* Terminal Body */
-.terminal-body {
-  padding: 20px 24px;
-  font-family: ui-monospace, 'Fira Code', monospace;
-  font-size: 14px;
-  line-height: 2;
-}
-
-.code-line {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  opacity: 0;
-  animation: line-appear 0.5s ease forwards;
-}
-
-.line-1 {
-  animation-delay: 0.3s;
-}
-.line-2 {
-  animation-delay: 1s;
-}
-.line-3 {
-  animation-delay: 1.8s;
-}
-.line-4 {
-  animation-delay: 2.5s;
-}
-
-@keyframes line-appear {
-  from {
-    opacity: 0;
-    transform: translateY(5px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.code-prompt {
-  color: #22c55e;
-  font-weight: bold;
-}
-.code-cmd {
-  color: #38bdf8;
-}
-.code-flag {
-  color: #a78bfa;
-}
-.code-url {
-  color: #14b8a6;
-}
-.code-comment {
-  color: #64748b;
-  font-style: italic;
-}
-.code-success {
-  color: #22c55e;
-  background: rgba(34, 197, 94, 0.15);
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-weight: 600;
-}
-.code-response {
-  color: #fbbf24;
-}
-
-/* Blinking Cursor */
-.cursor {
-  display: inline-block;
-  width: 8px;
-  height: 16px;
-  background: #22c55e;
-  animation: blink 1s step-end infinite;
-}
-
-@keyframes blink {
-  0%,
-  50% {
-    opacity: 1;
-  }
-  51%,
-  100% {
-    opacity: 0;
-  }
-}
-
-/* Dark mode adjustments */
-:deep(.dark) .terminal-window {
-  box-shadow:
-    0 25px 50px -12px rgba(0, 0, 0, 0.6),
-    0 0 0 1px rgba(20, 184, 166, 0.2),
-    0 0 40px rgba(20, 184, 166, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-}
+.star-home__grid { position: absolute; inset: 0; z-index: -2; opacity: .62; background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 64px 64px; mask-image: linear-gradient(to bottom, #000 0%, #000 70%, transparent 100%); }
+.star-home__sunbeam { position: absolute; z-index: -1; top: -18rem; right: 5%; width: 68rem; height: 56rem; border-radius: 50%; background: conic-gradient(from 210deg, transparent, rgba(255,255,255,.88), transparent 32%); filter: blur(22px); opacity: .7; transform: rotate(-12deg); }
+.star-shell { width: min(1400px, calc(100% - 80px)); margin: 0 auto; }
+.star-header { padding: 26px 0 0; }
+.star-nav { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
+.star-nav__spacer { width: 180px; }
+.star-nav__actions { display: flex; align-items: center; gap: 9px; }
+.star-icon-button { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 50%; color: #526078; transition: .2s ease; }
+.star-icon-button:hover { color: #111a32; background: rgba(255,255,255,.72); box-shadow: 0 6px 20px rgba(54,76,124,.11); }
+.star-console-button { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 5px; border-radius: 999px; background: #11182b; color: white; font-size: 14px; font-weight: 650; box-shadow: 0 8px 22px rgba(19,28,52,.16); transition: transform .2s ease, box-shadow .2s ease; }
+.star-console-button:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(19,28,52,.25); }
+.star-console-button__avatar { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 50%; background: linear-gradient(135deg,#4076ff,#2457e7); font-size: 12px; }
+.star-main { padding: 44px 0 44px; }
+.star-hero { display: grid; grid-template-columns: .82fr 1.18fr; align-items: center; min-height: 420px; gap: 24px; }
+.star-hero__copy { position: relative; z-index: 2; padding-left: 8.2%; }
+.star-hero__eyebrow { margin: 0 0 11px; color: #3776f1; font-size: 11px; font-weight: 750; letter-spacing: .16em; }
+.star-hero h1 { margin: 0; color: #080d1d; font-size: clamp(72px, 8.2vw, 136px); line-height: .85; letter-spacing: -.085em; font-weight: 800; }
+.star-hero__subtitle { margin: 25px 0 29px; color: #151c30; font-size: clamp(20px, 1.75vw, 31px); letter-spacing: .03em; }
+.star-cta { display: inline-flex; align-items: center; gap: 15px; padding: 14px 27px; border-radius: 17px; color: white; font-size: 18px; font-weight: 650; background: linear-gradient(135deg,#4383ff,#2356e6); box-shadow: 0 13px 20px rgba(42, 102, 239, .27), inset 0 1px 1px rgba(255,255,255,.35); transition: transform .2s ease, box-shadow .2s ease; }
+.star-cta:hover { transform: translateY(-3px); box-shadow: 0 18px 28px rgba(42,102,239,.35), inset 0 1px 1px rgba(255,255,255,.35); }
+.star-tags { display: flex; flex-wrap: wrap; gap: 25px; margin-top: 48px; color: #343e55; font-size: 14px; font-weight: 600; }
+.star-tags span { display: inline-flex; align-items: center; gap: 8px; }
+.star-tags :deep(svg) { color: #4281f4; }
+.star-hero__visual { position: relative; min-height: 420px; }
+.star-orb { position: absolute; top: -34px; right: 11%; width: min(455px, 38vw); aspect-ratio: 1; overflow: hidden; border: 1px solid rgba(255,255,255,.9); border-radius: 50%; background: radial-gradient(circle at 35% 28%, #c8dcff 0 3%, #5386ed 23%, #17499f 48%, #0d2b6d 66%, #071633 100%); box-shadow: 0 0 0 9px rgba(168,196,255,.1), 0 0 35px rgba(105,150,255,.9), 0 0 110px rgba(100,143,255,.52), inset -30px -38px 60px #05122e, inset 20px 18px 48px rgba(255,255,255,.35); animation: orb-float 8s ease-in-out infinite; }
+.star-orb::before { content: ''; position: absolute; inset: 10%; border-radius: inherit; opacity: .7; background: repeating-radial-gradient(ellipse at center, transparent 0 9px, rgba(215,233,255,.2) 10px 11px, transparent 12px 22px); mix-blend-mode: screen; transform: rotate(-18deg); }
+.star-orb::after { content: ''; position: absolute; inset: -4%; border: 3px solid rgba(235,244,255,.85); border-left-color: transparent; border-bottom-color: rgba(100,151,255,.2); border-radius: 50%; filter: drop-shadow(0 0 8px white); animation: orbit-spin 9s linear infinite; }
+.star-orb__core { position: absolute; inset: 22%; border-radius: 50%; background: radial-gradient(circle, rgba(235,247,255,.95), rgba(125,172,255,.42) 20%, rgba(45,101,220,.08) 67%, transparent 70%); filter: blur(2px); animation: core-pulse 2.8s ease-in-out infinite; }
+.star-orb__ring { position: absolute; border: 1px solid rgba(225,239,255,.85); border-radius: 50%; filter: drop-shadow(0 0 8px #bad8ff); }
+.star-orb__ring--one { width: 124%; height: 31%; left: -12%; top: 36%; transform: rotate(-20deg); animation: ring-one 7s ease-in-out infinite; }
+.star-orb__ring--two { width: 105%; height: 22%; left: -2%; top: 44%; transform: rotate(18deg); opacity: .65; animation: ring-two 5s ease-in-out infinite reverse; }
+.star-orb__lightning { position: absolute; inset: 0; width: 100%; height: 100%; filter: drop-shadow(0 0 3px white) drop-shadow(0 0 10px #a7cbff); }
+.bolt { stroke: #f2f7ff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 760; stroke-dashoffset: 760; opacity: .8; animation: lightning 5.4s ease-in-out infinite; }
+.bolt--two { animation-delay: 1.2s; stroke-width: 1.6; }.bolt--three { animation-delay: 2.6s; stroke-width: 1.4; }.bolt--four { animation-delay: 3.8s; stroke-width: 1.8; }
+.star-terminal { position: absolute; z-index: 3; top: 100px; left: 7%; width: min(430px, 38vw); overflow: hidden; border: 1px solid rgba(255,255,255,.15); border-radius: 18px; background: linear-gradient(145deg,rgba(22,33,54,.96),rgba(7,16,30,.95)); box-shadow: 0 24px 45px rgba(31,57,110,.3), 0 0 0 1px rgba(10,26,54,.5), inset 0 1px 0 rgba(255,255,255,.12); transform: rotate(-.3deg); backdrop-filter: blur(12px); animation: terminal-float 7s ease-in-out infinite; }
+.star-terminal__header { display: flex; align-items: center; gap: 8px; padding: 14px 17px; background: rgba(33,47,73,.7); border-bottom: 1px solid rgba(255,255,255,.05); }
+.terminal-dot { width: 12px; height: 12px; border-radius: 50%; }.terminal-dot--red{background:#ff5c55}.terminal-dot--yellow{background:#f9bd4e}.terminal-dot--green{background:#2dd46f}.star-terminal__title { flex: 1; margin-right: 46px; color: #8a94a8; font-family: ui-monospace, monospace; font-size: 12px; text-align: center; }
+.star-terminal__body { padding: 22px 27px 20px; color: #d5e1ff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: clamp(12px, 1.05vw, 15px); line-height: 1.95; }.star-terminal__body p{margin:0}.star-terminal__body b{color:#16c784}.star-terminal__body em{color:#1acac8;font-style:normal}.star-terminal__body i{color:#53b9f5;font-style:normal}.star-terminal__body strong{display:inline-block;padding:0 7px;border-radius:3px;background:rgba(39,196,113,.23);color:#3bea92}.star-terminal__body span{color:#f2c56c}.terminal-muted{color:#8997b0;font-style:italic}.terminal-cursor{display:inline-block;width:8px;height:16px;margin-left:4px;vertical-align:-2px;background:#1ed18a;animation: cursor-blink 1s step-end infinite;}
+.star-feature-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 24px; margin-top: 5px; }
+.star-feature-card { min-height: 185px; padding: 25px 28px; border: 1px solid rgba(151,171,219,.22); border-radius: 18px; background: rgba(255,255,255,.64); box-shadow: 0 14px 34px rgba(65,91,156,.07), inset 0 1px 0 rgba(255,255,255,.9); backdrop-filter: blur(10px); transition: transform .25s ease, box-shadow .25s ease; }.star-feature-card:hover{transform:translateY(-6px);box-shadow:0 23px 40px rgba(65,91,156,.16)}.star-feature-card h2{margin:13px 0 11px;font-size:22px;font-weight:750}.star-feature-card p{max-width:34rem;margin:0;color:var(--muted);font-size:14px;line-height:1.7}.star-feature-card__icon{display:grid;width:50px;height:50px;place-items:center;border-radius:14px;color:white;box-shadow:0 9px 16px rgba(41,83,190,.24)}.star-feature-card__icon svg{width:26px;height:26px}.star-feature-card__icon--blue{background:linear-gradient(135deg,#20a1f4,#326cf1)}.star-feature-card__icon--violet{background:linear-gradient(135deg,#6686ff,#4e62ec)}.star-feature-card__icon--purple{background:linear-gradient(135deg,#b855f6,#7129e7)}
+.star-providers { padding: 37px 0 26px; text-align: center; }.star-providers h2{margin:0;color:#080d1d;font-size:30px;font-weight:780}.star-providers>p{margin:7px 0 20px;color:#5c6680;font-size:14px}.star-provider-list{display:flex;flex-wrap:wrap;justify-content:center;gap:12px}.star-provider{display:flex;align-items:center;gap:9px;padding:10px 14px;border:1px solid rgba(151,171,219,.19);border-radius:11px;background:rgba(255,255,255,.62);box-shadow:0 7px 18px rgba(65,91,156,.06);font-size:14px;color:#27314a}.star-provider small{padding:2px 5px;border-radius:4px;background:#eef4ff;color:#3776e7;font-size:10px}.provider-mark{display:grid;width:27px;height:27px;place-items:center;border-radius:7px;color:white}.provider-mark--orange{background:#fa8b22}.provider-mark--green{background:#14a963}.provider-mark--blue{background:#2d87ea}.provider-mark--pink{background:#ea2461}.provider-mark--gray{background:#7b8497}.star-provider--muted{opacity:.67}.star-provider--muted small{background:#f0f1f5;color:#70798d}
+.star-footer { padding: 20px; color:#67718a; font-size:12px; text-align:center; }
+:global(.dark) .star-home { --ink:#edf3ff; --muted:#aebbd2; --line:rgba(133,158,210,.09); background:radial-gradient(circle at 70% 16%,rgba(67,105,209,.4),transparent 31%),linear-gradient(130deg,#080e1d,#10182d 48%,#182447); }:global(.dark) .star-hero h1,:global(.dark) .star-hero__subtitle,:global(.dark) .star-feature-card h2,:global(.dark) .star-providers h2{color:#f5f8ff}:global(.dark) .star-feature-card,:global(.dark) .star-provider{background:rgba(18,29,55,.69);border-color:rgba(153,178,237,.18)}:global(.dark) .star-tags,:global(.dark) .star-providers>p{color:#bfc9dc}
+@keyframes orb-float{50%{transform:translateY(-12px) scale(1.015)}}@keyframes orbit-spin{to{transform:rotate(360deg)}}@keyframes core-pulse{50%{transform:scale(1.15);opacity:.72}}@keyframes ring-one{50%{transform:rotate(-14deg) scale(1.04)}}@keyframes ring-two{50%{transform:rotate(26deg) scale(.95)}}@keyframes lightning{0%,100%{stroke-dashoffset:0;opacity:.62}18%,28%{stroke-dashoffset:0;opacity:1}32%{stroke-dashoffset:80;opacity:.72}45%{stroke-dashoffset:0;opacity:.58}}@keyframes terminal-float{50%{transform:translateY(-8px) rotate(.3deg)}}@keyframes cursor-blink{50%{opacity:0}}
+@media (max-width: 960px){.star-shell{width:min(100% - 40px,720px)}.star-nav__spacer{display:none}.star-nav{justify-content:flex-end}.star-hero{grid-template-columns:1fr;min-height:0;padding-top:35px}.star-hero__copy{padding-left:0;text-align:center}.star-tags{justify-content:center}.star-hero__visual{min-height:390px}.star-orb{right:50%;width:370px;transform:translateX(50%)}.star-terminal{left:50%;top:104px;width:min(430px,88vw);transform:translateX(-50%)}.star-feature-grid{grid-template-columns:1fr}.star-feature-card{min-height:0}.star-main{padding-top:16px}}@media (max-width:560px){.star-header{padding-top:12px}.star-shell{width:calc(100% - 28px)}.star-nav__actions{gap:2px}.star-console-button{padding-right:9px}.star-console-button span:not(.star-console-button__avatar){display:none}.star-hero h1{font-size:70px}.star-hero__subtitle{font-size:20px}.star-tags{gap:14px;font-size:12px}.star-hero__visual{min-height:315px}.star-orb{top:-16px;width:295px}.star-terminal{top:65px;border-radius:13px}.star-terminal__body{padding:15px 18px;font-size:11px}.star-terminal__header{padding:10px 12px}.terminal-dot{width:9px;height:9px}.star-provider-list{gap:8px}.star-provider{padding:8px 10px}.star-provider small{display:none}.star-feature-grid{gap:14px}.star-feature-card{padding:20px}.star-providers h2{font-size:26px}}
 </style>
