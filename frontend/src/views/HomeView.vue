@@ -200,7 +200,7 @@ function startTerminalTyping() {
     terminalResponse.value = terminalResponseText.slice(0, index)
     if (index < terminalResponseText.length) {
       index += 1
-      terminalTypingTimer = window.setTimeout(typeNext, index === 1 ? 480 : 58)
+      terminalTypingTimer = window.setTimeout(typeNext, index === 1 ? 480 : 500)
       return
     }
     terminalTypingTimer = window.setTimeout(() => {
