@@ -27,6 +27,22 @@ The default application image is:
 ghcr.io/roby-uo/star-x:latest
 ```
 
+### Build from source instead
+
+If you cloned the repository and prefer to build the exact checked-out source
+on that machine, use the source-build Compose override:
+
+```bash
+git clone https://github.com/roby-uo/star-x.git
+cd star-x/deploy
+cp .env.example .env
+# Edit .env and set the required secrets before the first start.
+docker compose -f docker-compose.yml -f docker-compose.source.yml up -d --build
+```
+
+This creates `local/star-x:source` locally and uses the same PostgreSQL and
+Redis services as the published-image deployment.
+
 Data is stored in named Docker volumes (`star_x_data`, `postgres_data`, and `redis_data`). Updating the application image does not remove those volumes. For an existing deployment, back up PostgreSQL before changing configuration or upgrading.
 
 ## First-use chain

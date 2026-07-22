@@ -1,0 +1,14 @@
+# Source-build override for developers and offline/self-managed deployments.
+#
+# From this directory:
+#   docker compose -f docker-compose.yml -f docker-compose.source.yml up -d --build
+#
+# It keeps the same PostgreSQL and Redis services as the normal deployment, but
+# builds the application image from the cloned star-X repository instead of
+# pulling ghcr.io/roby-uo/star-x:latest.
+services:
+  star-x:
+    image: local/star-x:source
+    build:
+      context: ..
+      dockerfile: Dockerfile
