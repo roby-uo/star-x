@@ -98,7 +98,7 @@
             <div class="star-terminal__body">
               <p><b>$</b> <em>curl</em> -X POST <i>/v1/messages</i></p>
               <p class="terminal-muted"># Routing to upstream...</p>
-              <p><strong>200 OK</strong> <span>{ "content": "Hello!" }</span></p>
+              <p><strong>200 OK</strong> <span class="terminal-response">{{ terminalResponse }}</span><span class="terminal-response__cursor" aria-hidden="true"></span></p>
               <p><b>$</b> <span class="terminal-cursor"></span></p>
             </div>
           </div>
@@ -145,7 +145,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore, useAppStore } from '@/stores'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
@@ -171,6 +171,9 @@ const isAdmin = computed(() => authStore.isAdmin)
 const dashboardPath = computed(() => (isAdmin.value ? '/admin/dashboard' : '/dashboard'))
 const userInitial = computed(() => authStore.user?.email?.charAt(0).toUpperCase() || 'A')
 const currentYear = computed(() => new Date().getFullYear())
+const terminalResponse = ref('')
+const terminalResponseText = '{ "content": "Hello!" }'
+let terminalTypingTimer: number | undefined
 
 function toggleTheme() {
   isDark.value = !isDark.value
@@ -186,10 +189,38 @@ function initTheme() {
   }
 }
 
+function startTerminalTyping() {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    terminalResponse.value = terminalResponseText
+    return
+  }
+
+  let index = 0
+  const typeNext = () => {
+    terminalResponse.value = terminalResponseText.slice(0, index)
+    if (index < terminalResponseText.length) {
+      index += 1
+      terminalTypingTimer = window.setTimeout(typeNext, index === 1 ? 480 : 58)
+      return
+    }
+    terminalTypingTimer = window.setTimeout(() => {
+      index = 0
+      terminalResponse.value = ''
+      typeNext()
+    }, 2400)
+  }
+  typeNext()
+}
+
 onMounted(() => {
   initTheme()
   authStore.checkAuth()
   if (!appStore.publicSettingsLoaded) appStore.fetchPublicSettings()
+  startTerminalTyping()
+})
+
+onBeforeUnmount(() => {
+  if (terminalTypingTimer) window.clearTimeout(terminalTypingTimer)
 })
 </script>
 
@@ -240,13 +271,13 @@ onMounted(() => {
 .star-terminal { position: absolute; z-index: 3; top: 100px; left: 7%; width: min(430px, 38vw); overflow: hidden; border: 1px solid rgba(255,255,255,.15); border-radius: 18px; background: linear-gradient(145deg,rgba(22,33,54,.96),rgba(7,16,30,.95)); box-shadow: 0 24px 45px rgba(31,57,110,.3), 0 0 0 1px rgba(10,26,54,.5), inset 0 1px 0 rgba(255,255,255,.12); transform: rotate(-.3deg); animation: terminal-float 7s ease-in-out infinite; }
 .star-terminal__header { display: flex; align-items: center; gap: 8px; padding: 14px 17px; background: rgba(33,47,73,.7); border-bottom: 1px solid rgba(255,255,255,.05); }
 .terminal-dot { width: 12px; height: 12px; border-radius: 50%; }.terminal-dot--red{background:#ff5c55}.terminal-dot--yellow{background:#f9bd4e}.terminal-dot--green{background:#2dd46f}.star-terminal__title { flex: 1; margin-right: 46px; color: #8a94a8; font-family: ui-monospace, monospace; font-size: 12px; text-align: center; }
-.star-terminal__body { padding: 22px 27px 20px; color: #d5e1ff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: clamp(12px, 1.05vw, 15px); line-height: 1.95; }.star-terminal__body p{margin:0}.star-terminal__body b{color:#16c784}.star-terminal__body em{color:#1acac8;font-style:normal}.star-terminal__body i{color:#53b9f5;font-style:normal}.star-terminal__body strong{display:inline-block;padding:0 7px;border-radius:3px;background:rgba(39,196,113,.23);color:#3bea92}.star-terminal__body span{color:#f2c56c}.terminal-muted{color:#8997b0;font-style:italic}.terminal-cursor{display:inline-block;width:8px;height:16px;margin-left:4px;vertical-align:-2px;background:#1ed18a;animation: cursor-blink 1s step-end infinite;}
+.star-terminal__body { padding: 22px 27px 20px; color: #d5e1ff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: clamp(12px, 1.05vw, 15px); line-height: 1.95; }.star-terminal__body p{margin:0}.star-terminal__body b{color:#16c784}.star-terminal__body em{color:#1acac8;font-style:normal}.star-terminal__body i{color:#53b9f5;font-style:normal}.star-terminal__body strong{display:inline-block;padding:0 7px;border-radius:3px;background:rgba(39,196,113,.23);color:#3bea92}.star-terminal__body span{color:#f2c56c}.terminal-response__cursor{display:inline-block;width:2px;height:1.08em;margin-left:3px;vertical-align:-2px;background:#f2c56c;animation:cursor-blink 1s step-end infinite}.terminal-muted{color:#8997b0;font-style:italic}.terminal-cursor{display:inline-block;width:8px;height:16px;margin-left:4px;vertical-align:-2px;background:#1ed18a;animation: cursor-blink 1s step-end infinite;}
 .star-feature-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 24px; margin-top: 5px; }
 .star-feature-card { min-height: 185px; padding: 25px 28px; border: 1px solid rgba(151,171,219,.22); border-radius: 18px; background: rgba(255,255,255,.64); box-shadow: 0 14px 34px rgba(65,91,156,.07), inset 0 1px 0 rgba(255,255,255,.9); backdrop-filter: blur(10px); transition: transform .25s ease, box-shadow .25s ease; }.star-feature-card:hover{transform:translateY(-6px);box-shadow:0 23px 40px rgba(65,91,156,.16)}.star-feature-card h2{margin:13px 0 11px;font-size:22px;font-weight:750}.star-feature-card p{max-width:34rem;margin:0;color:var(--muted);font-size:14px;line-height:1.7}.star-feature-card__icon{display:grid;width:50px;height:50px;place-items:center;border-radius:14px;color:white;box-shadow:0 9px 16px rgba(41,83,190,.24)}.star-feature-card__icon svg{width:26px;height:26px}.star-feature-card__icon--blue{background:linear-gradient(135deg,#20a1f4,#326cf1)}.star-feature-card__icon--violet{background:linear-gradient(135deg,#6686ff,#4e62ec)}.star-feature-card__icon--purple{background:linear-gradient(135deg,#b855f6,#7129e7)}
 .star-providers { padding: 37px 0 26px; text-align: center; }.star-providers h2{margin:0;color:#080d1d;font-size:30px;font-weight:780}.star-providers>p{margin:7px 0 20px;color:#5c6680;font-size:14px}.star-provider-list{display:flex;flex-wrap:wrap;justify-content:center;gap:12px}.star-provider{display:flex;align-items:center;gap:9px;padding:10px 14px;border:1px solid rgba(151,171,219,.19);border-radius:11px;background:rgba(255,255,255,.62);box-shadow:0 7px 18px rgba(65,91,156,.06);font-size:14px;color:#27314a}.star-provider small{padding:2px 5px;border-radius:4px;background:#eef4ff;color:#3776e7;font-size:10px}.provider-mark{display:grid;width:27px;height:27px;place-items:center;border-radius:7px;color:white}.provider-mark--orange{background:#fa8b22}.provider-mark--green{background:#14a963}.provider-mark--blue{background:#2d87ea}.provider-mark--pink{background:#ea2461}.provider-mark--gray{background:#7b8497}.star-provider--muted{opacity:.67}.star-provider--muted small{background:#f0f1f5;color:#70798d}
 .star-footer { padding: 20px; color:#67718a; font-size:12px; text-align:center; }
 :global(.dark) .star-home { --ink:#edf3ff; --muted:#aebbd2; --line:rgba(133,158,210,.09); background:radial-gradient(circle at 70% 16%,rgba(67,105,209,.4),transparent 31%),linear-gradient(130deg,#080e1d,#10182d 48%,#182447); }:global(.dark) .star-hero h1,:global(.dark) .star-hero__subtitle,:global(.dark) .star-feature-card h2,:global(.dark) .star-providers h2{color:#f5f8ff}:global(.dark) .star-feature-card,:global(.dark) .star-provider{background:rgba(18,29,55,.69);border-color:rgba(153,178,237,.18)}:global(.dark) .star-tags,:global(.dark) .star-providers>p{color:#bfc9dc}
 @keyframes orb-float{50%{translate:0 -12px;scale:1.015}}@keyframes orb-electricity{0%,100%{filter:brightness(1) saturate(1)}22%{filter:brightness(1.12) saturate(1.13)}25%{filter:brightness(.98) saturate(.96)}58%{filter:brightness(1.08) saturate(1.08)}}@keyframes orb-pulse{0%,100%{transform:scale(.96);opacity:.1}45%{transform:scale(1.035);opacity:.33}64%{transform:scale(1);opacity:.17}}@keyframes orb-scan{0%{transform:translate(-36%,-22%) rotate(14deg);opacity:0}12%{opacity:.24}48%{opacity:.28}76%{opacity:.08}100%{transform:translate(36%,22%) rotate(14deg);opacity:0}}@keyframes orbit-spin{to{transform:rotate(360deg)}}@keyframes core-pulse{50%{transform:scale(1.15);opacity:.72}}@keyframes ring-one{50%{transform:rotate(-14deg) scale(1.04)}}@keyframes ring-two{50%{transform:rotate(26deg) scale(.95)}}@keyframes lightning{0%,100%{stroke-dashoffset:0;opacity:.62}18%,28%{stroke-dashoffset:0;opacity:1}32%{stroke-dashoffset:80;opacity:.72}45%{stroke-dashoffset:0;opacity:.58}}@keyframes terminal-float{50%{transform:translateY(-8px) rotate(.3deg)}}@keyframes cursor-blink{50%{opacity:0}}
-@media (prefers-reduced-motion: reduce){.star-orb,.star-orb__art,.star-orb__pulse,.star-orb__scan,.star-terminal,.terminal-cursor{animation:none}}
+@media (prefers-reduced-motion: reduce){.star-orb,.star-orb__art,.star-orb__pulse,.star-orb__scan,.star-terminal,.terminal-cursor,.terminal-response__cursor{animation:none}}
 @media (max-width: 960px){.star-shell{width:min(100% - 40px,720px)}.star-nav__spacer{display:none}.star-nav{justify-content:flex-end}.star-hero{grid-template-columns:1fr;min-height:0;padding-top:35px}.star-hero__copy{padding-left:0;text-align:center}.star-tags{justify-content:center}.star-hero__visual{min-height:590px;margin-top:4px}.star-orb{top:-12px;right:50%;width:min(370px,76vw);transform:translateX(50%)}.star-terminal{top:248px;left:50%;width:min(430px,calc(100vw - 48px));transform:translateX(-50%);animation:none}.star-feature-grid{grid-template-columns:1fr}.star-feature-card{min-height:0}.star-main{padding-top:16px}}@media (max-width:560px){.star-header{padding-top:12px}.star-shell{width:calc(100% - 28px)}.star-nav__actions{gap:2px}.star-console-button{padding-right:9px}.star-console-button span:not(.star-console-button__avatar){display:none}.star-hero h1{font-size:70px}.star-hero__subtitle{font-size:20px}.star-tags{gap:14px;font-size:12px}.star-hero__visual{min-height:510px;margin-top:0}.star-orb{top:-4px;width:min(295px,76vw)}.star-terminal{top:185px;width:calc(100vw - 40px);border-radius:13px}.star-terminal__body{padding:15px 18px;font-size:11px}.star-terminal__header{padding:10px 12px}.terminal-dot{width:9px;height:9px}.star-provider-list{gap:8px}.star-provider{padding:8px 10px}.star-provider small{display:none}.star-feature-grid{gap:14px}.star-feature-card{padding:20px}.star-providers h2{font-size:26px}}
 </style>
