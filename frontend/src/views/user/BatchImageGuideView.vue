@@ -810,7 +810,7 @@ type PreviewCacheRecord = {
 type PreviewImageSource = ImageBitmap | HTMLImageElement
 
 const TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled', 'output_deleted'])
-const PREVIEW_CACHE_DB_NAME = 'sub2api-batch-image-preview-cache'
+const PREVIEW_CACHE_DB_NAME = 'star-x-batch-image-preview-cache'
 const PREVIEW_CACHE_STORE_NAME = 'thumbnails'
 const PREVIEW_THUMBNAIL_MAX_EDGE = 360
 const PREVIEW_THUMBNAIL_QUALITY = 0.72
@@ -1019,7 +1019,7 @@ const endpointBase = computed(() => {
   const configured = appStore.apiBaseUrl?.trim()
   if (configured) return configured.replace(/\/+$/, '')
   if (typeof window !== 'undefined') return window.location.origin.replace(/\/+$/, '')
-  return '<你的 Sub2API API 端点>'
+  return '<你的 star-X API 端点>'
 })
 
 const selectedModelReferenceLimit = computed(() => referenceImageLimitForModel(form.model))
@@ -1054,7 +1054,7 @@ function referenceImageLimitForModel(model: string) {
 }
 
 const agentInstruction = computed(() => `---
-name: sub2api-batch-image
+name: star-x-batch-image
 description: 当用户希望用 Gemini/Vertex 批量生成图片、批量跑提示词、下载批量生图结果、重试失败图片时使用。
 ---
 
