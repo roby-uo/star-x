@@ -1,6 +1,6 @@
 # Apple container Deployment
 
-Sub2API can run as a native three-service stack with Apple's `container` CLI. This workflow runs the published Sub2API, PostgreSQL, and Redis OCI images without Docker Desktop or a Docker-compatible daemon.
+star-X can run as a native three-service stack with Apple's `container` CLI. This workflow runs the published star-X, PostgreSQL, and Redis OCI images without Docker Desktop or a Docker-compatible daemon.
 
 ## Support Level
 
@@ -25,8 +25,8 @@ container --version
 ## Quick Start
 
 ```bash
-git clone https://github.com/Wei-Shaw/sub2api.git
-cd sub2api/deploy
+git clone https://github.com/roby-uo/star-x.git
+cd star-x/deploy
 
 # Creates .env with random PostgreSQL, JWT, and TOTP secrets.
 ./apple-container.sh init
@@ -34,7 +34,7 @@ cd sub2api/deploy
 # Review optional settings before startup.
 nano .env
 
-# Creates volumes/network/containers, waits for dependencies, and starts Sub2API.
+# Creates volumes/network/containers, waits for dependencies, and starts star-X.
 ./apple-container.sh up
 
 # Verifies PostgreSQL, Redis, and the application endpoint.
@@ -61,7 +61,7 @@ The env file uses literal `KEY=value` syntax. Do not use Compose expressions suc
 # Stop containers while preserving all resources and data.
 ./apple-container.sh down
 
-# Restart PostgreSQL, Redis, and Sub2API in dependency order.
+# Restart PostgreSQL, Redis, and star-X in dependency order.
 ./apple-container.sh restart
 
 # Show resource state and run live health probes.
@@ -89,10 +89,10 @@ After a host reboot or `container system stop`, run `./apple-container.sh up` ag
 
 ## Configuration
 
-The script uses `deploy/.env`, the same source file used by Docker Compose. Export `SUB2API_ENV_FILE` to use another file for every command in the current shell:
+The script uses `deploy/.env`, the same source file used by Docker Compose. Export `STARX_ENV_FILE` to use another file for every command in the current shell:
 
 ```bash
-export SUB2API_ENV_FILE=/absolute/path/to/sub2api.env
+export STARX_ENV_FILE=/absolute/path/to/star-x.env
 ./apple-container.sh init
 ./apple-container.sh up
 ```
@@ -100,7 +100,7 @@ export SUB2API_ENV_FILE=/absolute/path/to/sub2api.env
 Apple-specific image overrides are available:
 
 ```dotenv
-APPLE_CONTAINER_SUB2API_IMAGE=weishaw/sub2api:latest
+APPLE_CONTAINER_SUB2API_IMAGE=ghcr.io/roby-uo/star-x:latest
 APPLE_CONTAINER_POSTGRES_IMAGE=postgres:18-alpine
 APPLE_CONTAINER_REDIS_IMAGE=redis:8-alpine
 ```
@@ -113,10 +113,10 @@ Apple-specific handling of shared settings:
 
 | Setting | Apple workflow behavior |
 |---|---|
-| Application and gateway variables | Passed to Sub2API from `.env` |
+| Application and gateway variables | Passed to star-X from `.env` |
 | `BIND_HOST`, `SERVER_PORT` | Used for the macOS published port |
 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | PostgreSQL first initialization only |
-| `REDIS_PASSWORD` | Applied to Redis and Sub2API |
+| `REDIS_PASSWORD` | Applied to Redis and star-X |
 | `DATABASE_PORT`, `REDIS_PORT` | Internal ports are fixed to 5432 and 6379 |
 | `POSTGRES_MAX_*`, `REDIS_MAXCLIENTS` | Not currently applied to the database/cache server |
 
