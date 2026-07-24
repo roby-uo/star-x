@@ -8393,7 +8393,7 @@ const form = reactive<SettingsForm>({
   default_user_rpm_limit: 0,
   site_name: "star-X",
   site_logo: "",
-  site_subtitle: "Subscription to API Conversion Platform",
+  site_subtitle: "你的私人 AI API 网关",
   api_base_url: "",
   contact_info: "",
   doc_url: "",
