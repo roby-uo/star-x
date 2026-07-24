@@ -343,7 +343,7 @@ const baseSettingsResponse = {
   default_balance: 0,
   default_concurrency: 1,
   default_subscriptions: [],
-  site_name: "Sub2API",
+  site_name: "star-X",
   site_logo: "",
   site_subtitle: "",
   api_base_url: "",
@@ -712,7 +712,7 @@ describe("admin SettingsView payment visible method controls", () => {
     );
   });
 
-  it("links payment guidance to README sections instead of removed payment docs", async () => {
+  it("links payment guidance to the branded help page", async () => {
     const wrapper = mountView();
 
     await flushPromises();
@@ -725,14 +725,10 @@ describe("admin SettingsView payment visible method controls", () => {
       );
 
     expect(paymentLinks).toHaveLength(2);
-    expect(paymentLinks[0]?.attributes("href")).toBe(
-      "https://github.com/Wei-Shaw/sub2api/blob/main/docs/PAYMENT_CN.md",
-    );
-    expect(paymentLinks[1]?.attributes("href")).toBe(
-      "https://github.com/Wei-Shaw/sub2api/blob/main/docs/PAYMENT_CN.md#支持的支付方式",
-    );
+    expect(paymentLinks[0]?.attributes("href")).toBe("/star-x-help/payment.zh.html");
+    expect(paymentLinks[1]?.attributes("href")).toBe("/star-x-help/payment.zh.html");
     for (const link of paymentLinks) {
-      expect(link.attributes("href")).toContain("docs/PAYMENT");
+      expect(link.attributes("href")).toContain("/star-x-help/payment");
     }
   });
 
