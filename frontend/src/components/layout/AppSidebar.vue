@@ -11,10 +11,11 @@
       <!-- Custom Logo or Default Logo -->
       <router-link
         :to="homePath"
-        class="sidebar-logo flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl shadow-glow transition-opacity hover:opacity-80"
+        class="sidebar-logo flex h-10 items-center justify-center overflow-hidden transition-opacity hover:opacity-80"
+        :class="sidebarCollapsed ? 'sidebar-logo-collapsed w-9 rounded-xl shadow-glow' : 'sidebar-logo-expanded w-20 rounded-lg'"
         @click="handleMenuItemClick(homePath)"
       >
-        <img v-if="settingsLoaded" :src="siteLogo || '/logo.png'" alt="Logo" class="h-full w-full object-contain" />
+        <img v-if="settingsLoaded" :src="siteLogo || '/starx-logo-transparent.png'" alt="star-X" class="h-full w-full object-cover" />
       </router-link>
       <div class="sidebar-brand" :class="{ 'sidebar-brand-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
         <router-link
@@ -957,8 +958,17 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .sidebar-logo {
-  flex: 0 0 2.25rem;
+  flex: 0 0 auto;
+}
+
+.sidebar-logo-collapsed {
+  flex-basis: 2.25rem;
   min-width: 2.25rem;
+}
+
+.sidebar-logo-expanded {
+  flex-basis: 5rem;
+  min-width: 5rem;
 }
 
 .sidebar-header-collapsed {
