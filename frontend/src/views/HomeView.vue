@@ -32,7 +32,7 @@
     <main id="top">
       <section class="hero section-shell">
         <div class="hero-copy">
-          <div class="eyebrow"><span></span> 从来 AI 基础设施</div>
+          <div class="eyebrow"><span></span> 未来 AI 基础设施</div>
           <div class="hero-wordmark" role="img" aria-label="star-X"><span>star-</span><b>X</b></div>
           <h2>你的私人 <strong>AI API</strong> 网关</h2>
           <p>通过统一、标准的接口协议接入海量模型。<br />承载 AI 应用，高效管理数字资产，连接未来。</p>
