@@ -155,7 +155,10 @@ export default {
         codexCli: 'Codex CLI',
         codexCliWs: 'Codex CLI (WebSocket)',
         grokCli: 'Grok CLI',
-        opencode: 'OpenCode'
+        opencode: 'OpenCode',
+        hermes: 'Hermes',
+        codebuddy: 'CodeBuddy',
+        traeIde: 'TRAE IDE'
       },
       antigravity: {
         description: '为 Antigravity 分组配置 API 访问。请根据您使用的客户端选择对应的配置方式。',
@@ -188,6 +191,28 @@ export default {
         title: 'OpenCode 配置示例',
         subtitle: 'opencode.json',
         hint: '配置文件路径：~/.config/opencode/opencode.json（或 opencode.jsonc），不存在需手动创建。可使用默认 provider（openai/anthropic/google）或自定义 provider_id。API Key 支持直接配置或通过客户端 /connect 命令配置。示例仅供参考，模型与选项可按需调整。'
+      },
+      hermes: {
+        description: '配置 Hermes 的 custom Provider，通过 star-X 的 OpenAI 兼容接口调用模型。',
+        hint: '用户级配置。若文件已有其他设置，请合并 model 区块，不要覆盖整个文件。',
+        note: '保存后运行 hermes doctor 检查配置，再启动 hermes。此文件包含 API 密钥，请勿提交到代码仓库。'
+      },
+      codebuddy: {
+        description: '向 CodeBuddy 添加一个 star-X 自定义模型。',
+        hint: '用户级配置。若已有 models.json，请把此模型合并进 models 数组，不要覆盖其他模型。',
+        note: 'CodeBuddy 会热重载此文件。自定义模型使用 OpenAI Chat Completions 接口。'
+      },
+      'trae-ide': {
+        description: '在 TraeCode IDE 的模型管理中添加 star-X 自定义模型。',
+        path: '设置 → 模型 → 添加模型 → 自定义配置',
+        apiFormat: 'API 格式',
+        fullUrl: '完整 URL',
+        modelId: '模型 ID',
+        apiKey: 'API 密钥',
+        multimodal: '多模态',
+        enabled: '开启',
+        hint: '在 TraeCode 中打开“完整 URL”，然后逐项填写以下内容。',
+        note: '保存时 TraeCode 会自动验证连接。若验证失败，请确认当前分组支持该模型的 Chat Completions 请求。'
       }
     },
     customKeyLabel: '自定义密钥',

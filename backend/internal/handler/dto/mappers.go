@@ -204,11 +204,31 @@ func groupFromServiceBase(g *service.Group) Group {
 		FallbackGroupID:                 g.FallbackGroupID,
 		FallbackGroupIDOnInvalidRequest: g.FallbackGroupIDOnInvalidRequest,
 		AllowMessagesDispatch:           g.AllowMessagesDispatch,
+		SupportedAgentClients:           supportedAgentClients(g.Platform, g.AllowMessagesDispatch),
 		RequireOAuthOnly:                g.RequireOAuthOnly,
 		RequirePrivacySet:               g.RequirePrivacySet,
 		RPMLimit:                        g.RPMLimit,
 		CreatedAt:                       g.CreatedAt,
 		UpdatedAt:                       g.UpdatedAt,
+	}
+}
+
+func supportedAgentClients(platform string, allowMessagesDispatch bool) []string {
+	switch platform {
+	case "openai":
+		clients := []string{"codex", "codex-ws"}
+		if allowMessagesDispatch {
+			clients = append(clients, "claude")
+		}
+		return append(clients, "opencode", "hermes", "codebuddy", "trae-ide")
+	case "gemini":
+		return []string{"gemini", "opencode"}
+	case "antigravity":
+		return []string{"claude", "gemini", "opencode"}
+	case "grok":
+		return []string{"grok", "claude", "codex", "opencode"}
+	default:
+		return []string{"claude", "opencode"}
 	}
 }
 

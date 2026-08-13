@@ -544,6 +544,8 @@ export interface Group {
   fallback_group_id_on_invalid_request: number | null
   // OpenAI Messages 调度开关（用户侧需要此字段判断是否展示 Claude Code 教程）
   allow_messages_dispatch?: boolean
+  // 后端按分组能力计算的客户端配置清单
+  supported_agent_clients?: AgentClientId[]
   default_mapped_model?: string
   messages_dispatch_model_config?: OpenAIMessagesDispatchModelConfig
   require_oauth_only: boolean
@@ -551,6 +553,17 @@ export interface Group {
   created_at: string
   updated_at: string
 }
+
+export type AgentClientId =
+  | 'codex'
+  | 'codex-ws'
+  | 'claude'
+  | 'opencode'
+  | 'gemini'
+  | 'grok'
+  | 'hermes'
+  | 'codebuddy'
+  | 'trae-ide'
 
 export interface AdminGroup extends Group {
   // 模型路由配置（仅管理员可见，内部信息）

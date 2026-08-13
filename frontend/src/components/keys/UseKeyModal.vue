@@ -201,7 +201,7 @@ import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useClipboard } from '@/composables/useClipboard'
-import type { GroupPlatform } from '@/types'
+import type { AgentClientId, GroupPlatform } from '@/types'
 
 interface Props {
   show: boolean
@@ -209,6 +209,7 @@ interface Props {
   baseUrl: string
   platform: GroupPlatform | null
   allowMessagesDispatch?: boolean
+  supportedAgentClients?: AgentClientId[]
 }
 
 interface Emits {
@@ -340,15 +341,28 @@ const clientTabs = computed((): TabConfig[] => {
   if (!props.platform) return []
   switch (props.platform) {
     case 'openai': {
+      const fallbackClients: AgentClientId[] = [
+        'codex',
+        'codex-ws',
+        ...(props.allowMessagesDispatch ? ['claude' as const] : []),
+        'opencode',
+        'hermes',
+        'codebuddy',
+        'trae-ide'
+      ]
+      const supported = new Set(props.supportedAgentClients?.length
+        ? props.supportedAgentClients
+        : fallbackClients)
       const tabs: TabConfig[] = [
         { id: 'codex', label: t('keys.useKeyModal.cliTabs.codexCli'), icon: TerminalIcon },
         { id: 'codex-ws', label: t('keys.useKeyModal.cliTabs.codexCliWs'), icon: TerminalIcon },
+        { id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon },
+        { id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon },
+        { id: 'hermes', label: t('keys.useKeyModal.cliTabs.hermes'), icon: TerminalIcon },
+        { id: 'codebuddy', label: t('keys.useKeyModal.cliTabs.codebuddy'), icon: TerminalIcon },
+        { id: 'trae-ide', label: t('keys.useKeyModal.cliTabs.traeIde'), icon: TerminalIcon }
       ]
-      if (props.allowMessagesDispatch) {
-        tabs.push({ id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon })
-      }
-      tabs.push({ id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon })
-      return tabs
+      return tabs.filter((tab) => supported.has(tab.id as AgentClientId))
     }
     case 'gemini':
       return [
@@ -389,7 +403,8 @@ const openaiTabs: TabConfig[] = [
   { id: 'windows', label: 'Windows', icon: WindowsIcon }
 ]
 
-const showShellTabs = computed(() => activeClientTab.value !== 'opencode')
+const clientsWithoutShellTabs = new Set(['opencode', 'hermes', 'codebuddy', 'trae-ide'])
+const showShellTabs = computed(() => !clientsWithoutShellTabs.has(activeClientTab.value))
 
 const showCodexAuthMode = computed(() =>
   props.platform === 'openai' &&
@@ -409,6 +424,9 @@ const platformDescription = computed(() => {
     case 'openai':
       if (activeClientTab.value === 'claude') {
         return t('keys.useKeyModal.description')
+      }
+      if (['hermes', 'codebuddy', 'trae-ide'].includes(activeClientTab.value)) {
+        return t(`keys.useKeyModal.${activeClientTab.value}.description`)
       }
       return t('keys.useKeyModal.openai.description')
     case 'gemini':
@@ -433,6 +451,9 @@ const platformNote = computed(() => {
     case 'openai':
       if (activeClientTab.value === 'claude') {
         return t('keys.useKeyModal.note')
+      }
+      if (['hermes', 'codebuddy', 'trae-ide'].includes(activeClientTab.value)) {
+        return t(`keys.useKeyModal.${activeClientTab.value}.note`)
       }
       return activeTab.value === 'windows'
         ? t('keys.useKeyModal.openai.noteWindows')
@@ -519,6 +540,18 @@ const currentFiles = computed((): FileConfig[] => {
     }
   }
 
+  if (props.platform === 'openai') {
+    if (activeClientTab.value === 'hermes') {
+      return [generateHermesConfig(apiBase, apiKey)]
+    }
+    if (activeClientTab.value === 'codebuddy') {
+      return [generateCodeBuddyConfig(apiBase, apiKey)]
+    }
+    if (activeClientTab.value === 'trae-ide') {
+      return [generateTraeIdeConfig(apiBase, apiKey)]
+    }
+  }
+
   switch (props.platform) {
     case 'openai':
       if (activeClientTab.value === 'claude') {
@@ -601,6 +634,63 @@ $env:CLAUDE_CODE_ATTRIBUTION_HEADER=0`
       hint: t('keys.useKeyModal.claudeSettingsHint')
     }
   ]
+}
+
+const OPENAI_COMPATIBLE_AGENT_MODEL = 'gpt-5.5'
+
+function generateHermesConfig(baseUrl: string, apiKey: string): FileConfig {
+  const content = `model:
+  provider: custom
+  default: ${OPENAI_COMPATIBLE_AGENT_MODEL}
+  base_url: ${JSON.stringify(baseUrl)}
+  api_key: ${JSON.stringify(apiKey)}`
+
+  return {
+    path: '~/.hermes/config.yaml',
+    content,
+    hint: t('keys.useKeyModal.hermes.hint')
+  }
+}
+
+function generateCodeBuddyConfig(baseUrl: string, apiKey: string): FileConfig {
+  const endpoint = `${baseUrl.replace(/\/+$/, '')}/chat/completions`
+  const content = JSON.stringify({
+    models: [{
+      id: 'star-x-gpt-5.5',
+      name: 'star-X GPT-5.5',
+      vendor: 'star-X',
+      apiKey,
+      maxInputTokens: 400000,
+      maxOutputTokens: 128000,
+      url: endpoint,
+      supportsToolCall: true,
+      supportsImages: true,
+      supportsReasoning: true
+    }]
+  }, null, 2)
+
+  return {
+    path: '~/.codebuddy/models.json',
+    content,
+    hint: t('keys.useKeyModal.codebuddy.hint')
+  }
+}
+
+function generateTraeIdeConfig(baseUrl: string, apiKey: string): FileConfig {
+  const endpoint = `${baseUrl.replace(/\/+$/, '')}/chat/completions`
+  const content = [
+    `${t('keys.useKeyModal.trae-ide.apiFormat')}: OpenAI`,
+    `${t('keys.useKeyModal.trae-ide.fullUrl')}: ${endpoint}`,
+    `${t('keys.useKeyModal.trae-ide.modelId')}: ${OPENAI_COMPATIBLE_AGENT_MODEL}`,
+    `${t('keys.useKeyModal.trae-ide.apiKey')}: ${apiKey}`,
+    `${t('keys.useKeyModal.trae-ide.multimodal')}: ${t('keys.useKeyModal.trae-ide.enabled')}`
+  ].join('\n')
+
+  return {
+    path: t('keys.useKeyModal.trae-ide.path'),
+    content,
+    hint: t('keys.useKeyModal.trae-ide.hint')
+  }
 }
 
 function generateGrokClaudeFiles(baseUrl: string, apiKey: string): FileConfig[] {

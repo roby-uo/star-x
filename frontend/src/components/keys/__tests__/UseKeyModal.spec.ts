@@ -271,6 +271,94 @@ describe('UseKeyModal', () => {
     expect(wrapper.find('[data-testid="codex-api-key-restart-notice"]').exists()).toBe(false)
   })
 
+  it('renders Hermes, CodeBuddy, and TRAE IDE setup for OpenAI groups', async () => {
+    const wrapper = mount(UseKeyModal, {
+      props: {
+        show: true,
+        apiKey: 'sk-agent-test',
+        baseUrl: 'https://example.com/v1',
+        platform: 'openai',
+        supportedAgentClients: [
+          'codex',
+          'codex-ws',
+          'opencode',
+          'hermes',
+          'codebuddy',
+          'trae-ide'
+        ]
+      },
+      global: {
+        stubs: {
+          BaseDialog: {
+            template: '<div><slot /><slot name="footer" /></div>'
+          },
+          Icon: {
+            template: '<span />'
+          }
+        }
+      }
+    })
+
+    const selectClient = async (translationKey: string) => {
+      const button = wrapper.findAll('button').find((candidate) =>
+        candidate.text().includes(translationKey)
+      )
+      expect(button).toBeDefined()
+      await button!.trigger('click')
+      await nextTick()
+      return wrapper.find('pre code').text()
+    }
+
+    const hermes = await selectClient('keys.useKeyModal.cliTabs.hermes')
+    expect(hermes).toContain('provider: custom')
+    expect(hermes).toContain('base_url: "https://example.com/v1"')
+    expect(hermes).toContain('api_key: "sk-agent-test"')
+    expect(wrapper.text()).toContain('~/.hermes/config.yaml')
+
+    const codeBuddy = JSON.parse(await selectClient('keys.useKeyModal.cliTabs.codebuddy'))
+    expect(codeBuddy.models[0]).toMatchObject({
+      id: 'star-x-gpt-5.5',
+      apiKey: 'sk-agent-test',
+      url: 'https://example.com/v1/chat/completions',
+      supportsToolCall: true
+    })
+    expect(wrapper.text()).toContain('~/.codebuddy/models.json')
+
+    const traeIde = await selectClient('keys.useKeyModal.cliTabs.traeIde')
+    expect(traeIde).toContain('OpenAI')
+    expect(traeIde).toContain('https://example.com/v1/chat/completions')
+    expect(traeIde).toContain('sk-agent-test')
+
+  })
+
+  it('uses the backend client capability list to hide unsupported setup tabs', () => {
+    const wrapper = mount(UseKeyModal, {
+      props: {
+        show: true,
+        apiKey: 'sk-agent-test',
+        baseUrl: 'https://example.com/v1',
+        platform: 'openai',
+        allowMessagesDispatch: true,
+        supportedAgentClients: ['codex', 'hermes']
+      },
+      global: {
+        stubs: {
+          BaseDialog: {
+            template: '<div><slot /><slot name="footer" /></div>'
+          },
+          Icon: {
+            template: '<span />'
+          }
+        }
+      }
+    })
+
+    expect(wrapper.text()).toContain('keys.useKeyModal.cliTabs.codexCli')
+    expect(wrapper.text()).toContain('keys.useKeyModal.cliTabs.hermes')
+    expect(wrapper.text()).not.toContain('keys.useKeyModal.cliTabs.claudeCode')
+    expect(wrapper.text()).not.toContain('keys.useKeyModal.cliTabs.codebuddy')
+  })
+
   it('renders API Key Mode authorization in OpenAI Codex config', async () => {
     const wrapper = mount(UseKeyModal, {
       props: {
