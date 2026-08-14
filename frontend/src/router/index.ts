@@ -281,10 +281,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/recharge',
     name: 'BalanceRecharge',
-    beforeEnter: () => {
-      window.location.assign('https://pay.ldxp.cn/shop/starX')
-      return false
-    },
+    component: () => import('@/views/user/BalanceRechargeRedirectView.vue'),
     meta: {
       requiresAuth: true,
       requiresAdmin: false,

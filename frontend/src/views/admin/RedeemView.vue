@@ -565,6 +565,13 @@
           </div>
           <!-- Content -->
           <div class="p-5">
+            <div
+              v-if="generatedCodes[0]?.type === 'balance'"
+              class="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-800/60 dark:bg-blue-900/20 dark:text-blue-200"
+            >
+              <p class="font-medium">{{ t('admin.redeem.storeCardReady') }}</p>
+              <p class="mt-1">{{ t('admin.redeem.storeCardHint') }}</p>
+            </div>
             <div class="relative">
               <textarea
                 readonly
@@ -598,7 +605,7 @@
             </button>
             <button @click="downloadGeneratedCodes" class="btn btn-primary flex items-center gap-2">
               <Icon name="download" size="sm" :stroke-width="2" />
-              {{ t('admin.redeem.download') }}
+              {{ generatedCodes[0]?.type === 'balance' ? t('admin.redeem.downloadStoreCards') : t('admin.redeem.download') }}
             </button>
           </div>
         </div>
@@ -634,6 +641,7 @@ import Select from '@/components/common/Select.vue'
 import GroupBadge from '@/components/common/GroupBadge.vue'
 import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
 import Icon from '@/components/icons/Icon.vue'
+import { buildStoreCardFilename, buildStoreCardPayload } from '@/utils/storeCardExport'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -708,11 +716,17 @@ const copyGeneratedCodes = async () => {
 }
 
 const downloadGeneratedCodes = () => {
-  const blob = new Blob([generatedCodesText.value], { type: 'text/plain' })
+  const isStoreCardBatch = generatedCodes.value[0]?.type === 'balance'
+  const payload = isStoreCardBatch
+    ? buildStoreCardPayload(generatedCodes.value)
+    : generatedCodesText.value
+  const blob = new Blob([payload], { type: 'text/plain;charset=utf-8' })
   const url = window.URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `redeem-codes-${new Date().toISOString().split('T')[0]}.txt`
+  link.download = isStoreCardBatch
+    ? buildStoreCardFilename(generatedCodes.value)
+    : `redeem-codes-${new Date().toISOString().split('T')[0]}.txt`
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)

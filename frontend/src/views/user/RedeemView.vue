@@ -19,6 +19,24 @@
         </div>
       </div>
 
+      <div class="card border-primary-200 bg-primary-50 dark:border-primary-800/50 dark:bg-primary-900/20">
+        <div class="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 class="font-semibold text-gray-900 dark:text-white">{{ t('redeem.buyCreditsTitle') }}</h2>
+            <p class="mt-1 text-sm text-gray-600 dark:text-dark-300">{{ t('redeem.buyCreditsDescription') }}</p>
+          </div>
+          <a
+            href="https://pay.ldxp.cn/shop/starX"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="btn btn-primary flex-shrink-0"
+          >
+            {{ t('redeem.buyCreditsButton') }}
+            <Icon name="externalLink" size="sm" class="ml-2" />
+          </a>
+        </div>
+      </div>
+
       <!-- Redeem Form -->
       <div class="card">
         <div class="p-6">
