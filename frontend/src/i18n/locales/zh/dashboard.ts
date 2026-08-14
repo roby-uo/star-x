@@ -147,7 +147,20 @@ export default {
         configTomlHint: '请确保以下内容位于 config.toml 文件的开头部分',
         note: '请确保配置目录存在。macOS/Linux 用户可运行 mkdir -p ~/.codex 创建目录。',
         noteWindows:
-          '按 Win+R，输入 %userprofile%\\.codex 打开配置目录。如目录不存在，请先手动创建。'
+          '按 Win+R，输入 %userprofile%\\.codex 打开配置目录。如目录不存在，请先手动创建。',
+        quickSetupTitle: '推荐：一键配置 Codex',
+        quickSetupDescription: '无需寻找隐藏文件。复制下面的整段命令并运行，它会自动创建目录、备份旧配置并写入 Star-X 配置。',
+        quickSetupStepOneWindows: '点击“复制一键配置命令”，打开开始菜单中的 PowerShell。',
+        quickSetupStepOneUnix: '点击“复制一键配置命令”，然后打开终端 Terminal。',
+        quickSetupStepTwo: '粘贴整段命令并按回车，等待出现绿色完成提示。',
+        quickSetupStepThree: '完全退出并重新打开 Codex，然后新建一个任务。',
+        copyInstallCommand: '复制一键配置命令',
+        quickSetupBackupNotice: '命令会覆盖当前 Codex 配置，但会先在同一目录生成带时间戳的 .starx-backup 备份文件。命令内含你的 API 密钥，请勿转发给他人。',
+        manualSetupTitle: '手动配置（高级用户）',
+        manualSetupStepsTitle: '不知道配置文件在哪里？',
+        manualSetupPathWindows: '按 Win + R，输入 %USERPROFILE%\\.codex 后回车；如果目录不存在，请先新建 .codex 文件夹。',
+        manualSetupPathUnix: '打开终端并运行 mkdir -p ~/.codex，然后在访达或文件管理器中显示隐藏文件。',
+        manualSetupPasteGuide: '分别创建或打开 config.toml 和 auth.json，把下面对应代码完整粘贴进去，保存后重启 Codex。'
       },
       cliTabs: {
         claudeCode: 'Claude Code',

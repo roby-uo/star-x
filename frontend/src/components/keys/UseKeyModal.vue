@@ -133,8 +133,63 @@
           </nav>
         </div>
 
+        <!-- Beginner-friendly Codex installer -->
+        <div
+          v-if="showCodexQuickSetup"
+          class="space-y-3 rounded-xl border border-primary-200 bg-primary-50 p-4 dark:border-primary-800/60 dark:bg-primary-900/20"
+        >
+          <div>
+            <p class="font-medium text-gray-900 dark:text-white">
+              {{ t('keys.useKeyModal.openai.quickSetupTitle') }}
+            </p>
+            <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+              {{ t('keys.useKeyModal.openai.quickSetupDescription') }}
+            </p>
+          </div>
+          <ol class="list-inside list-decimal space-y-1 text-sm text-gray-700 dark:text-gray-200">
+            <li>{{ quickSetupStepOne }}</li>
+            <li>{{ t('keys.useKeyModal.openai.quickSetupStepTwo') }}</li>
+            <li>{{ t('keys.useKeyModal.openai.quickSetupStepThree') }}</li>
+          </ol>
+          <div class="overflow-hidden rounded-xl bg-gray-900 dark:bg-dark-900">
+            <div class="flex items-center justify-between border-b border-gray-700 bg-gray-800 px-4 py-2 dark:bg-dark-800">
+              <span class="text-xs font-medium text-gray-300">{{ quickSetupShellLabel }}</span>
+              <button
+                type="button"
+                data-testid="copy-codex-installer"
+                class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-500"
+                @click="copyContent(codexInstallCommand, -1)"
+              >
+                {{ copiedIndex === -1 ? t('keys.useKeyModal.copied') : t('keys.useKeyModal.openai.copyInstallCommand') }}
+              </button>
+            </div>
+            <pre class="max-h-56 overflow-auto p-4 text-xs text-gray-100"><code v-text="codexInstallCommand"></code></pre>
+          </div>
+          <p class="text-xs leading-5 text-amber-700 dark:text-amber-300">
+            {{ t('keys.useKeyModal.openai.quickSetupBackupNotice') }}
+          </p>
+        </div>
+
+        <button
+          v-if="showCodexQuickSetup"
+          type="button"
+          class="flex w-full items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-dark-700 dark:text-gray-200 dark:hover:bg-dark-800"
+          @click="manualConfigOpen = !manualConfigOpen"
+        >
+          <span>{{ t('keys.useKeyModal.openai.manualSetupTitle') }}</span>
+          <span aria-hidden="true">{{ manualConfigOpen ? '−' : '+' }}</span>
+        </button>
+
         <!-- Code Blocks (Stacked for multi-file platforms) -->
-        <div class="space-y-4">
+        <div v-show="!showCodexQuickSetup || manualConfigOpen" class="space-y-4">
+          <div
+            v-if="showCodexQuickSetup"
+            class="rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm leading-6 text-blue-800 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-200"
+          >
+            <p class="font-medium">{{ t('keys.useKeyModal.openai.manualSetupStepsTitle') }}</p>
+            <p>{{ manualSetupPathGuide }}</p>
+            <p>{{ t('keys.useKeyModal.openai.manualSetupPasteGuide') }}</p>
+          </div>
           <div
             v-for="(file, index) in currentFiles"
             :key="index"
@@ -240,6 +295,7 @@ const activeTab = ref<string>('unix')
 const activeClientTab = ref<string>('claude')
 type CodexAuthMode = 'legacy' | 'api-key'
 const codexAuthMode = ref<CodexAuthMode>('legacy')
+const manualConfigOpen = ref(false)
 
 // Reset tabs when platform changes
 const defaultClientTab = computed(() => {
@@ -272,6 +328,7 @@ watch(() => props.show, (show) => {
 // Reset shell tab when client changes
 watch(activeClientTab, () => {
   activeTab.value = 'unix'
+  manualConfigOpen.value = false
 })
 
 // Icon components
@@ -407,6 +464,11 @@ const clientsWithoutShellTabs = new Set(['opencode', 'hermes', 'codebuddy', 'tra
 const showShellTabs = computed(() => !clientsWithoutShellTabs.has(activeClientTab.value))
 
 const showCodexAuthMode = computed(() =>
+  props.platform === 'openai' &&
+  (activeClientTab.value === 'codex' || activeClientTab.value === 'codex-ws')
+)
+
+const showCodexQuickSetup = computed(() =>
   props.platform === 'openai' &&
   (activeClientTab.value === 'codex' || activeClientTab.value === 'codex-ws')
 )
@@ -579,6 +641,62 @@ const currentFiles = computed((): FileConfig[] => {
     default:
       return generateAnthropicFiles(baseUrl, apiKey)
   }
+})
+
+const quickSetupShellLabel = computed(() =>
+  activeTab.value === 'windows' ? 'Windows PowerShell' : 'macOS / Linux Terminal'
+)
+
+const quickSetupStepOne = computed(() =>
+  activeTab.value === 'windows'
+    ? t('keys.useKeyModal.openai.quickSetupStepOneWindows')
+    : t('keys.useKeyModal.openai.quickSetupStepOneUnix')
+)
+
+const manualSetupPathGuide = computed(() =>
+  activeTab.value === 'windows'
+    ? t('keys.useKeyModal.openai.manualSetupPathWindows')
+    : t('keys.useKeyModal.openai.manualSetupPathUnix')
+)
+
+const codexInstallCommand = computed(() => {
+  const [configFile, authFile] = currentFiles.value
+  if (!configFile || !authFile) return ''
+
+  if (activeTab.value === 'windows') {
+    return `$codexDir = Join-Path $env:USERPROFILE ".codex"
+New-Item -ItemType Directory -Force -Path $codexDir | Out-Null
+$stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+@("config.toml", "auth.json") | ForEach-Object {
+  $target = Join-Path $codexDir $_
+  if (Test-Path $target) { Copy-Item $target "$target.starx-backup-$stamp" }
+}
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+$config = @'
+${configFile.content}
+'@
+$auth = @'
+${authFile.content}
+'@
+[System.IO.File]::WriteAllText((Join-Path $codexDir "config.toml"), $config, $utf8)
+[System.IO.File]::WriteAllText((Join-Path $codexDir "auth.json"), $auth, $utf8)
+Write-Host "Star-X Codex configuration completed. Please restart Codex." -ForegroundColor Green`
+  }
+
+  return `set -e
+codex_dir="$HOME/.codex"
+mkdir -p "$codex_dir"
+stamp="$(date +%Y%m%d-%H%M%S)"
+for name in config.toml auth.json; do
+  [ ! -f "$codex_dir/$name" ] || cp "$codex_dir/$name" "$codex_dir/$name.starx-backup-$stamp"
+done
+cat > "$codex_dir/config.toml" <<'STARX_CONFIG'
+${configFile.content}
+STARX_CONFIG
+cat > "$codex_dir/auth.json" <<'STARX_AUTH'
+${authFile.content}
+STARX_AUTH
+printf '%s\\n' 'Star-X Codex configuration completed. Please restart Codex.'`
 })
 
 function generateAnthropicFiles(baseUrl: string, apiKey: string): FileConfig[] {

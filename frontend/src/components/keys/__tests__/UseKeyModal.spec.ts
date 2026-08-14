@@ -271,6 +271,51 @@ describe('UseKeyModal', () => {
     expect(wrapper.find('[data-testid="codex-api-key-restart-notice"]').exists()).toBe(false)
   })
 
+  it('provides beginner-friendly Codex installers with backups', async () => {
+    copyToClipboardMock.mockClear()
+    const wrapper = mount(UseKeyModal, {
+      props: {
+        show: true,
+        apiKey: 'sk-quick-setup-test',
+        baseUrl: 'https://example.com',
+        platform: 'openai'
+      },
+      global: {
+        stubs: {
+          BaseDialog: {
+            template: '<div><slot /><slot name="footer" /></div>'
+          },
+          Icon: {
+            template: '<span />'
+          }
+        }
+      }
+    })
+
+    let installer = wrapper.find('[data-testid="copy-codex-installer"]')
+    expect(installer.exists()).toBe(true)
+    await installer.trigger('click')
+    expect(copyToClipboardMock).toHaveBeenCalledWith(
+      expect.stringContaining('cp "$codex_dir/$name" "$codex_dir/$name.starx-backup-$stamp"'),
+      'keys.copied'
+    )
+
+    const windowsTab = wrapper.findAll('button').find(
+      (button) => button.text().trim() === 'Windows'
+    )
+    expect(windowsTab).toBeDefined()
+    await windowsTab!.trigger('click')
+    await nextTick()
+
+    installer = wrapper.find('[data-testid="copy-codex-installer"]')
+    await installer.trigger('click')
+    const windowsCommand = copyToClipboardMock.mock.calls.at(-1)?.[0] as string
+    expect(windowsCommand).toContain('Join-Path $env:USERPROFILE ".codex"')
+    expect(windowsCommand).toContain('Copy-Item $target "$target.starx-backup-$stamp"')
+    expect(windowsCommand).toContain('sk-quick-setup-test')
+    expect(windowsCommand).toContain('[System.IO.File]::WriteAllText')
+  })
+
   it('renders Hermes, CodeBuddy, and TRAE IDE setup for OpenAI groups', async () => {
     const wrapper = mount(UseKeyModal, {
       props: {
