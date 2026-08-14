@@ -2,7 +2,7 @@
   <div class="min-h-screen bg-gray-50 text-gray-900 dark:bg-dark-950 dark:text-white">
     <header class="border-b border-gray-200 bg-white/95 dark:border-dark-800 dark:bg-dark-900/95">
       <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-        <RouterLink to="/home" class="flex min-w-0 items-center gap-3">
+        <RouterLink to="/" class="flex min-w-0 items-center gap-3">
           <template v-if="settings">
             <span class="flex h-10 w-24 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-200 dark:bg-dark-800 dark:ring-dark-700">
               <img :src="siteLogo || '/starx-logo-transparent.png'" alt="star-X" class="h-full w-full object-cover" />

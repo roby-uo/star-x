@@ -7,7 +7,7 @@
   <div v-else class="starx-home" :class="{ 'is-dark': isDark }">
     <header class="site-header">
       <nav class="nav-shell" aria-label="主导航">
-        <router-link to="/home" class="brand" aria-label="star-X 首页">
+        <router-link to="/" class="brand" aria-label="star-X 首页">
           <img src="/starx-logo-transparent.png" alt="star-X" class="brand-logo" />
         </router-link>
         <div class="nav-links">

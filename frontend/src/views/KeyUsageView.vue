@@ -3,7 +3,7 @@
     <!-- Header (same pattern as HomeView) -->
     <header class="relative z-20 px-6 py-4">
       <nav class="mx-auto flex max-w-6xl items-center justify-between">
-        <router-link to="/home" class="flex items-center gap-3">
+        <router-link to="/" class="flex items-center gap-3">
           <div class="h-10 w-24 overflow-hidden rounded-lg">
             <img :src="siteLogo || '/starx-logo-transparent.png'" alt="star-X" class="h-full w-full object-cover" />
           </div>
