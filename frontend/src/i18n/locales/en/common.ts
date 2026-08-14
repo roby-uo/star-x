@@ -182,6 +182,7 @@ export default {
     github: 'GitHub',
     mySubscriptions: 'My Subscriptions',
     buySubscription: 'Recharge / Subscription',
+    balanceRecharge: 'Add Credits',
     docs: 'Docs',
     myOrders: 'My Orders',
     orderManagement: 'Orders',

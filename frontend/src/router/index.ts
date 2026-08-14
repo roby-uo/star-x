@@ -279,6 +279,20 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/recharge',
+    name: 'BalanceRecharge',
+    beforeEnter: () => {
+      window.location.assign('https://pay.ldxp.cn/shop/starX')
+      return false
+    },
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Balance Recharge',
+      titleKey: 'nav.balanceRecharge'
+    }
+  },
+  {
     path: '/subscriptions',
     name: 'Subscriptions',
     component: () => import('@/views/user/SubscriptionsView.vue'),
