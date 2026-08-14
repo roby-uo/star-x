@@ -420,7 +420,7 @@ const clientTabs = computed((): TabConfig[] => {
         ...(props.allowMessagesDispatch ? ['claude' as const] : []),
         'opencode',
         'hermes',
-        'codebuddy',
+        'workbuddy',
         'trae-ide'
       ]
       const supported = new Set(props.supportedAgentClients?.length
@@ -432,7 +432,7 @@ const clientTabs = computed((): TabConfig[] => {
         { id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon },
         { id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon },
         { id: 'hermes', label: t('keys.useKeyModal.cliTabs.hermes'), icon: TerminalIcon },
-        { id: 'codebuddy', label: t('keys.useKeyModal.cliTabs.codebuddy'), icon: TerminalIcon },
+        { id: 'workbuddy', label: t('keys.useKeyModal.cliTabs.workbuddy'), icon: TerminalIcon },
         { id: 'trae-ide', label: t('keys.useKeyModal.cliTabs.traeIde'), icon: TerminalIcon }
       ]
       return tabs.filter((tab) => supported.has(tab.id as AgentClientId))
@@ -494,14 +494,14 @@ const showAgentQuickSetup = computed(() => {
   if (activeClientTab.value === 'claude') {
     return activeTab.value === 'unix' || activeTab.value === 'powershell'
   }
-  return ['opencode', 'hermes', 'codebuddy'].includes(activeClientTab.value)
+  return ['opencode', 'hermes', 'workbuddy'].includes(activeClientTab.value)
 })
 
 const showAnyQuickSetup = computed(() => showCodexQuickSetup.value || showAgentQuickSetup.value)
 
 const currentTabs = computed(() => {
   if (!showShellTabs.value) return []
-  if (['codex', 'codex-ws', 'grok', 'opencode', 'hermes', 'codebuddy'].includes(activeClientTab.value)) {
+  if (['codex', 'codex-ws', 'grok', 'opencode', 'hermes', 'workbuddy'].includes(activeClientTab.value)) {
     return openaiTabs
   }
   return shellTabs
@@ -513,7 +513,7 @@ const platformDescription = computed(() => {
       if (activeClientTab.value === 'claude') {
         return t('keys.useKeyModal.description')
       }
-      if (['hermes', 'codebuddy', 'trae-ide'].includes(activeClientTab.value)) {
+      if (['hermes', 'workbuddy', 'trae-ide'].includes(activeClientTab.value)) {
         return t(`keys.useKeyModal.${activeClientTab.value}.description`)
       }
       return t('keys.useKeyModal.openai.description')
@@ -540,7 +540,7 @@ const platformNote = computed(() => {
       if (activeClientTab.value === 'claude') {
         return t('keys.useKeyModal.note')
       }
-      if (['hermes', 'codebuddy', 'trae-ide'].includes(activeClientTab.value)) {
+      if (['hermes', 'workbuddy', 'trae-ide'].includes(activeClientTab.value)) {
         return t(`keys.useKeyModal.${activeClientTab.value}.note`)
       }
       return activeTab.value === 'windows'
@@ -632,8 +632,8 @@ const currentFiles = computed((): FileConfig[] => {
     if (activeClientTab.value === 'hermes') {
       return [generateHermesConfig(apiBase, apiKey)]
     }
-    if (activeClientTab.value === 'codebuddy') {
-      return [generateCodeBuddyConfig(apiBase, apiKey)]
+    if (activeClientTab.value === 'workbuddy') {
+      return [generateWorkBuddyConfig(apiBase, apiKey)]
     }
     if (activeClientTab.value === 'trae-ide') {
       return [generateTraeIdeConfig(apiBase, apiKey)]
@@ -773,8 +773,8 @@ const quickInstallCommand = computed(() => {
   if (activeClientTab.value === 'opencode' && files[0]) {
     return buildJsonMergeInstaller('.config/opencode/opencode.json', files[0].content, 'OpenCode')
   }
-  if (activeClientTab.value === 'codebuddy' && files[0]) {
-    return buildCodeBuddyInstaller(files[0].content)
+  if (activeClientTab.value === 'workbuddy' && files[0]) {
+    return buildWorkBuddyInstaller(files[0].content)
   }
   if (activeClientTab.value === 'hermes' && files[0]) {
     return buildFileInstaller('.hermes/config.yaml', files[0].content, 'Hermes')
@@ -835,11 +835,11 @@ STARX_PY
 printf '%s\\n' 'Star-X ${clientName} configuration completed. Please restart ${clientName}.'`
 }
 
-function buildCodeBuddyInstaller(content: string): string {
+function buildWorkBuddyInstaller(content: string): string {
   const parsed = JSON.parse(content) as { models: Array<{ id: string }> }
   const model = JSON.stringify(parsed.models[0], null, 2)
   if (activeTab.value === 'windows') {
-    return `$path = Join-Path $env:USERPROFILE ".codebuddy\\models.json"
+    return `$path = Join-Path $env:USERPROFILE ".workbuddy\\models.json"
 New-Item -ItemType Directory -Force -Path (Split-Path $path) | Out-Null
 if (Test-Path $path) { Copy-Item $path "$path.starx-backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')" }
 $current = if (Test-Path $path) { Get-Content $path -Raw | ConvertFrom-Json } else { [PSCustomObject]@{ models = @() } }
@@ -847,13 +847,15 @@ $model = @'
 ${model}
 '@ | ConvertFrom-Json
 $models = @($current.models | Where-Object { $_.id -ne $model.id }) + @($model)
+$availableModels = @($current.availableModels | Where-Object { $_ -ne $model.id }) + @($model.id)
 $current | Add-Member -NotePropertyName models -NotePropertyValue $models -Force
+$current | Add-Member -NotePropertyName availableModels -NotePropertyValue $availableModels -Force
 $json = $current | ConvertTo-Json -Depth 100
 [System.IO.File]::WriteAllText($path, $json, (New-Object System.Text.UTF8Encoding($false)))
-Write-Host "Star-X CodeBuddy configuration completed. Please restart CodeBuddy." -ForegroundColor Green`
+Write-Host "Star-X WorkBuddy configuration completed. Please restart WorkBuddy." -ForegroundColor Green`
   }
   return `set -e
-path="$HOME/.codebuddy/models.json"
+path="$HOME/.workbuddy/models.json"
 mkdir -p "$(dirname "$path")"
 [ ! -f "$path" ] || cp "$path" "$path.starx-backup-$(date +%Y%m%d-%H%M%S)"
 python3 - "$path" <<'STARX_PY'
@@ -865,10 +867,12 @@ try:
 except FileNotFoundError: current = {}
 models = [item for item in current.get('models', []) if item.get('id') != model['id']]
 current['models'] = models + [model]
+available = [item for item in current.get('availableModels', []) if item != model['id']]
+current['availableModels'] = available + [model['id']]
 with open(path, 'w', encoding='utf-8') as handle:
     json.dump(current, handle, ensure_ascii=False, indent=2); handle.write('\\n')
 STARX_PY
-printf '%s\\n' 'Star-X CodeBuddy configuration completed. Please restart CodeBuddy.'`
+printf '%s\\n' 'Star-X WorkBuddy configuration completed. Please restart WorkBuddy.'`
 }
 
 function buildFileInstaller(relativePath: string, content: string, clientName: string): string {
@@ -965,7 +969,7 @@ function generateHermesConfig(baseUrl: string, apiKey: string): FileConfig {
   }
 }
 
-function generateCodeBuddyConfig(baseUrl: string, apiKey: string): FileConfig {
+function generateWorkBuddyConfig(baseUrl: string, apiKey: string): FileConfig {
   const endpoint = `${baseUrl.replace(/\/+$/, '')}/chat/completions`
   const content = JSON.stringify({
     models: [{
@@ -979,13 +983,14 @@ function generateCodeBuddyConfig(baseUrl: string, apiKey: string): FileConfig {
       supportsToolCall: true,
       supportsImages: true,
       supportsReasoning: true
-    }]
+    }],
+    availableModels: ['star-x-gpt-5.5']
   }, null, 2)
 
   return {
-    path: activeTab.value === 'windows' ? '%USERPROFILE%\\.codebuddy\\models.json' : '~/.codebuddy/models.json',
+    path: activeTab.value === 'windows' ? '%USERPROFILE%\\.workbuddy\\models.json' : '~/.workbuddy/models.json',
     content,
-    hint: t('keys.useKeyModal.codebuddy.hint')
+    hint: t('keys.useKeyModal.workbuddy.hint')
   }
 }
 

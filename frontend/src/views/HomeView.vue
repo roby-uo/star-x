@@ -160,11 +160,11 @@ const features = [
   { icon: '▤', color: 'violet', title: '按量付费', description: '按实际使用量计费，支持设置配额上限，团队用量一目了然。' },
 ]
 const models = [
-  { name: 'Claude', brand: 'claude' }, { name: 'GPT', brand: 'openai' }, { name: 'Gemini', brand: 'gemini' }, { name: 'Antigravity', brand: 'antigravity' },
+  { name: 'Claude', brand: 'claude' }, { name: 'GPT', brand: 'openai' }, { name: 'Gemini', brand: 'gemini' }, { name: 'DeepSeek', brand: 'deepseek' }, { name: 'Grok', brand: 'grok' },
 ]
 const codingTools = [
   { name: 'Claude Code', brand: 'claude' }, { name: 'Codex', brand: 'openai' }, { name: 'OpenCode', brand: 'opencode' },
-  { name: 'Hermes', brand: 'hermes' }, { name: 'CodeBuddy', brand: 'tencent' }, { name: 'TRAE IDE', brand: 'trae' },
+  { name: 'Hermes', brand: 'hermes' }, { name: 'WorkBuddy', brand: 'workbuddy' }, { name: 'TRAE IDE', brand: 'trae' },
 ]
 const metrics = [{ value: '50+', label: '上游服务集成' }, { value: '100+', label: '模型计费支持' }, { value: '50+', label: '兼容 API 接口' }, { value: '10+', label: '调度控制策略' }]
 const steps = [

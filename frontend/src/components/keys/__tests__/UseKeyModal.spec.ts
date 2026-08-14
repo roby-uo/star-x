@@ -326,7 +326,7 @@ describe('UseKeyModal', () => {
     expect(windowsCommand).toContain('[System.IO.File]::WriteAllText')
   })
 
-  it('renders Hermes, CodeBuddy, and TRAE IDE setup for OpenAI groups', async () => {
+  it('renders Hermes, WorkBuddy, and TRAE IDE setup for OpenAI groups', async () => {
     const wrapper = mount(UseKeyModal, {
       props: {
         show: true,
@@ -338,7 +338,7 @@ describe('UseKeyModal', () => {
           'codex-ws',
           'opencode',
           'hermes',
-          'codebuddy',
+          'workbuddy',
           'trae-ide'
         ]
       },
@@ -373,15 +373,16 @@ describe('UseKeyModal', () => {
 
     expect(wrapper.find('[data-testid="copy-agent-installer"]').exists()).toBe(true)
 
-    const codeBuddyBlocks = await selectClient('keys.useKeyModal.cliTabs.codebuddy')
-    const codeBuddy = JSON.parse(codeBuddyBlocks.find((content) => content.trim().startsWith('{')) ?? '{}')
-    expect(codeBuddy.models[0]).toMatchObject({
+    const workBuddyBlocks = await selectClient('keys.useKeyModal.cliTabs.workbuddy')
+    const workBuddy = JSON.parse(workBuddyBlocks.find((content) => content.trim().startsWith('{')) ?? '{}')
+    expect(workBuddy.models[0]).toMatchObject({
       id: 'star-x-gpt-5.5',
       apiKey: 'sk-agent-test',
       url: 'https://example.com/v1/chat/completions',
       supportsToolCall: true
     })
-    expect(wrapper.text()).toContain('~/.codebuddy/models.json')
+    expect(workBuddy.availableModels).toContain('star-x-gpt-5.5')
+    expect(wrapper.text()).toContain('~/.workbuddy/models.json')
 
     const traeBlocks = await selectClient('keys.useKeyModal.cliTabs.traeIde')
     const traeIde = traeBlocks.join('\n')
@@ -417,7 +418,7 @@ describe('UseKeyModal', () => {
     expect(wrapper.text()).toContain('keys.useKeyModal.cliTabs.codexCli')
     expect(wrapper.text()).toContain('keys.useKeyModal.cliTabs.hermes')
     expect(wrapper.text()).not.toContain('keys.useKeyModal.cliTabs.claudeCode')
-    expect(wrapper.text()).not.toContain('keys.useKeyModal.cliTabs.codebuddy')
+    expect(wrapper.text()).not.toContain('keys.useKeyModal.cliTabs.workbuddy')
   })
 
   it('renders API Key Mode authorization in OpenAI Codex config', async () => {

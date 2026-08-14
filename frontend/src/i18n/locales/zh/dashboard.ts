@@ -178,7 +178,7 @@ export default {
         grokCli: 'Grok CLI',
         opencode: 'OpenCode',
         hermes: 'Hermes',
-        codebuddy: 'CodeBuddy',
+        workbuddy: 'WorkBuddy',
         traeIde: 'TRAE IDE'
       },
       antigravity: {
@@ -218,10 +218,10 @@ export default {
         hint: '用户级配置。若文件已有其他设置，请合并 model 区块，不要覆盖整个文件。',
         note: '保存后运行 hermes doctor 检查配置，再启动 hermes。此文件包含 API 密钥，请勿提交到代码仓库。'
       },
-      codebuddy: {
-        description: '向 CodeBuddy 添加一个 star-X 自定义模型。',
-        hint: '用户级配置。若已有 models.json，请把此模型合并进 models 数组，不要覆盖其他模型。',
-        note: 'CodeBuddy 会热重载此文件。自定义模型使用 OpenAI Chat Completions 接口。'
+      workbuddy: {
+        description: '向 WorkBuddy 添加一个 star-X 自定义模型。',
+        hint: '用户级配置，路径为 ~/.workbuddy/models.json。若文件已存在，请合并模型，不要覆盖其他模型。',
+        note: '保存后重启 WorkBuddy。自定义模型使用 OpenAI Chat Completions 接口。'
       },
       'trae-ide': {
         description: '在 TraeCode IDE 的模型管理中添加 star-X 自定义模型。',

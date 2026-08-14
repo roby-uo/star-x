@@ -177,7 +177,7 @@ export default {
         grokCli: 'Grok CLI',
         opencode: 'OpenCode',
         hermes: 'Hermes',
-        codebuddy: 'CodeBuddy',
+        workbuddy: 'WorkBuddy',
         traeIde: 'TRAE IDE',
       },
       antigravity: {
@@ -214,10 +214,10 @@ export default {
         hint: 'User-level configuration. Merge the model section if the file already contains other settings.',
         note: 'Run hermes doctor after saving, then start hermes. This file contains an API key; do not commit it.',
       },
-      codebuddy: {
-        description: 'Add a star-X custom model to CodeBuddy.',
-        hint: 'User-level configuration. Merge this entry into the existing models array instead of replacing other models.',
-        note: 'CodeBuddy hot-reloads this file. Custom models use the OpenAI Chat Completions endpoint.',
+      workbuddy: {
+        description: 'Add a star-X custom model to WorkBuddy.',
+        hint: 'User-level configuration at ~/.workbuddy/models.json. Merge this entry instead of replacing other models.',
+        note: 'Restart WorkBuddy after saving. Custom models use the OpenAI Chat Completions endpoint.',
       },
       'trae-ide': {
         description: 'Add a star-X custom model in the TraeCode IDE model manager.',

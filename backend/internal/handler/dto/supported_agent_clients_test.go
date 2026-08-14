@@ -10,12 +10,12 @@ func TestSupportedAgentClients(t *testing.T) {
 	t.Run("openai exposes chat completions clients and conditionally claude", func(t *testing.T) {
 		withoutMessages := supportedAgentClients("openai", false)
 		require.Equal(t, []string{
-			"codex", "codex-ws", "opencode", "hermes", "codebuddy", "trae-ide",
+			"codex", "codex-ws", "opencode", "hermes", "workbuddy", "trae-ide",
 		}, withoutMessages)
 
 		withMessages := supportedAgentClients("openai", true)
 		require.Equal(t, []string{
-			"codex", "codex-ws", "claude", "opencode", "hermes", "codebuddy", "trae-ide",
+			"codex", "codex-ws", "claude", "opencode", "hermes", "workbuddy", "trae-ide",
 		}, withMessages)
 	})
 

@@ -220,7 +220,7 @@ func supportedAgentClients(platform string, allowMessagesDispatch bool) []string
 		if allowMessagesDispatch {
 			clients = append(clients, "claude")
 		}
-		return append(clients, "opencode", "hermes", "codebuddy", "trae-ide")
+		return append(clients, "opencode", "hermes", "workbuddy", "trae-ide")
 	case "gemini":
 		return []string{"gemini", "opencode"}
 	case "antigravity":

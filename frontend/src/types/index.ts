@@ -562,7 +562,7 @@ export type AgentClientId =
   | 'gemini'
   | 'grok'
   | 'hermes'
-  | 'codebuddy'
+  | 'workbuddy'
   | 'trae-ide'
 
 export interface AdminGroup extends Group {
