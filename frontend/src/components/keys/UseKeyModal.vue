@@ -133,17 +133,17 @@
           </nav>
         </div>
 
-        <!-- Beginner-friendly Codex installer -->
+        <!-- Beginner-friendly agent installer -->
         <div
-          v-if="showCodexQuickSetup"
+          v-if="showAnyQuickSetup"
           class="space-y-3 rounded-xl border border-primary-200 bg-primary-50 p-4 dark:border-primary-800/60 dark:bg-primary-900/20"
         >
           <div>
             <p class="font-medium text-gray-900 dark:text-white">
-              {{ t('keys.useKeyModal.openai.quickSetupTitle') }}
+              {{ quickSetupTitle }}
             </p>
             <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
-              {{ t('keys.useKeyModal.openai.quickSetupDescription') }}
+              {{ quickSetupDescription }}
             </p>
           </div>
           <ol class="list-inside list-decimal space-y-1 text-sm text-gray-700 dark:text-gray-200">
@@ -156,39 +156,39 @@
               <span class="text-xs font-medium text-gray-300">{{ quickSetupShellLabel }}</span>
               <button
                 type="button"
-                data-testid="copy-codex-installer"
+                data-testid="copy-agent-installer"
                 class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-500"
-                @click="copyContent(codexInstallCommand, -1)"
+                @click="copyContent(quickInstallCommand, -1)"
               >
                 {{ copiedIndex === -1 ? t('keys.useKeyModal.copied') : t('keys.useKeyModal.openai.copyInstallCommand') }}
               </button>
             </div>
-            <pre class="max-h-56 overflow-auto p-4 text-xs text-gray-100"><code v-text="codexInstallCommand"></code></pre>
+            <pre class="max-h-56 overflow-auto p-4 text-xs text-gray-100"><code v-text="quickInstallCommand"></code></pre>
           </div>
           <p class="text-xs leading-5 text-amber-700 dark:text-amber-300">
-            {{ t('keys.useKeyModal.openai.quickSetupBackupNotice') }}
+            {{ quickSetupBackupNotice }}
           </p>
         </div>
 
         <button
-          v-if="showCodexQuickSetup"
+          v-if="showAnyQuickSetup"
           type="button"
           class="flex w-full items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-dark-700 dark:text-gray-200 dark:hover:bg-dark-800"
           @click="manualConfigOpen = !manualConfigOpen"
         >
-          <span>{{ t('keys.useKeyModal.openai.manualSetupTitle') }}</span>
+          <span>{{ manualSetupTitle }}</span>
           <span aria-hidden="true">{{ manualConfigOpen ? '−' : '+' }}</span>
         </button>
 
         <!-- Code Blocks (Stacked for multi-file platforms) -->
-        <div v-show="!showCodexQuickSetup || manualConfigOpen" class="space-y-4">
+        <div v-show="!showAnyQuickSetup || manualConfigOpen" class="space-y-4">
           <div
-            v-if="showCodexQuickSetup"
+            v-if="showAnyQuickSetup"
             class="rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm leading-6 text-blue-800 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-200"
           >
-            <p class="font-medium">{{ t('keys.useKeyModal.openai.manualSetupStepsTitle') }}</p>
+            <p class="font-medium">{{ manualSetupStepsTitle }}</p>
             <p>{{ manualSetupPathGuide }}</p>
-            <p>{{ t('keys.useKeyModal.openai.manualSetupPasteGuide') }}</p>
+            <p>{{ manualSetupPasteGuide }}</p>
           </div>
           <div
             v-for="(file, index) in currentFiles"
@@ -200,6 +200,21 @@
               <Icon name="exclamationCircle" size="sm" class="flex-shrink-0" />
               {{ file.hint }}
             </p>
+            <div v-if="file.guideFields" class="mb-3 grid gap-2 sm:grid-cols-2">
+              <div
+                v-for="(field, fieldIndex) in file.guideFields"
+                :key="field.label"
+                class="rounded-lg border border-gray-200 bg-white p-3 dark:border-dark-700 dark:bg-dark-800"
+              >
+                <p class="text-xs text-gray-500 dark:text-gray-400">{{ field.label }}</p>
+                <div class="mt-1 flex items-center gap-2">
+                  <code class="min-w-0 flex-1 break-all text-sm text-gray-900 dark:text-white">{{ field.value }}</code>
+                  <button type="button" class="btn btn-secondary px-2 py-1 text-xs" @click="copyContent(field.value, 100 + fieldIndex)">
+                    {{ copiedIndex === 100 + fieldIndex ? t('keys.useKeyModal.copied') : t('keys.useKeyModal.copy') }}
+                  </button>
+                </div>
+              </div>
+            </div>
             <div class="bg-gray-900 dark:bg-dark-900 rounded-xl overflow-hidden">
               <!-- Code Header -->
               <div class="flex items-center justify-between px-4 py-2 bg-gray-800 dark:bg-dark-800 border-b border-gray-700 dark:border-dark-700">
@@ -282,6 +297,7 @@ interface FileConfig {
   content: string
   hint?: string  // Optional hint message for this file
   highlighted?: string
+  guideFields?: Array<{ label: string; value: string }>
 }
 
 const props = defineProps<Props>()
@@ -460,7 +476,7 @@ const openaiTabs: TabConfig[] = [
   { id: 'windows', label: 'Windows', icon: WindowsIcon }
 ]
 
-const clientsWithoutShellTabs = new Set(['opencode', 'hermes', 'codebuddy', 'trae-ide'])
+const clientsWithoutShellTabs = new Set(['trae-ide'])
 const showShellTabs = computed(() => !clientsWithoutShellTabs.has(activeClientTab.value))
 
 const showCodexAuthMode = computed(() =>
@@ -473,9 +489,19 @@ const showCodexQuickSetup = computed(() =>
   (activeClientTab.value === 'codex' || activeClientTab.value === 'codex-ws')
 )
 
+const showAgentQuickSetup = computed(() => {
+  if (props.platform !== 'openai') return false
+  if (activeClientTab.value === 'claude') {
+    return activeTab.value === 'unix' || activeTab.value === 'powershell'
+  }
+  return ['opencode', 'hermes', 'codebuddy'].includes(activeClientTab.value)
+})
+
+const showAnyQuickSetup = computed(() => showCodexQuickSetup.value || showAgentQuickSetup.value)
+
 const currentTabs = computed(() => {
   if (!showShellTabs.value) return []
-  if (activeClientTab.value === 'codex' || activeClientTab.value === 'codex-ws' || activeClientTab.value === 'grok') {
+  if (['codex', 'codex-ws', 'grok', 'opencode', 'hermes', 'codebuddy'].includes(activeClientTab.value)) {
     return openaiTabs
   }
   return shellTabs
@@ -644,19 +670,58 @@ const currentFiles = computed((): FileConfig[] => {
 })
 
 const quickSetupShellLabel = computed(() =>
-  activeTab.value === 'windows' ? 'Windows PowerShell' : 'macOS / Linux Terminal'
+  activeTab.value === 'windows' || activeTab.value === 'powershell'
+    ? 'Windows PowerShell'
+    : 'macOS / Linux Terminal'
 )
 
 const quickSetupStepOne = computed(() =>
-  activeTab.value === 'windows'
+  activeTab.value === 'windows' || activeTab.value === 'powershell'
     ? t('keys.useKeyModal.openai.quickSetupStepOneWindows')
     : t('keys.useKeyModal.openai.quickSetupStepOneUnix')
 )
 
 const manualSetupPathGuide = computed(() =>
-  activeTab.value === 'windows'
-    ? t('keys.useKeyModal.openai.manualSetupPathWindows')
-    : t('keys.useKeyModal.openai.manualSetupPathUnix')
+  showCodexQuickSetup.value
+    ? (activeTab.value === 'windows' || activeTab.value === 'powershell'
+        ? t('keys.useKeyModal.openai.manualSetupPathWindows')
+        : t('keys.useKeyModal.openai.manualSetupPathUnix'))
+    : t('keys.useKeyModal.agentQuickSetup.manualPath', {
+        path: currentFiles.value.find((file) => file.path.includes('.') || file.path.includes('%'))?.path ?? currentFiles.value[0]?.path
+      })
+)
+
+const manualSetupTitle = computed(() => t('keys.useKeyModal.openai.manualSetupTitle'))
+const manualSetupStepsTitle = computed(() =>
+  showCodexQuickSetup.value
+    ? t('keys.useKeyModal.openai.manualSetupStepsTitle')
+    : t('keys.useKeyModal.agentQuickSetup.manualTitle', { client: activeClientLabel.value })
+)
+const manualSetupPasteGuide = computed(() =>
+  showCodexQuickSetup.value
+    ? t('keys.useKeyModal.openai.manualSetupPasteGuide')
+    : t('keys.useKeyModal.agentQuickSetup.manualPasteGuide')
+)
+
+const quickSetupTitle = computed(() => {
+  if (showCodexQuickSetup.value) return t('keys.useKeyModal.openai.quickSetupTitle')
+  return t('keys.useKeyModal.agentQuickSetup.title', { client: activeClientLabel.value })
+})
+
+const quickSetupDescription = computed(() =>
+  showCodexQuickSetup.value
+    ? t('keys.useKeyModal.openai.quickSetupDescription')
+    : t('keys.useKeyModal.agentQuickSetup.description')
+)
+
+const quickSetupBackupNotice = computed(() =>
+  showCodexQuickSetup.value
+    ? t('keys.useKeyModal.openai.quickSetupBackupNotice')
+    : t('keys.useKeyModal.agentQuickSetup.backupNotice')
+)
+
+const activeClientLabel = computed(() =>
+  clientTabs.value.find((tab) => tab.id === activeClientTab.value)?.label ?? activeClientTab.value
 )
 
 const codexInstallCommand = computed(() => {
@@ -698,6 +763,136 @@ ${authFile.content}
 STARX_AUTH
 printf '%s\\n' 'Star-X Codex configuration completed. Please restart Codex.'`
 })
+
+const quickInstallCommand = computed(() => {
+  if (showCodexQuickSetup.value) return codexInstallCommand.value
+  const files = currentFiles.value
+  if (activeClientTab.value === 'claude' && files[1]) {
+    return buildJsonMergeInstaller('.claude/settings.json', files[1].content, 'Claude Code')
+  }
+  if (activeClientTab.value === 'opencode' && files[0]) {
+    return buildJsonMergeInstaller('.config/opencode/opencode.json', files[0].content, 'OpenCode')
+  }
+  if (activeClientTab.value === 'codebuddy' && files[0]) {
+    return buildCodeBuddyInstaller(files[0].content)
+  }
+  if (activeClientTab.value === 'hermes' && files[0]) {
+    return buildFileInstaller('.hermes/config.yaml', files[0].content, 'Hermes')
+  }
+  return ''
+})
+
+function buildJsonMergeInstaller(relativePath: string, patchContent: string, clientName: string): string {
+  if (activeTab.value === 'windows' || activeTab.value === 'powershell') {
+    const windowsPath = relativePath.replace(/\//g, '\\')
+    return `$path = Join-Path $env:USERPROFILE "${windowsPath}"
+New-Item -ItemType Directory -Force -Path (Split-Path $path) | Out-Null
+if (Test-Path $path) { Copy-Item $path "$path.starx-backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')" }
+$current = if (Test-Path $path) { Get-Content $path -Raw | ConvertFrom-Json } else { [PSCustomObject]@{} }
+$patch = @'
+${patchContent}
+'@ | ConvertFrom-Json
+function Merge-StarXJson($target, $source) {
+  foreach ($property in $source.PSObject.Properties) {
+    $existing = $target.PSObject.Properties[$property.Name]
+    if ($existing -and $property.Value -is [PSCustomObject] -and $existing.Value -is [PSCustomObject]) {
+      Merge-StarXJson $existing.Value $property.Value
+    } else {
+      $target | Add-Member -NotePropertyName $property.Name -NotePropertyValue $property.Value -Force
+    }
+  }
+}
+Merge-StarXJson $current $patch
+$json = $current | ConvertTo-Json -Depth 100
+[System.IO.File]::WriteAllText($path, $json, (New-Object System.Text.UTF8Encoding($false)))
+Write-Host "Star-X ${clientName} configuration completed. Please restart ${clientName}." -ForegroundColor Green`
+  }
+
+  return `set -e
+path="$HOME/${relativePath}"
+mkdir -p "$(dirname "$path")"
+[ ! -f "$path" ] || cp "$path" "$path.starx-backup-$(date +%Y%m%d-%H%M%S)"
+python3 - "$path" <<'STARX_PY'
+import json, os, sys
+path = sys.argv[1]
+patch = json.loads(r'''${patchContent}''')
+try:
+    with open(path, 'r', encoding='utf-8-sig') as handle:
+        current = json.load(handle)
+except FileNotFoundError:
+    current = {}
+def merge(target, source):
+    for key, value in source.items():
+        if isinstance(value, dict) and isinstance(target.get(key), dict):
+            merge(target[key], value)
+        else:
+            target[key] = value
+merge(current, patch)
+with open(path, 'w', encoding='utf-8') as handle:
+    json.dump(current, handle, ensure_ascii=False, indent=2)
+    handle.write('\\n')
+STARX_PY
+printf '%s\\n' 'Star-X ${clientName} configuration completed. Please restart ${clientName}.'`
+}
+
+function buildCodeBuddyInstaller(content: string): string {
+  const parsed = JSON.parse(content) as { models: Array<{ id: string }> }
+  const model = JSON.stringify(parsed.models[0], null, 2)
+  if (activeTab.value === 'windows') {
+    return `$path = Join-Path $env:USERPROFILE ".codebuddy\\models.json"
+New-Item -ItemType Directory -Force -Path (Split-Path $path) | Out-Null
+if (Test-Path $path) { Copy-Item $path "$path.starx-backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')" }
+$current = if (Test-Path $path) { Get-Content $path -Raw | ConvertFrom-Json } else { [PSCustomObject]@{ models = @() } }
+$model = @'
+${model}
+'@ | ConvertFrom-Json
+$models = @($current.models | Where-Object { $_.id -ne $model.id }) + @($model)
+$current | Add-Member -NotePropertyName models -NotePropertyValue $models -Force
+$json = $current | ConvertTo-Json -Depth 100
+[System.IO.File]::WriteAllText($path, $json, (New-Object System.Text.UTF8Encoding($false)))
+Write-Host "Star-X CodeBuddy configuration completed. Please restart CodeBuddy." -ForegroundColor Green`
+  }
+  return `set -e
+path="$HOME/.codebuddy/models.json"
+mkdir -p "$(dirname "$path")"
+[ ! -f "$path" ] || cp "$path" "$path.starx-backup-$(date +%Y%m%d-%H%M%S)"
+python3 - "$path" <<'STARX_PY'
+import json, sys
+path = sys.argv[1]
+model = json.loads(r'''${model}''')
+try:
+    with open(path, 'r', encoding='utf-8-sig') as handle: current = json.load(handle)
+except FileNotFoundError: current = {}
+models = [item for item in current.get('models', []) if item.get('id') != model['id']]
+current['models'] = models + [model]
+with open(path, 'w', encoding='utf-8') as handle:
+    json.dump(current, handle, ensure_ascii=False, indent=2); handle.write('\\n')
+STARX_PY
+printf '%s\\n' 'Star-X CodeBuddy configuration completed. Please restart CodeBuddy.'`
+}
+
+function buildFileInstaller(relativePath: string, content: string, clientName: string): string {
+  if (activeTab.value === 'windows') {
+    const windowsPath = relativePath.replace(/\//g, '\\')
+    return `$path = Join-Path $env:USERPROFILE "${windowsPath}"
+New-Item -ItemType Directory -Force -Path (Split-Path $path) | Out-Null
+if (Test-Path $path) { Copy-Item $path "$path.starx-backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')" }
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+$content = @'
+${content}
+'@
+[System.IO.File]::WriteAllText($path, $content, $utf8)
+Write-Host "Star-X ${clientName} configuration completed. Please restart ${clientName}." -ForegroundColor Green`
+  }
+  return `set -e
+path="$HOME/${relativePath}"
+mkdir -p "$(dirname "$path")"
+[ ! -f "$path" ] || cp "$path" "$path.starx-backup-$(date +%Y%m%d-%H%M%S)"
+cat > "$path" <<'STARX_CONFIG'
+${content}
+STARX_CONFIG
+printf '%s\\n' 'Star-X ${clientName} configuration completed. Please restart ${clientName}.'`
+}
 
 function generateAnthropicFiles(baseUrl: string, apiKey: string): FileConfig[] {
   let path: string
@@ -764,7 +959,7 @@ function generateHermesConfig(baseUrl: string, apiKey: string): FileConfig {
   api_key: ${JSON.stringify(apiKey)}`
 
   return {
-    path: '~/.hermes/config.yaml',
+    path: activeTab.value === 'windows' ? '%USERPROFILE%\\.hermes\\config.yaml' : '~/.hermes/config.yaml',
     content,
     hint: t('keys.useKeyModal.hermes.hint')
   }
@@ -788,7 +983,7 @@ function generateCodeBuddyConfig(baseUrl: string, apiKey: string): FileConfig {
   }, null, 2)
 
   return {
-    path: '~/.codebuddy/models.json',
+    path: activeTab.value === 'windows' ? '%USERPROFILE%\\.codebuddy\\models.json' : '~/.codebuddy/models.json',
     content,
     hint: t('keys.useKeyModal.codebuddy.hint')
   }
@@ -796,6 +991,13 @@ function generateCodeBuddyConfig(baseUrl: string, apiKey: string): FileConfig {
 
 function generateTraeIdeConfig(baseUrl: string, apiKey: string): FileConfig {
   const endpoint = `${baseUrl.replace(/\/+$/, '')}/chat/completions`
+  const guideFields = [
+    { label: t('keys.useKeyModal.trae-ide.apiFormat'), value: 'OpenAI' },
+    { label: t('keys.useKeyModal.trae-ide.fullUrl'), value: endpoint },
+    { label: t('keys.useKeyModal.trae-ide.modelId'), value: OPENAI_COMPATIBLE_AGENT_MODEL },
+    { label: t('keys.useKeyModal.trae-ide.apiKey'), value: apiKey },
+    { label: t('keys.useKeyModal.trae-ide.multimodal'), value: t('keys.useKeyModal.trae-ide.enabled') }
+  ]
   const content = [
     `${t('keys.useKeyModal.trae-ide.apiFormat')}: OpenAI`,
     `${t('keys.useKeyModal.trae-ide.fullUrl')}: ${endpoint}`,
@@ -807,6 +1009,7 @@ function generateTraeIdeConfig(baseUrl: string, apiKey: string): FileConfig {
   return {
     path: t('keys.useKeyModal.trae-ide.path'),
     content,
+    guideFields,
     hint: t('keys.useKeyModal.trae-ide.hint')
   }
 }
@@ -1593,7 +1796,9 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
   )
 
   return {
-    path: pathLabel ?? 'opencode.json',
+    path: pathLabel ?? (activeTab.value === 'windows'
+      ? '%USERPROFILE%\\.config\\opencode\\opencode.json'
+      : '~/.config/opencode/opencode.json'),
     content,
     hint: t('keys.useKeyModal.opencode.hint')
   }

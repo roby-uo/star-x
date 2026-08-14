@@ -20,6 +20,16 @@ vi.mock('@/composables/useClipboard', () => ({
 
 import UseKeyModal from '../UseKeyModal.vue'
 
+function findJsonConfig(wrapper: ReturnType<typeof mount>) {
+  const content = wrapper
+    .findAll('pre code')
+    .map((block) => block.text())
+    .find((text) => text.trim().startsWith('{') && text.includes('"provider"'))
+
+  expect(content).toBeDefined()
+  return content!
+}
+
 describe('UseKeyModal', () => {
   it('renders Grok Build and OpenCode setup for Grok groups', async () => {
     const wrapper = mount(UseKeyModal, {
@@ -70,7 +80,7 @@ describe('UseKeyModal', () => {
     await opencodeTab!.trigger('click')
     await nextTick()
 
-    const parsed = JSON.parse(wrapper.find('pre code').text())
+    const parsed = JSON.parse(findJsonConfig(wrapper))
     expect(parsed.provider.grok.npm).toBe('@ai-sdk/openai')
     expect(parsed.provider.grok.options).toEqual({
       baseURL: 'https://example.com/v1',
@@ -292,7 +302,7 @@ describe('UseKeyModal', () => {
       }
     })
 
-    let installer = wrapper.find('[data-testid="copy-codex-installer"]')
+    let installer = wrapper.find('[data-testid="copy-agent-installer"]')
     expect(installer.exists()).toBe(true)
     await installer.trigger('click')
     expect(copyToClipboardMock).toHaveBeenCalledWith(
@@ -307,7 +317,7 @@ describe('UseKeyModal', () => {
     await windowsTab!.trigger('click')
     await nextTick()
 
-    installer = wrapper.find('[data-testid="copy-codex-installer"]')
+    installer = wrapper.find('[data-testid="copy-agent-installer"]')
     await installer.trigger('click')
     const windowsCommand = copyToClipboardMock.mock.calls.at(-1)?.[0] as string
     expect(windowsCommand).toContain('Join-Path $env:USERPROFILE ".codex"')
@@ -351,16 +361,20 @@ describe('UseKeyModal', () => {
       expect(button).toBeDefined()
       await button!.trigger('click')
       await nextTick()
-      return wrapper.find('pre code').text()
+      return wrapper.findAll('pre code').map((code) => code.text())
     }
 
-    const hermes = await selectClient('keys.useKeyModal.cliTabs.hermes')
+    const hermesBlocks = await selectClient('keys.useKeyModal.cliTabs.hermes')
+    const hermes = hermesBlocks.find((content) => content.includes('provider: custom')) ?? ''
     expect(hermes).toContain('provider: custom')
     expect(hermes).toContain('base_url: "https://example.com/v1"')
     expect(hermes).toContain('api_key: "sk-agent-test"')
     expect(wrapper.text()).toContain('~/.hermes/config.yaml')
 
-    const codeBuddy = JSON.parse(await selectClient('keys.useKeyModal.cliTabs.codebuddy'))
+    expect(wrapper.find('[data-testid="copy-agent-installer"]').exists()).toBe(true)
+
+    const codeBuddyBlocks = await selectClient('keys.useKeyModal.cliTabs.codebuddy')
+    const codeBuddy = JSON.parse(codeBuddyBlocks.find((content) => content.trim().startsWith('{')) ?? '{}')
     expect(codeBuddy.models[0]).toMatchObject({
       id: 'star-x-gpt-5.5',
       apiKey: 'sk-agent-test',
@@ -369,10 +383,12 @@ describe('UseKeyModal', () => {
     })
     expect(wrapper.text()).toContain('~/.codebuddy/models.json')
 
-    const traeIde = await selectClient('keys.useKeyModal.cliTabs.traeIde')
+    const traeBlocks = await selectClient('keys.useKeyModal.cliTabs.traeIde')
+    const traeIde = traeBlocks.join('\n')
     expect(traeIde).toContain('OpenAI')
     expect(traeIde).toContain('https://example.com/v1/chat/completions')
     expect(traeIde).toContain('sk-agent-test')
+    expect(wrapper.find('[data-testid="copy-agent-installer"]').exists()).toBe(false)
 
   })
 
@@ -610,10 +626,9 @@ describe('UseKeyModal', () => {
     await opencodeTab!.trigger('click')
     await nextTick()
 
-    const codeBlock = wrapper.find('pre code')
-    expect(codeBlock.exists()).toBe(true)
-    expect(codeBlock.text()).toContain('"name": "GPT-5.4 Mini"')
-    expect(codeBlock.text()).not.toContain('"name": "GPT-5.4 Nano"')
+    const config = findJsonConfig(wrapper)
+    expect(config).toContain('"name": "GPT-5.4 Mini"')
+    expect(config).not.toContain('"name": "GPT-5.4 Nano"')
   })
 
   it('renders GPT-5.6 alias and max variants in OpenCode config', async () => {
@@ -643,7 +658,7 @@ describe('UseKeyModal', () => {
     await opencodeTab!.trigger('click')
     await nextTick()
 
-    const parsed = JSON.parse(wrapper.find('pre code').text())
+    const parsed = JSON.parse(findJsonConfig(wrapper))
     const models = parsed.provider.openai.models
     for (const model of ['gpt-5.6', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']) {
       expect(models[model]).toBeDefined()

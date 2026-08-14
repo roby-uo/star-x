@@ -161,6 +161,14 @@ export default {
         manualSetupPathUnix: 'Open Terminal and run mkdir -p ~/.codex, then enable hidden files in Finder or your file manager.',
         manualSetupPasteGuide: 'Create or open config.toml and auth.json, paste each matching block below, save both files, and restart Codex.',
       },
+      agentQuickSetup: {
+        title: 'Recommended: Configure {client} in one step',
+        description: 'Copy and run the command below to create the config directory, back up existing files, and add the Star-X configuration.',
+        backupNotice: 'The script first creates a timestamped .starx-backup copy. It contains your API key; never share it or commit it. Hermes is replaced after backup; JSON clients preserve existing content and merge the Star-X entry where possible.',
+        manualTitle: 'Where is the {client} configuration file?',
+        manualPath: 'Configuration path: {path}. Create the directory and file if they do not exist.',
+        manualPasteGuide: 'Copy the configuration below into the matching file. Merge the Star-X entry when a file already exists, then restart the client.',
+      },
       cliTabs: {
         claudeCode: 'Claude Code',
         geminiCli: 'Gemini CLI',

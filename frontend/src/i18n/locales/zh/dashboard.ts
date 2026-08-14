@@ -162,6 +162,14 @@ export default {
         manualSetupPathUnix: '打开终端并运行 mkdir -p ~/.codex，然后在访达或文件管理器中显示隐藏文件。',
         manualSetupPasteGuide: '分别创建或打开 config.toml 和 auth.json，把下面对应代码完整粘贴进去，保存后重启 Codex。'
       },
+      agentQuickSetup: {
+        title: '推荐：一键配置 {client}',
+        description: '复制并运行下面的命令，即可自动创建配置目录、备份已有文件并添加 Star-X 配置。',
+        backupNotice: '脚本会先生成带时间戳的 .starx-backup 备份。命令内含你的 API 密钥，请勿转发或发布到代码仓库。Hermes 配置会在备份后替换，其他 JSON 配置会尽量保留原有内容并合并 Star-X 项。',
+        manualTitle: '{client} 配置文件在哪里？',
+        manualPath: '配置文件路径：{path}。如果目录或文件不存在，请按该路径新建。',
+        manualPasteGuide: '把下面的配置复制到对应文件中；已有配置时请合并 Star-X 项，不要删除其他设置。保存后重启客户端。'
+      },
       cliTabs: {
         claudeCode: 'Claude Code',
         geminiCli: 'Gemini CLI',
