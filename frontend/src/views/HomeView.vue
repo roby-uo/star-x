@@ -70,7 +70,24 @@
   <span>"usage"</span>: { <span>"input_tokens"</span>: 11, <span>"output_tokens"</span>: 18 }
 }</code></pre>
           </div>
-          <div class="api-footer"><span>156 MS　·　29 TOKENS　·　COST $0.00007</span><span>STREAM　·　SSE</span></div>
+          <div class="api-footer"><span>156 MS · 29 TOKENS · COST $0.00007</span><span>STREAM · SSE</span></div>
+        </div>
+      </section>
+
+      <section id="models" class="models section-shell">
+        <p class="section-kicker">已支持的 AI 模型</p>
+        <p class="section-note">一个 API，多种选择</p>
+        <div class="model-list">
+          <span v-for="model in models" :key="model.name" class="model-pill"><HomeBrandIcon :brand="model.brand" />{{ model.name }} <b>已支持</b></span>
+          <span class="model-pill muted"><i>＋</i> 更多 <small>即将推出</small></span>
+        </div>
+      </section>
+
+      <section class="models coding-tools section-shell">
+        <p class="section-kicker">已支持的 AI Coding</p>
+        <p class="section-note">主流 AI 编程工具，一站式配置接入</p>
+        <div class="model-list">
+          <span v-for="tool in codingTools" :key="tool.name" class="model-pill"><HomeBrandIcon :brand="tool.brand" />{{ tool.name }} <b>已支持</b></span>
         </div>
       </section>
 
@@ -80,15 +97,6 @@
           <h3>{{ feature.title }}</h3>
           <p>{{ feature.description }}</p>
         </article>
-      </section>
-
-      <section id="models" class="models section-shell">
-        <p class="section-kicker">已支持的 AI 模型</p>
-        <p class="section-note">一个 API，多种选择</p>
-        <div class="model-list">
-          <span v-for="model in models" :key="model.name" class="model-pill"><i :class="model.color">{{ model.mark }}</i>{{ model.name }} <b>已支持</b></span>
-          <span class="model-pill muted"><i>＋</i> 更多 <small>即将推出</small></span>
-        </div>
       </section>
 
       <section id="metrics" class="metrics section-shell">
@@ -119,7 +127,7 @@
 
       <section class="cta section-shell">
         <div><h2>准备简化你的 AI 集成了吗？</h2><p>立即部署你的网关，开始路由请求，掌控你的 AI 服务。</p></div>
-        <div class="cta-actions"><router-link :to="isAuthenticated ? dashboardPath : '/login'" class="primary-button">进入控制台　→</router-link><a v-if="docUrl" :href="docUrl" target="_blank" rel="noopener noreferrer" class="secondary-button">查看定价</a></div>
+        <div class="cta-actions"><router-link :to="isAuthenticated ? dashboardPath : '/login'" class="primary-button">进入控制台 →</router-link><a v-if="docUrl" :href="docUrl" target="_blank" rel="noopener noreferrer" class="secondary-button">查看定价</a></div>
       </section>
     </main>
 
@@ -131,6 +139,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useAuthStore, useAppStore } from '@/stores'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
+import HomeBrandIcon from '@/components/common/HomeBrandIcon.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { sanitizeUrl } from '@/utils/url'
 
@@ -151,7 +160,11 @@ const features = [
   { icon: '▤', color: 'violet', title: '按量付费', description: '按实际使用量计费，支持设置配额上限，团队用量一目了然。' },
 ]
 const models = [
-  { name: 'Claude', mark: 'C', color: 'orange' }, { name: 'GPT', mark: 'G', color: 'green' }, { name: 'Gemini', mark: 'G', color: 'blue' }, { name: 'Antigravity', mark: 'A', color: 'pink' },
+  { name: 'Claude', brand: 'claude' }, { name: 'GPT', brand: 'openai' }, { name: 'Gemini', brand: 'gemini' }, { name: 'Antigravity', brand: 'antigravity' },
+]
+const codingTools = [
+  { name: 'Claude Code', brand: 'claude' }, { name: 'Codex', brand: 'openai' }, { name: 'OpenCode', brand: 'opencode' },
+  { name: 'Hermes', brand: 'hermes' }, { name: 'CodeBuddy', brand: 'tencent' }, { name: 'TRAE IDE', brand: 'trae' },
 ]
 const metrics = [{ value: '50+', label: '上游服务集成' }, { value: '100+', label: '模型计费支持' }, { value: '50+', label: '兼容 API 接口' }, { value: '10+', label: '调度控制策略' }]
 const steps = [
@@ -172,6 +185,7 @@ onMounted(() => { isDark.value = localStorage.getItem('theme') === 'dark'; docum
 .is-dark .eyebrow{border-color:#28547d;background:#14263a;color:#69b9ff}.is-dark .trust-list{color:#9eacc0}
 .is-dark .api-tabs button{color:#a7b2c4}.is-dark .api-tabs button.active{color:#58aeff}.is-dark .api-status{color:#a7b3c5}.is-dark .endpoint{color:#edf5ff}.is-dark .endpoint span{background:#173b36;color:#55d7ad}
 .is-dark .api-panel pre{color:#91c8ee}.is-dark .api-panel code span{color:#69b6f5}.is-dark .api-panel code em{color:#f0af75}.is-dark .api-footer{color:#9eacc0}
+.coding-tools{padding-top:0;padding-bottom:48px}.models:not(.coding-tools){padding-bottom:32px}.model-pill{padding:8px 13px}
 .is-dark .feature-card,.is-dark .model-pill{background:#18212f;border-color:#2d3a4f;box-shadow:0 12px 26px #02060d44}.is-dark .feature-card:hover{box-shadow:0 18px 34px #02060d88}.is-dark .feature-card h3{color:#f4f7fc}
 .is-dark .model-pill b{background:#173653;color:#73c0ff}.is-dark .model-pill.muted{color:#b4becd}.is-dark .model-pill.muted i{background:#2a3444;color:#c7d0dd}
 .is-dark .metrics{border-color:#2d3a4f;background:#151e2b}.is-dark .metric{border-color:#2d3a4f}.is-dark .metric span{color:#aeb9c9}
