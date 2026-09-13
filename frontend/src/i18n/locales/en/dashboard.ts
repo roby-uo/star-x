@@ -162,8 +162,8 @@ export default {
         manualSetupPasteGuide: 'Create or open config.toml and auth.json, paste each matching block below, save both files, and restart Codex.',
       },
       agentQuickSetup: {
-        title: 'Recommended: Configure {client} in one step',
-        description: 'Copy and run the command below to create the config directory, back up existing files, and add the Star-X configuration.',
+        title: 'Method 2: Configure {client} in one step',
+        description: 'Copy and run the command below to create the config directory, back up existing files, and add the Star-X configuration. Running it again refreshes the available models from /models.',
         stepThree: 'Completely quit and reopen {client}, then create a new task.',
         agentPromptTitle: 'Method 1: Let the {client} agent configure it',
         agentPromptDescription: 'Copy this prompt and paste it into the current agent so it can configure and test the connection on your computer.',
@@ -180,7 +180,7 @@ Please follow these requirements:
 3. Run a minimal request to verify connectivity and model availability. If it fails, report the HTTP status and cause without printing the API key again.
 4. Tell me which file you changed, which model you tested, and whether {client} needs to be restarted.`,
         backupNotice: 'The script first creates a timestamped .starx-backup copy. It contains your API key; never share it or commit it. Hermes is replaced after backup; JSON clients preserve existing content and merge the Star-X entry where possible.',
-        manualTitle: 'Where is the {client} configuration file?',
+        manualTitle: 'Method 3: Configure {client} manually',
         manualPath: 'Configuration path: {path}. Create the directory and file if they do not exist.',
         manualPasteGuide: 'Copy the configuration below into the matching file. Merge the Star-X entry when a file already exists, then restart the client.',
       },

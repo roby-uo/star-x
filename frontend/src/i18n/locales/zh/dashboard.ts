@@ -163,8 +163,8 @@ export default {
         manualSetupPasteGuide: '分别创建或打开 config.toml 和 auth.json，把下面对应代码完整粘贴进去，保存后重启 Codex。'
       },
       agentQuickSetup: {
-        title: '推荐：一键配置 {client}',
-        description: '复制并运行下面的命令，即可自动创建配置目录、备份已有文件并添加 Star-X 配置。',
+        title: '方式二：一键配置 {client}',
+        description: '复制并运行下面的命令，即可自动创建配置目录、备份已有文件并添加 Star-X 配置；再次运行时会从 /models 刷新当前可用模型。',
         stepThree: '完全退出并重新打开 {client}，然后新建一个任务。',
         agentPromptTitle: '方式一：让 {client} Agent 自动配置',
         agentPromptDescription: '复制这段提示词，粘贴给当前 Agent，让它在你的电脑上完成配置并测试连接。',
@@ -181,7 +181,7 @@ API Key：{apiKey}
 3. 配置完成后，用一个最小请求测试连通性和模型可用性；如果失败，请告诉我实际 HTTP 状态码和错误原因，但不要在输出中再次显示 API Key。
 4. 最后告诉我修改了哪个文件、使用了哪个模型，以及是否需要我重启 {client}。`,
         backupNotice: '脚本会先生成带时间戳的 .starx-backup 备份。命令内含你的 API 密钥，请勿转发或发布到代码仓库。Hermes 配置会在备份后替换，其他 JSON 配置会尽量保留原有内容并合并 Star-X 项。',
-        manualTitle: '{client} 配置文件在哪里？',
+        manualTitle: '方式三：手动配置 {client}',
         manualPath: '配置文件路径：{path}。如果目录或文件不存在，请按该路径新建。',
         manualPasteGuide: '把下面的配置复制到对应文件中；已有配置时请合并 Star-X 项，不要删除其他设置。保存后重启客户端。'
       },
