@@ -384,6 +384,15 @@ describe('UseKeyModal', () => {
     expect(workBuddy.availableModels).toContain('star-x-gpt-5.5')
     expect(wrapper.text()).toContain('~/.workbuddy/models.json')
 
+    const workBuddyInstaller = wrapper.find('[data-testid="copy-agent-installer"]')
+    await workBuddyInstaller.trigger('click')
+    const installerCommand = copyToClipboardMock.mock.calls.at(-1)?.[0] as string
+    expect(installerCommand).toContain('/models')
+    expect(installerCommand).toContain('Model list refreshed')
+
+    expect(wrapper.text()).toContain('keys.useKeyModal.agentQuickSetup.stepThree')
+    expect(wrapper.find('[data-testid="copy-agent-prompt"]').exists()).toBe(true)
+
     const traeBlocks = await selectClient('keys.useKeyModal.cliTabs.traeIde')
     const traeIde = traeBlocks.join('\n')
     expect(traeIde).toContain('OpenAI')

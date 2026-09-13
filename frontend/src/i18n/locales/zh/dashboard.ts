@@ -165,6 +165,21 @@ export default {
       agentQuickSetup: {
         title: '推荐：一键配置 {client}',
         description: '复制并运行下面的命令，即可自动创建配置目录、备份已有文件并添加 Star-X 配置。',
+        stepThree: '完全退出并重新打开 {client}，然后新建一个任务。',
+        agentPromptTitle: '方式一：让 {client} Agent 自动配置',
+        agentPromptDescription: '复制这段提示词，粘贴给当前 Agent，让它在你的电脑上完成配置并测试连接。',
+        copyAgentPrompt: '复制提示词',
+        agentPrompt: `请帮我把当前电脑上的 {client} 配置为使用 Star-X 的兼容接口。
+
+配置地址：{baseUrl}
+OpenAI Chat Completions 地址：{endpoint}
+API Key：{apiKey}
+
+请按以下要求执行：
+1. 先识别 {client} 当前版本和正确的用户级配置文件位置；如果已有配置，先备份，不要删除其他账号、模型或插件设置。
+2. 使用适合 {client} 的原生配置格式，把 Star-X 接口写入配置；模型列表从兼容接口的 /models 获取，或保留当前中转站返回的可用模型名称，不要自行猜测模型 ID。
+3. 配置完成后，用一个最小请求测试连通性和模型可用性；如果失败，请告诉我实际 HTTP 状态码和错误原因，但不要在输出中再次显示 API Key。
+4. 最后告诉我修改了哪个文件、使用了哪个模型，以及是否需要我重启 {client}。`,
         backupNotice: '脚本会先生成带时间戳的 .starx-backup 备份。命令内含你的 API 密钥，请勿转发或发布到代码仓库。Hermes 配置会在备份后替换，其他 JSON 配置会尽量保留原有内容并合并 Star-X 项。',
         manualTitle: '{client} 配置文件在哪里？',
         manualPath: '配置文件路径：{path}。如果目录或文件不存在，请按该路径新建。',

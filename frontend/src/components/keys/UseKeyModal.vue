@@ -146,10 +146,31 @@
               {{ quickSetupDescription }}
             </p>
           </div>
+          <div class="rounded-lg border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-800/60 dark:bg-indigo-900/20">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="font-medium text-indigo-900 dark:text-indigo-100">
+                  {{ agentPromptTitle }}
+                </p>
+                <p class="mt-1 text-xs leading-5 text-indigo-800 dark:text-indigo-200">
+                  {{ agentPromptDescription }}
+                </p>
+              </div>
+              <button
+                type="button"
+                data-testid="copy-agent-prompt"
+                class="flex-shrink-0 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500"
+                @click="copyContent(agentAssistPrompt, -2)"
+              >
+                {{ copiedIndex === -2 ? t('keys.useKeyModal.copied') : agentPromptCopyLabel }}
+              </button>
+            </div>
+            <pre class="mt-3 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-white/80 p-3 text-xs leading-5 text-indigo-950 dark:bg-dark-900/70 dark:text-indigo-100"><code v-text="agentAssistPrompt"></code></pre>
+          </div>
           <ol class="list-inside list-decimal space-y-1 text-sm text-gray-700 dark:text-gray-200">
             <li>{{ quickSetupStepOne }}</li>
             <li>{{ t('keys.useKeyModal.openai.quickSetupStepTwo') }}</li>
-            <li>{{ t('keys.useKeyModal.openai.quickSetupStepThree') }}</li>
+            <li>{{ quickSetupStepThree }}</li>
           </ol>
           <div class="overflow-hidden rounded-xl bg-gray-900 dark:bg-dark-900">
             <div class="flex items-center justify-between border-b border-gray-700 bg-gray-800 px-4 py-2 dark:bg-dark-800">
@@ -724,6 +745,36 @@ const activeClientLabel = computed(() =>
   clientTabs.value.find((tab) => tab.id === activeClientTab.value)?.label ?? activeClientTab.value
 )
 
+const quickSetupStepThree = computed(() =>
+  showCodexQuickSetup.value
+    ? t('keys.useKeyModal.openai.quickSetupStepThree')
+    : t('keys.useKeyModal.agentQuickSetup.stepThree', { client: activeClientLabel.value })
+)
+
+const agentPromptTitle = computed(() =>
+  t('keys.useKeyModal.agentQuickSetup.agentPromptTitle', { client: activeClientLabel.value })
+)
+
+const agentPromptDescription = computed(() =>
+  t('keys.useKeyModal.agentQuickSetup.agentPromptDescription')
+)
+
+const agentPromptCopyLabel = computed(() =>
+  t('keys.useKeyModal.agentQuickSetup.copyAgentPrompt')
+)
+
+const agentAssistPrompt = computed(() => {
+  const configuredBaseUrl = props.baseUrl || window.location.origin
+  const normalizedBaseUrl = configuredBaseUrl.replace(/\/+$/, '')
+  const openAiEndpoint = `${normalizedBaseUrl.replace(/\/v1\/?$/, '')}/v1/chat/completions`
+  return t('keys.useKeyModal.agentQuickSetup.agentPrompt', {
+    client: activeClientLabel.value,
+    baseUrl: configuredBaseUrl,
+    endpoint: openAiEndpoint,
+    apiKey: props.apiKey
+  })
+})
+
 const codexInstallCommand = computed(() => {
   const [configFile, authFile] = currentFiles.value
   if (!configFile || !authFile) return ''
@@ -838,41 +889,107 @@ printf '%s\\n' 'Star-X ${clientName} configuration completed. Please restart ${c
 function buildWorkBuddyInstaller(content: string): string {
   const parsed = JSON.parse(content) as { models: Array<{ id: string }> }
   const model = JSON.stringify(parsed.models[0], null, 2)
+  const configuredRoot = (props.baseUrl || window.location.origin).replace(/\/+$/, '').replace(/\/v1\/?$/, '')
+  const configuredBaseUrl = `${configuredRoot}/v1`
+  const modelsEndpoint = `${configuredBaseUrl}/models`
+  const chatEndpoint = `${configuredBaseUrl}/chat/completions`
   if (activeTab.value === 'windows') {
     return `$path = Join-Path $env:USERPROFILE ".workbuddy\\models.json"
 New-Item -ItemType Directory -Force -Path (Split-Path $path) | Out-Null
 if (Test-Path $path) { Copy-Item $path "$path.starx-backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')" }
 $current = if (Test-Path $path) { Get-Content $path -Raw | ConvertFrom-Json } else { [PSCustomObject]@{ models = @() } }
-$model = @'
+$headers = @{ Authorization = "Bearer ${props.apiKey}" }
+$remoteIds = @()
+try {
+  $response = Invoke-RestMethod -Uri "${modelsEndpoint}" -Headers $headers -Method Get -TimeoutSec 20
+  $remoteIds = @($response.data | ForEach-Object { $_.id } | Where-Object { $_ -is [string] -and $_.Trim() })
+} catch {
+  Write-Warning "Could not load Star-X model list; preserving existing models and adding the fallback model."
+}
+$fallback = @'
 ${model}
 '@ | ConvertFrom-Json
-$models = @($current.models | Where-Object { $_.id -ne $model.id }) + @($model)
-$availableModels = @($current.availableModels | Where-Object { $_ -ne $model.id }) + @($model.id)
+$ids = @($remoteIds)
+if ($ids.Count -eq 0) { $ids = @($fallback.id) }
+$models = @($current.models)
+foreach ($id in $ids) {
+  $existing = @($models | Where-Object { $_.id -eq $id }) | Select-Object -First 1
+  if ($null -eq $existing) {
+    $models += [PSCustomObject]@{
+      id = $id
+      name = "Star-X $id"
+      vendor = "star-X"
+      apiKey = "${props.apiKey}"
+      maxInputTokens = 400000
+      maxOutputTokens = 128000
+      url = "${chatEndpoint}"
+      supportsToolCall = $true
+      supportsImages = $false
+      supportsReasoning = $true
+    }
+  } elseif ($existing.vendor -eq "star-X") {
+    $existing.name = "Star-X $id"
+    $existing.apiKey = "${props.apiKey}"
+    $existing.url = "${chatEndpoint}"
+  }
+}
+$availableModels = @($current.availableModels) + @($ids) | Select-Object -Unique
 $current | Add-Member -NotePropertyName models -NotePropertyValue $models -Force
 $current | Add-Member -NotePropertyName availableModels -NotePropertyValue $availableModels -Force
 $json = $current | ConvertTo-Json -Depth 100
 [System.IO.File]::WriteAllText($path, $json, (New-Object System.Text.UTF8Encoding($false)))
-Write-Host "Star-X WorkBuddy configuration completed. Please restart WorkBuddy." -ForegroundColor Green`
+Write-Host "Star-X WorkBuddy configuration completed. Loaded $($ids.Count) model(s). Please restart WorkBuddy." -ForegroundColor Green`
   }
   return `set -e
 path="$HOME/.workbuddy/models.json"
 mkdir -p "$(dirname "$path")"
 [ ! -f "$path" ] || cp "$path" "$path.starx-backup-$(date +%Y%m%d-%H%M%S)"
 python3 - "$path" <<'STARX_PY'
-import json, sys
+import json, sys, urllib.request
 path = sys.argv[1]
-model = json.loads(r'''${model}''')
+api_key = ${JSON.stringify(props.apiKey)}
+models_url = ${JSON.stringify(modelsEndpoint)}
+chat_url = ${JSON.stringify(chatEndpoint)}
 try:
     with open(path, 'r', encoding='utf-8-sig') as handle: current = json.load(handle)
 except FileNotFoundError: current = {}
-models = [item for item in current.get('models', []) if item.get('id') != model['id']]
-current['models'] = models + [model]
-available = [item for item in current.get('availableModels', []) if item != model['id']]
-current['availableModels'] = available + [model['id']]
+ids = []
+try:
+    request = urllib.request.Request(models_url, headers={'Authorization': f'Bearer {api_key}'})
+    with urllib.request.urlopen(request, timeout=20) as response:
+        payload = json.load(response)
+    ids = [item.get('id') for item in payload.get('data', []) if isinstance(item, dict) and item.get('id')]
+except Exception as error:
+    print(f'Warning: could not load Star-X model list ({error}); preserving existing models.', file=sys.stderr)
+if not ids:
+    fallback = json.loads(r'''${model}''')
+    ids = [fallback['id']]
+models = current.get('models') or []
+by_id = {item.get('id'): item for item in models if isinstance(item, dict) and item.get('id')}
+for model_id in ids:
+    model = by_id.get(model_id)
+    if model is None:
+        by_id[model_id] = {
+            'id': model_id,
+            'name': f'Star-X {model_id}',
+            'vendor': 'star-X',
+            'apiKey': api_key,
+            'maxInputTokens': 400000,
+            'maxOutputTokens': 128000,
+            'url': chat_url,
+            'supportsToolCall': True,
+            'supportsImages': False,
+            'supportsReasoning': True,
+        }
+    elif model.get('vendor') == 'star-X':
+        model.update({'name': f'Star-X {model_id}', 'apiKey': api_key, 'url': chat_url})
+current['models'] = list(by_id.values())
+available = current.get('availableModels') or []
+current['availableModels'] = list(dict.fromkeys(available + ids))
 with open(path, 'w', encoding='utf-8') as handle:
     json.dump(current, handle, ensure_ascii=False, indent=2); handle.write('\\n')
 STARX_PY
-printf '%s\\n' 'Star-X WorkBuddy configuration completed. Please restart WorkBuddy.'`
+printf '%s\\n' 'Star-X WorkBuddy configuration completed. Model list refreshed. Please restart WorkBuddy.'`
 }
 
 function buildFileInstaller(relativePath: string, content: string, clientName: string): string {
