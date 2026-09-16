@@ -174,6 +174,10 @@
       <template #table>
         <AccountBulkActionsBar
           :selected-ids="selIds"
+          :auto-rotation-enabled="autoRotationStatus?.enabled === true"
+          :auto-rotation-loading="autoRotationLoading"
+          :auto-rotation-countdown="autoRotationCountdownLabel"
+          @toggle-auto-rotation="handleToggleAutoRotation"
           @delete="handleBulkDelete"
           @reset-status="handleBulkResetStatus"
           @refresh-token="handleBulkRefreshToken"
@@ -285,7 +289,7 @@
             </div>
           </template>
           <template #cell-schedulable="{ row }">
-            <button @click="handleToggleSchedulable(row)" :disabled="togglingSchedulable === row.id" class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus:ring-offset-dark-800" :class="[row.schedulable ? 'bg-primary-500 hover:bg-primary-600' : 'bg-gray-200 hover:bg-gray-300 dark:bg-dark-600 dark:hover:bg-dark-500']" :title="row.schedulable ? t('admin.accounts.schedulableEnabled') : t('admin.accounts.schedulableDisabled')">
+            <button @click="handleToggleSchedulable(row)" :disabled="autoRotationStatus?.enabled === true || togglingSchedulable === row.id" class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus:ring-offset-dark-800" :class="[row.schedulable ? 'bg-primary-500 hover:bg-primary-600' : 'bg-gray-200 hover:bg-gray-300 dark:bg-dark-600 dark:hover:bg-dark-500']" :title="autoRotationStatus?.enabled ? t('admin.accounts.autoRotation.managedHint') : (row.schedulable ? t('admin.accounts.schedulableEnabled') : t('admin.accounts.schedulableDisabled'))">
               <span class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out" :class="[row.schedulable ? 'translate-x-4' : 'translate-x-0']" />
             </button>
           </template>
@@ -507,6 +511,7 @@ import { formatDateTime, formatRelativeTime } from '@/utils/format'
 import { proxyExpiryBadgeClass, proxyExpiryLabelKey } from '@/utils/proxyExpiry'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { sanitizeUrl } from '@/utils/url'
+import type { AccountAutoRotationStatus } from '@/api/admin/accounts'
 import type { Account, AccountPlatform, AccountSchedulerGroupScore, AccountType, Proxy as AccountProxy, AdminGroup, WindowStats, ClaudeModel, UpstreamBillingProbeSnapshot } from '@/types'
 
 const { t } = useI18n()
@@ -657,6 +662,62 @@ const todayStatsError = ref<string | null>(null)
 const todayStatsReqSeq = ref(0)
 const pendingTodayStatsRefresh = ref(false)
 const usageManualRefreshToken = ref(0)
+const autoRotationStatus = ref<AccountAutoRotationStatus | null>(null)
+const autoRotationLoading = ref(false)
+const autoRotationNow = ref(Date.now())
+
+const autoRotationCountdownLabel = computed(() => {
+  const status = autoRotationStatus.value
+  if (!status?.enabled) return ''
+  if (!status.next_rotation_at) return t('admin.accounts.autoRotation.waitingForEligible')
+  const remainingSeconds = Math.max(0, Math.ceil((new Date(status.next_rotation_at).getTime() - autoRotationNow.value) / 1000))
+  const hours = Math.floor(remainingSeconds / 3600)
+  const minutes = Math.floor((remainingSeconds % 3600) / 60)
+  const seconds = remainingSeconds % 60
+  const time = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+  return t('admin.accounts.autoRotation.countdown', {
+    time,
+    name: status.active_account_name || `#${status.active_account_id ?? '-'}`
+  })
+})
+
+const loadAutoRotationStatus = async () => {
+  if (typeof adminAPI.accounts.getAutoRotation !== 'function') return
+  try {
+    autoRotationStatus.value = await adminAPI.accounts.getAutoRotation()
+  } catch (error) {
+    console.error('Failed to load automatic account rotation status:', error)
+  }
+}
+
+const handleToggleAutoRotation = async () => {
+  if (autoRotationLoading.value || typeof adminAPI.accounts.updateAutoRotation !== 'function') return
+  autoRotationLoading.value = true
+  try {
+    const nextEnabled = !(autoRotationStatus.value?.enabled === true)
+    autoRotationStatus.value = await adminAPI.accounts.updateAutoRotation(nextEnabled)
+    appStore.showSuccess(t(nextEnabled ? 'admin.accounts.autoRotation.enableSuccess' : 'admin.accounts.autoRotation.disableSuccess'))
+    await reload()
+  } catch (error) {
+    console.error('Failed to update automatic account rotation:', error)
+    appStore.showError(t('admin.accounts.autoRotation.updateFailed'))
+  } finally {
+    autoRotationLoading.value = false
+  }
+}
+
+const { pause: pauseAutoRotationClock, resume: resumeAutoRotationClock } = useIntervalFn(() => {
+  autoRotationNow.value = Date.now()
+}, 1000, { immediate: false })
+
+const { pause: pauseAutoRotationPoll, resume: resumeAutoRotationPoll } = useIntervalFn(async () => {
+  if (typeof document !== 'undefined' && document.hidden) return
+  const previousActiveID = autoRotationStatus.value?.active_account_id
+  await loadAutoRotationStatus()
+  if (previousActiveID !== autoRotationStatus.value?.active_account_id) {
+    await reload()
+  }
+}, 15_000, { immediate: false })
 
 const buildDefaultTodayStats = (): WindowStats => ({
   requests: 0,
@@ -1987,6 +2048,7 @@ const confirmCreateSparkShadow = async () => {
 const handleDelete = (a: Account) => { deletingAcc.value = a; showDeleteDialog.value = true }
 const confirmDelete = async () => { if(!deletingAcc.value) return; try { await adminAPI.accounts.delete(deletingAcc.value.id); showDeleteDialog.value = false; deletingAcc.value = null; reload() } catch (error) { console.error('Failed to delete account:', error) } }
 const handleToggleSchedulable = async (a: Account) => {
+  if (autoRotationStatus.value?.enabled) return
   const nextSchedulable = !a.schedulable
   togglingSchedulable.value = a.id
   try {
@@ -2052,6 +2114,9 @@ const handleClickOutside = (event: MouseEvent) => {
 onMounted(async () => {
   load()
   loadUpstreamBillingProbeGlobalState()
+  await loadAutoRotationStatus()
+  resumeAutoRotationClock()
+  resumeAutoRotationPoll()
   try {
     const [p, g] = await Promise.all([adminAPI.proxies.getAll(), adminAPI.groups.getAll()])
     proxies.value = p
@@ -2071,6 +2136,8 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  pauseAutoRotationClock()
+  pauseAutoRotationPoll()
   window.removeEventListener('scroll', handleScroll, true)
   document.removeEventListener('click', handleClickOutside)
 })

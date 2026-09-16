@@ -274,6 +274,15 @@ func ProvideAccountExpiryService(accountRepo AccountRepository) *AccountExpirySe
 	return svc
 }
 
+// ProvideAccountAutoRotationService creates the persistent five-hour OpenAI
+// OAuth account rotation worker.
+func ProvideAccountAutoRotationService(accountRepo AccountRepository, settingRepo SettingRepository, settingService *SettingService) *AccountAutoRotationService {
+	svc := NewAccountAutoRotationService(accountRepo, settingRepo)
+	svc.SetSettingService(settingService)
+	svc.Start()
+	return svc
+}
+
 // ProvideProxyExpiryService creates and starts ProxyExpiryService.
 func ProvideProxyExpiryService(proxyRepo ProxyRepository) *ProxyExpiryService {
 	svc := NewProxyExpiryService(proxyRepo, time.Minute)
@@ -753,6 +762,7 @@ var ProviderSet = wire.NewSet(
 	ProvideTokenRefreshService,
 	wire.Bind(new(GrokOAuthReconciler), new(*TokenRefreshService)),
 	ProvideAccountExpiryService,
+	ProvideAccountAutoRotationService,
 	ProvideProxyExpiryService,
 	ProvideSubscriptionExpiryService,
 	ProvideTimingWheelService,

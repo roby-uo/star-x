@@ -63,6 +63,7 @@ type AccountHandler struct {
 	tokenCacheInvalidator   service.TokenCacheInvalidator
 	grokImportProber        grokImportProber
 	upstreamBillingProbe    *service.UpstreamBillingProbeService
+	autoRotation            *service.AccountAutoRotationService
 }
 
 // SetUpstreamBillingProbeService attaches the optional remote billing probe service.
@@ -1890,6 +1891,17 @@ func (h *AccountHandler) BulkUpdate(c *gin.Context) {
 		response.BadRequest(c, "rate_multiplier must be >= 0")
 		return
 	}
+	if req.Schedulable != nil && h.autoRotation != nil {
+		enabled, checkErr := h.autoRotation.IsEnabled(c.Request.Context())
+		if checkErr != nil {
+			response.ErrorFrom(c, checkErr)
+			return
+		}
+		if enabled {
+			response.ErrorFrom(c, infraerrors.Conflict("ACCOUNT_AUTO_ROTATION_ACTIVE", "automatic account rotation controls scheduling while enabled"))
+			return
+		}
+	}
 	if len(req.AccountIDs) == 0 && req.Filters == nil {
 		response.BadRequest(c, "account_ids or filters is required")
 		return
@@ -2318,6 +2330,17 @@ func (h *AccountHandler) SetSchedulable(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
+	}
+	if h.autoRotation != nil {
+		enabled, checkErr := h.autoRotation.IsEnabled(c.Request.Context())
+		if checkErr != nil {
+			response.ErrorFrom(c, checkErr)
+			return
+		}
+		if enabled {
+			response.ErrorFrom(c, infraerrors.Conflict("ACCOUNT_AUTO_ROTATION_ACTIVE", "automatic account rotation controls scheduling while enabled"))
+			return
+		}
 	}
 
 	account, err := h.adminService.SetAccountSchedulable(c.Request.Context(), accountID, req.Schedulable)

@@ -512,6 +512,27 @@ export async function setSchedulable(id: number, schedulable: boolean): Promise<
   return data
 }
 
+export interface AccountAutoRotationStatus {
+  enabled: boolean
+  interval_seconds: number
+  active_account_id?: number | null
+  active_account_name?: string
+  cycle_started_at?: string | null
+  next_rotation_at?: string | null
+  eligible_account_ids: number[]
+  eligible_account_count: number
+}
+
+export async function getAutoRotation(): Promise<AccountAutoRotationStatus> {
+  const { data } = await apiClient.get<AccountAutoRotationStatus>('/admin/accounts/auto-rotation')
+  return data
+}
+
+export async function updateAutoRotation(enabled: boolean): Promise<AccountAutoRotationStatus> {
+  const { data } = await apiClient.put<AccountAutoRotationStatus>('/admin/accounts/auto-rotation', { enabled })
+  return data
+}
+
 /**
  * Get available models for an account
  * @param id - Account ID
@@ -906,6 +927,8 @@ export const accountsAPI = {
   getTempUnschedulableStatus,
   resetTempUnschedulable,
   setSchedulable,
+  getAutoRotation,
+  updateAutoRotation,
   getAvailableModels,
   syncUpstreamModels,
   syncUpstreamModelsPreview,

@@ -94,6 +94,16 @@ export default {
       schedulableEnabled: '调度已开启',
       schedulableDisabled: '调度已关闭',
       failedToToggleSchedulable: '切换调度状态失败',
+      autoRotation: {
+        enable: '自动调动',
+        enabled: '自动调动已开启',
+        countdown: '{name} 服役中，距下次调度 {time}',
+        waitingForEligible: '暂无同时具备 5h 与周额度的账号',
+        managedHint: '自动调动已开启，账号调度状态由系统管理',
+        enableSuccess: '自动调动已开启',
+        disableSuccess: '自动调动已关闭，账号调度状态已恢复',
+        updateFailed: '更新自动调动状态失败'
+      },
       groupCountTotal: '共 {count} 个分组',
       columns: {
         name: '名称',

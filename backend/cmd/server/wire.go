@@ -88,6 +88,7 @@ func provideCleanup(
 	schedulerSnapshot *service.SchedulerSnapshotService,
 	tokenRefresh *service.TokenRefreshService,
 	accountExpiry *service.AccountExpiryService,
+	accountAutoRotation *service.AccountAutoRotationService,
 	proxyExpiry *service.ProxyExpiryService,
 	subscriptionExpiry *service.SubscriptionExpiryService,
 	usageCleanup *service.UsageCleanupService,
@@ -125,6 +126,12 @@ func provideCleanup(
 
 		// 应用层清理步骤可并行执行，基础设施资源（Redis/Ent）最后按顺序关闭。
 		parallelSteps := []cleanupStep{
+			{"AccountAutoRotationService", func() error {
+				if accountAutoRotation != nil {
+					accountAutoRotation.Stop()
+				}
+				return nil
+			}},
 			{"OpsIngressRejectAggregator", func() error {
 				if opsIngressReject != nil {
 					opsIngressReject.Stop()
