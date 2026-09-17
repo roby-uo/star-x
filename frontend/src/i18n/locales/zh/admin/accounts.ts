@@ -97,11 +97,15 @@ export default {
       autoRotation: {
         enable: '自动调动',
         enabled: '自动调动已开启',
+        interval: '调度时间',
+        intervalOption: '调度时间：{hours} 小时',
         countdown: '{name} 服役中，距下次调度 {time}',
         waitingForEligible: '暂无同时具备 5h 与周额度的账号',
         managedHint: '自动调动已开启，账号调度状态由系统管理',
         enableSuccess: '自动调动已开启',
         disableSuccess: '自动调动已关闭，账号调度状态已恢复',
+        intervalUpdateSuccess: '调度时间已调整为 {hours} 小时',
+        intervalUpdateFailed: '更新调度时间失败',
         updateFailed: '更新自动调动状态失败'
       },
       groupCountTotal: '共 {count} 个分组',

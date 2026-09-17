@@ -17,11 +17,13 @@ const (
 	accountAutoRotationSettingKey = "account_auto_rotation_state"
 	accountAutoRotationInterval   = 5 * time.Hour
 	accountAutoRotationTick       = 30 * time.Second
+	accountAutoRotationMin        = 30 * time.Minute
+	accountAutoRotationMax        = 4 * time.Hour
+	accountAutoRotationStep       = 30 * time.Minute
 )
 
 // AccountAutoRotationStatus is the administrator-facing state of the timed
-// OpenAI OAuth account rotation. The interval is intentionally fixed at five
-// hours so one cycle matches the upstream short quota window.
+// OpenAI OAuth account rotation.
 type AccountAutoRotationStatus struct {
 	Enabled              bool       `json:"enabled"`
 	IntervalSeconds      int64      `json:"interval_seconds"`
@@ -35,6 +37,7 @@ type AccountAutoRotationStatus struct {
 
 type accountAutoRotationState struct {
 	Enabled             bool            `json:"enabled"`
+	IntervalSeconds     int64           `json:"interval_seconds,omitempty"`
 	ActiveAccountID     *int64          `json:"active_account_id,omitempty"`
 	LastActiveAccountID *int64          `json:"last_active_account_id,omitempty"`
 	CycleStartedAt      *time.Time      `json:"cycle_started_at,omitempty"`
@@ -123,8 +126,21 @@ func (s *AccountAutoRotationService) Status(ctx context.Context) (*AccountAutoRo
 }
 
 func (s *AccountAutoRotationService) SetEnabled(ctx context.Context, enabled bool) (*AccountAutoRotationStatus, error) {
+	return s.Update(ctx, &enabled, nil)
+}
+
+// Update changes the enabled state and/or interval in one persisted operation.
+// Existing installations without an interval retain the legacy five-hour
+// default until an administrator selects one of the configurable intervals.
+func (s *AccountAutoRotationService) Update(ctx context.Context, enabled *bool, intervalSeconds *int64) (*AccountAutoRotationStatus, error) {
 	if s == nil || s.accountRepo == nil || s.settingRepo == nil {
 		return nil, fmt.Errorf("account auto rotation service unavailable")
+	}
+	if enabled == nil && intervalSeconds == nil {
+		return nil, fmt.Errorf("automatic rotation update is empty")
+	}
+	if intervalSeconds != nil && !validAccountAutoRotationInterval(*intervalSeconds) {
+		return nil, fmt.Errorf("rotation interval must be between 1800 and 14400 seconds in 1800-second steps")
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -138,22 +154,32 @@ func (s *AccountAutoRotationService) SetEnabled(ctx context.Context, enabled boo
 		return nil, fmt.Errorf("list OpenAI accounts: %w", err)
 	}
 	candidates := regularOpenAIOAuthAccounts(accounts)
+	wasEnabled := state.Enabled
+	if intervalSeconds != nil {
+		state.IntervalSeconds = *intervalSeconds
+		if state.Enabled && state.CycleStartedAt != nil {
+			nextAt := state.CycleStartedAt.Add(time.Duration(*intervalSeconds) * time.Second)
+			state.NextRotationAt = &nextAt
+		}
+	}
+	if enabled != nil {
+		state.Enabled = *enabled
+	}
 
-	if !enabled {
-		if state.Enabled {
+	if !state.Enabled {
+		if wasEnabled {
 			if err := s.restoreOriginalSchedulable(ctx, candidates, state.OriginalSchedulable); err != nil {
 				return nil, err
 			}
 		}
-		state = accountAutoRotationState{}
+		state = accountAutoRotationState{IntervalSeconds: state.IntervalSeconds}
 		if err := s.saveState(ctx, &state); err != nil {
 			return nil, err
 		}
-		return buildAccountAutoRotationStatus(&state, nil, nil, s.interval), nil
+		return buildAccountAutoRotationStatus(&state, nil, nil, s.intervalForState(&state)), nil
 	}
 
-	if !state.Enabled {
-		state.Enabled = true
+	if !wasEnabled {
 		state.OriginalSchedulable = make(map[string]bool, len(candidates))
 		for i := range candidates {
 			state.OriginalSchedulable[strconv.FormatInt(candidates[i].ID, 10)] = candidates[i].Schedulable
@@ -184,7 +210,7 @@ func (s *AccountAutoRotationService) reconcileLocked(ctx context.Context) (*Acco
 		return nil, err
 	}
 	if !state.Enabled {
-		return buildAccountAutoRotationStatus(&state, nil, nil, s.interval), nil
+		return buildAccountAutoRotationStatus(&state, nil, nil, s.intervalForState(&state)), nil
 	}
 	accounts, err := s.accountRepo.ListByPlatform(ctx, PlatformOpenAI)
 	if err != nil {
@@ -196,6 +222,7 @@ func (s *AccountAutoRotationService) reconcileLocked(ctx context.Context) (*Acco
 func (s *AccountAutoRotationService) reconcileStateLocked(ctx context.Context, state *accountAutoRotationState, candidates []Account) (*AccountAutoRotationStatus, error) {
 	stateBefore, _ := json.Marshal(state)
 	now := s.now().UTC()
+	interval := s.intervalForState(state)
 	if state.OriginalSchedulable == nil {
 		state.OriginalSchedulable = make(map[string]bool)
 	}
@@ -233,7 +260,7 @@ func (s *AccountAutoRotationService) reconcileStateLocked(ctx context.Context, s
 		} else {
 			id := next.ID
 			started := now
-			nextAt := now.Add(s.interval)
+			nextAt := now.Add(interval)
 			state.ActiveAccountID = &id
 			state.LastActiveAccountID = &id
 			state.CycleStartedAt = &started
@@ -250,7 +277,21 @@ func (s *AccountAutoRotationService) reconcileStateLocked(ctx context.Context, s
 			return nil, err
 		}
 	}
-	return buildAccountAutoRotationStatus(state, candidates, eligible, s.interval), nil
+	return buildAccountAutoRotationStatus(state, candidates, eligible, interval), nil
+}
+
+func (s *AccountAutoRotationService) intervalForState(state *accountAutoRotationState) time.Duration {
+	if state != nil && state.IntervalSeconds > 0 {
+		return time.Duration(state.IntervalSeconds) * time.Second
+	}
+	return s.interval
+}
+
+func validAccountAutoRotationInterval(seconds int64) bool {
+	minSeconds := int64(accountAutoRotationMin / time.Second)
+	maxSeconds := int64(accountAutoRotationMax / time.Second)
+	stepSeconds := int64(accountAutoRotationStep / time.Second)
+	return seconds >= minSeconds && seconds <= maxSeconds && seconds%stepSeconds == 0
 }
 
 func (s *AccountAutoRotationService) loadState(ctx context.Context) (accountAutoRotationState, error) {

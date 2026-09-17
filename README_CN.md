@@ -4,6 +4,16 @@
 
 star-X 用于在你自己掌控的服务器上管理已授权的上游 AI 账号、分组、API Key、路由、额度与用量。
 
+## 最新更新
+
+### 2026-09-17
+
+#### 新增
+
+- OpenAI OAuth 账号自动调动支持自定义调度时间，可选择 0.5–4 小时并即时更新当前轮次倒计时。
+
+[查看完整更新记录](docs/releases/release-notes.md)
+
 ## Docker Compose 一键部署
 
 前提：已安装 Docker Desktop（或 Docker Engine）和 Docker Compose v2。

@@ -528,8 +528,14 @@ export async function getAutoRotation(): Promise<AccountAutoRotationStatus> {
   return data
 }
 
-export async function updateAutoRotation(enabled: boolean): Promise<AccountAutoRotationStatus> {
-  const { data } = await apiClient.put<AccountAutoRotationStatus>('/admin/accounts/auto-rotation', { enabled })
+export interface AccountAutoRotationUpdate {
+  enabled?: boolean
+  interval_seconds?: number
+}
+
+export async function updateAutoRotation(settings: boolean | AccountAutoRotationUpdate): Promise<AccountAutoRotationStatus> {
+  const payload = typeof settings === 'boolean' ? { enabled: settings } : settings
+  const { data } = await apiClient.put<AccountAutoRotationStatus>('/admin/accounts/auto-rotation', payload)
   return data
 }
 

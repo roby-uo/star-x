@@ -33,6 +33,25 @@
         <button @click="$emit('toggle-schedulable', false)" :disabled="autoRotationEnabled" class="btn btn-warning btn-sm">{{ t('admin.accounts.bulkActions.disableScheduling') }}</button>
         <button @click="$emit('edit-selected')" class="btn btn-primary btn-sm">{{ t('admin.accounts.bulkActions.edit') }}</button>
       </template>
+      <select
+        data-test="auto-rotation-interval"
+        class="btn btn-secondary btn-sm cursor-pointer"
+        :value="autoRotationIntervalSeconds"
+        :disabled="autoRotationLoading"
+        :aria-label="t('admin.accounts.autoRotation.interval')"
+        @change="handleIntervalChange"
+      >
+        <option
+          v-if="!rotationIntervals.some((option) => option.seconds === autoRotationIntervalSeconds)"
+          :value="autoRotationIntervalSeconds"
+          disabled
+        >
+          {{ t('admin.accounts.autoRotation.intervalOption', { hours: formatHours(autoRotationIntervalSeconds / 3600) }) }}
+        </option>
+        <option v-for="option in rotationIntervals" :key="option.seconds" :value="option.seconds">
+          {{ t('admin.accounts.autoRotation.intervalOption', { hours: formatHours(option.hours) }) }}
+        </option>
+      </select>
       <div class="flex min-w-[9.5rem] flex-col items-end gap-1">
         <button
           data-test="auto-rotation-toggle"
@@ -61,17 +80,19 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   selectedIds: number[]
   autoRotationEnabled?: boolean
   autoRotationLoading?: boolean
   autoRotationCountdown?: string
+  autoRotationIntervalSeconds?: number
 }>(), {
   autoRotationEnabled: false,
   autoRotationLoading: false,
-  autoRotationCountdown: ''
+  autoRotationCountdown: '',
+  autoRotationIntervalSeconds: 18000
 })
-defineEmits([
+const emit = defineEmits([
   'delete',
   'edit-selected',
   'edit-filtered',
@@ -81,8 +102,22 @@ defineEmits([
   'reset-status',
   'refresh-token',
   'probe-upstream-billing',
-  'toggle-auto-rotation'
+  'toggle-auto-rotation',
+  'update-auto-rotation-interval'
 ])
 
 const { t } = useI18n()
+const rotationIntervals = Array.from({ length: 8 }, (_, index) => {
+  const hours = (index + 1) / 2
+  return { hours, seconds: hours * 3600 }
+})
+
+const formatHours = (hours: number) => Number.isInteger(hours) ? String(hours) : hours.toFixed(1)
+
+const handleIntervalChange = (event: Event) => {
+  const seconds = Number((event.target as HTMLSelectElement).value)
+  if (Number.isFinite(seconds) && seconds !== props.autoRotationIntervalSeconds) {
+    emit('update-auto-rotation-interval', seconds)
+  }
+}
 </script>

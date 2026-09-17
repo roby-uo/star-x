@@ -177,7 +177,9 @@
           :auto-rotation-enabled="autoRotationStatus?.enabled === true"
           :auto-rotation-loading="autoRotationLoading"
           :auto-rotation-countdown="autoRotationCountdownLabel"
+          :auto-rotation-interval-seconds="autoRotationStatus?.interval_seconds ?? 18000"
           @toggle-auto-rotation="handleToggleAutoRotation"
+          @update-auto-rotation-interval="handleUpdateAutoRotationInterval"
           @delete="handleBulkDelete"
           @reset-status="handleBulkResetStatus"
           @refresh-token="handleBulkRefreshToken"
@@ -701,6 +703,24 @@ const handleToggleAutoRotation = async () => {
   } catch (error) {
     console.error('Failed to update automatic account rotation:', error)
     appStore.showError(t('admin.accounts.autoRotation.updateFailed'))
+  } finally {
+    autoRotationLoading.value = false
+  }
+}
+
+const handleUpdateAutoRotationInterval = async (intervalSeconds: number) => {
+  if (autoRotationLoading.value || typeof adminAPI.accounts.updateAutoRotation !== 'function') return
+  autoRotationLoading.value = true
+  try {
+    autoRotationStatus.value = await adminAPI.accounts.updateAutoRotation({ interval_seconds: intervalSeconds })
+    autoRotationNow.value = Date.now()
+    appStore.showSuccess(t('admin.accounts.autoRotation.intervalUpdateSuccess', {
+      hours: Number.isInteger(intervalSeconds / 3600) ? String(intervalSeconds / 3600) : (intervalSeconds / 3600).toFixed(1)
+    }))
+    await reload()
+  } catch (error) {
+    console.error('Failed to update automatic account rotation interval:', error)
+    appStore.showError(t('admin.accounts.autoRotation.intervalUpdateFailed'))
   } finally {
     autoRotationLoading.value = false
   }

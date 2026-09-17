@@ -13,16 +13,21 @@ describe('AccountBulkActionsBar automatic rotation', () => {
       props: {
         selectedIds: [],
         autoRotationEnabled: true,
-        autoRotationCountdown: 'A serving; 04:59:59 remaining'
+        autoRotationCountdown: 'A serving; 04:59:59 remaining',
+        autoRotationIntervalSeconds: 5400
       }
     })
 
     expect(wrapper.get('[data-test="auto-rotation-countdown"]').text()).toBe('A serving; 04:59:59 remaining')
+    expect((wrapper.get('[data-test="auto-rotation-interval"]').element as HTMLSelectElement).value).toBe('5400')
     const buttons = wrapper.findAll('button')
     expect(buttons[0].attributes('data-test')).toBe('auto-rotation-toggle')
     expect(buttons[1].text()).toBe('admin.accounts.bulkEdit.submit')
 
     await wrapper.get('[data-test="auto-rotation-toggle"]').trigger('click')
     expect(wrapper.emitted('toggle-auto-rotation')).toHaveLength(1)
+
+    await wrapper.get('[data-test="auto-rotation-interval"]').setValue('7200')
+    expect(wrapper.emitted('update-auto-rotation-interval')).toEqual([[7200]])
   })
 })

@@ -99,11 +99,15 @@ export default {
       autoRotation: {
         enable: 'Auto Rotation',
         enabled: 'Auto Rotation On',
+        interval: 'Rotation Interval',
+        intervalOption: 'Rotation: {hours} hours',
         countdown: '{name} is serving; next rotation in {time}',
         waitingForEligible: 'No account currently has both 5h and weekly quota',
         managedHint: 'Automatic rotation controls account scheduling while enabled',
         enableSuccess: 'Automatic account rotation enabled',
         disableSuccess: 'Automatic account rotation disabled and scheduling states restored',
+        intervalUpdateSuccess: 'Rotation interval updated to {hours} hours',
+        intervalUpdateFailed: 'Failed to update rotation interval',
         updateFailed: 'Failed to update automatic account rotation'
       },
       groupCountTotal: '{count} groups total',

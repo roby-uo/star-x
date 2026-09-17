@@ -6,6 +6,16 @@ star-X is a self-hosted, privately branded distribution for managing authorized 
 
 ![star-X logo](frontend/public/brand/star-x-logo-original.jpg)
 
+## 最新更新
+
+### 2026-09-17
+
+#### 新增
+
+- OpenAI OAuth 账号自动调动支持自定义调度时间，可选择 0.5–4 小时并即时更新当前轮次倒计时。
+
+[查看完整更新记录](docs/releases/release-notes.md)
+
 ## Quick start with Docker
 
 Requirements: Docker Engine / Docker Desktop with Docker Compose v2.

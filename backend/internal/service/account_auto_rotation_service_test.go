@@ -105,6 +105,68 @@ func TestAccountAutoRotation_DisableRestoresOriginalSchedulableState(t *testing.
 	require.True(t, repo.accounts[1].Schedulable)
 }
 
+func TestAccountAutoRotation_UpdateIntervalPersistsAndRecalculatesCurrentCycle(t *testing.T) {
+	now := time.Date(2026, 9, 17, 8, 0, 0, 0, time.UTC)
+	repo := &accountAutoRotationRepoStub{accounts: []Account{
+		{ID: 10, Name: "A", Platform: PlatformOpenAI, Type: AccountTypeOAuth, Status: StatusActive, Schedulable: true},
+		{ID: 20, Name: "B", Platform: PlatformOpenAI, Type: AccountTypeOAuth, Status: StatusActive, Schedulable: true},
+	}}
+	settings := &accountAutoRotationSettingRepoStub{values: map[string]string{}}
+	svc := NewAccountAutoRotationService(repo, settings)
+	svc.now = func() time.Time { return now }
+
+	status, err := svc.SetEnabled(context.Background(), true)
+	require.NoError(t, err)
+	require.Equal(t, int64((5 * time.Hour).Seconds()), status.IntervalSeconds)
+	require.Equal(t, now.Add(5*time.Hour), *status.NextRotationAt)
+
+	now = now.Add(15 * time.Minute)
+	intervalSeconds := int64((90 * time.Minute).Seconds())
+	status, err = svc.Update(context.Background(), nil, &intervalSeconds)
+	require.NoError(t, err)
+	require.Equal(t, intervalSeconds, status.IntervalSeconds)
+	require.Equal(t, time.Date(2026, 9, 17, 9, 30, 0, 0, time.UTC), *status.NextRotationAt)
+	require.Contains(t, settings.values[accountAutoRotationSettingKey], `"interval_seconds":5400`)
+
+	status, err = svc.SetEnabled(context.Background(), false)
+	require.NoError(t, err)
+	require.Equal(t, intervalSeconds, status.IntervalSeconds)
+
+	status, err = svc.SetEnabled(context.Background(), true)
+	require.NoError(t, err)
+	require.Equal(t, intervalSeconds, status.IntervalSeconds)
+	require.Equal(t, now.Add(90*time.Minute), *status.NextRotationAt)
+}
+
+func TestAccountAutoRotation_UpdateIntervalRotatesImmediatelyWhenNewDeadlinePassed(t *testing.T) {
+	now := time.Date(2026, 9, 17, 8, 0, 0, 0, time.UTC)
+	repo := &accountAutoRotationRepoStub{accounts: []Account{
+		{ID: 10, Name: "A", Platform: PlatformOpenAI, Type: AccountTypeOAuth, Status: StatusActive, Schedulable: true},
+		{ID: 20, Name: "B", Platform: PlatformOpenAI, Type: AccountTypeOAuth, Status: StatusActive, Schedulable: true},
+	}}
+	settings := &accountAutoRotationSettingRepoStub{values: map[string]string{}}
+	svc := NewAccountAutoRotationService(repo, settings)
+	svc.now = func() time.Time { return now }
+
+	status, err := svc.SetEnabled(context.Background(), true)
+	require.NoError(t, err)
+	require.Equal(t, int64(10), *status.ActiveAccountID)
+
+	now = now.Add(time.Hour)
+	intervalSeconds := int64((30 * time.Minute).Seconds())
+	status, err = svc.Update(context.Background(), nil, &intervalSeconds)
+	require.NoError(t, err)
+	require.Equal(t, int64(20), *status.ActiveAccountID)
+	require.Equal(t, now.Add(30*time.Minute), *status.NextRotationAt)
+}
+
+func TestAccountAutoRotation_UpdateIntervalRejectsUnsupportedValue(t *testing.T) {
+	svc := NewAccountAutoRotationService(&accountAutoRotationRepoStub{}, &accountAutoRotationSettingRepoStub{values: map[string]string{}})
+	intervalSeconds := int64(2700)
+	_, err := svc.Update(context.Background(), nil, &intervalSeconds)
+	require.ErrorContains(t, err, "1800-second steps")
+}
+
 func TestAccountEligibleForAutoRotation_RequiresBothQuotaWindows(t *testing.T) {
 	now := time.Date(2026, 9, 16, 8, 0, 0, 0, time.UTC)
 	account := &Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth, Status: StatusActive}
