@@ -11,8 +11,8 @@
       <!-- Custom Logo or Default Logo -->
       <router-link
         :to="homePath"
-        class="sidebar-logo flex h-10 items-center justify-center overflow-hidden transition-opacity hover:opacity-80"
-        :class="sidebarCollapsed ? 'sidebar-logo-collapsed w-9 rounded-xl shadow-glow' : 'sidebar-logo-expanded w-14 rounded-lg'"
+        class="sidebar-logo flex items-center justify-center overflow-hidden transition-opacity hover:opacity-80"
+        :class="sidebarCollapsed ? 'sidebar-logo-collapsed h-9 w-9 rounded-xl shadow-glow' : 'sidebar-logo-expanded h-12 w-12 rounded-lg'"
         @click="handleMenuItemClick(homePath)"
       >
         <img
@@ -23,16 +23,24 @@
         />
       </router-link>
       <div class="sidebar-brand" :class="{ 'sidebar-brand-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
+        <div class="sidebar-brand-topline">
+          <router-link
+            :to="homePath"
+            class="sidebar-brand-title text-gray-900 transition-colors hover:text-primary-600 dark:text-white dark:hover:text-primary-400"
+            @click="handleMenuItemClick(homePath)"
+          >
+            <span class="sidebar-brand-primary">{{ brandPrimary }}</span>
+          </router-link>
+          <VersionBadge class="sidebar-version-badge" :version="siteVersion" />
+        </div>
         <router-link
+          v-if="brandSecondary"
           :to="homePath"
-          class="sidebar-brand-title text-lg font-bold text-gray-900 transition-colors hover:text-primary-600 dark:text-white dark:hover:text-primary-400"
+          class="sidebar-brand-secondary transition-colors hover:text-primary-600 dark:hover:text-primary-400"
           @click="handleMenuItemClick(homePath)"
         >
-          <span class="sidebar-brand-primary">{{ brandPrimary }}</span>
-          <span v-if="brandSecondary" class="sidebar-brand-secondary">{{ brandSecondary }}</span>
+          {{ brandSecondary }}
         </router-link>
-        <!-- Version Badge -->
-        <VersionBadge :version="siteVersion" />
       </div>
     </div>
 
@@ -961,14 +969,14 @@ onBeforeUnmount(() => {
 }
 
 .sidebar-logo-expanded {
-  flex-basis: 4.25rem;
-  min-width: 4.25rem;
+  flex-basis: 3rem;
+  min-width: 3rem;
 }
 
 .sidebar-header:not(.sidebar-header-collapsed) {
-  gap: 0.625rem;
+  gap: 0.75rem;
   padding-left: 0.75rem;
-  padding-right: 0.875rem;
+  padding-right: 0.75rem;
 }
 
 .sidebar-logo-image {
@@ -984,6 +992,10 @@ onBeforeUnmount(() => {
 }
 
 .sidebar-brand {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.1875rem;
   min-width: 0;
   flex: 1 1 auto;
   white-space: nowrap;
@@ -1003,26 +1015,48 @@ onBeforeUnmount(() => {
 }
 
 .sidebar-brand-title {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.0625rem;
+  display: block;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  line-height: 1.12;
+  line-height: 1;
+}
+
+.sidebar-brand-topline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
 }
 
 .sidebar-brand-primary {
   font-size: 0.9375rem;
   font-weight: 800;
+  letter-spacing: -0.0125em;
 }
 
 .sidebar-brand-secondary {
-  color: rgb(75 85 99);
+  display: block;
+  overflow: hidden;
+  color: rgb(100 116 139);
   font-size: 0.6875rem;
   font-weight: 600;
-  letter-spacing: 0.01em;
+  line-height: 1.15;
+  letter-spacing: 0.015em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:deep(.sidebar-version-badge) {
+  flex: 0 0 auto;
+}
+
+:deep(.sidebar-version-badge > button) {
+  border-radius: 0.5rem;
+  padding: 0.1875rem 0.4375rem;
+  font-size: 0.6875rem;
+  line-height: 1;
 }
 
 :global(.dark) .sidebar-brand-secondary {

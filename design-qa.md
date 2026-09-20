@@ -1,58 +1,56 @@
-# Design QA — 品牌标题与侧栏锁定组合
+# Design QA — 侧栏紧凑品牌条
 
 ## Evidence
 
-- Source visual truth:
-  - `C:/Users/哈哈/AppData/Local/Temp/codex-clipboard-b58e7ab8-0fef-4b9f-afb8-05ec56cea983.png`（首页 Hero，510 × 565 px）
-  - `C:/Users/哈哈/AppData/Local/Temp/codex-clipboard-a1103abb-7cd2-49ab-b182-953ce71716c9.png`（侧栏品牌区，249 × 93 px）
-- Implementation:
-  - `http://127.0.0.1:4173/`，Codex IAB 同轮内联截图（默认桌面视口与 510 × 565 CSS 响应式视口）
-  - `http://127.0.0.1:4173/sidebar-brand-preview.html`，Codex IAB 同轮内联截图（256 × 96 CSS 聚焦预览；使用与组件相同的尺寸、间距和 Logo 处理）
-- State: 浅色、首页未登录状态；侧栏为展开状态，默认品牌名与 `vedge` 版本徽标。
-- Density normalization: 源图与浏览器截图均按 CSS 像素进行视觉比较；IAB 输出画布密度差异不作为问题。
+- Source visual truth: `C:/Users/哈哈/.codex/generated_images/01a0a818-b2d9-75d1-8e2e-2232e83ea185/exec-4421ebbd-b1a3-419e-9ea5-0a99bee34faa.png`（用户选择的第 3 个设计方向，2073 × 758 px）。
+- Implementation: `http://127.0.0.1:4173/sidebar-brand-review.html`，Codex IAB 同轮内联截图（300 × 180 CSS 视口，侧栏实际宽度 256 px、品牌区高度 64 px）。
+- State: 浅色、展开侧栏、默认品牌名、`vedge` 版本徽标。
+- Density normalization: 源图是放大概念稿，实际实现按产品真实 256 px 侧栏尺寸评审；比较信息层级、比例、间距、颜色和资产清晰度，不以概念稿画布空白作为实现尺寸。
 
 ## Full-view comparison
 
-- 首页保留原有蓝白色调、大幅 star-X 标识、按钮与内容节奏，只替换品牌标题层级。
-- 新标题由大幅 `star-X` 与下方 `API 算力中转站` 共同组成完整品牌名，不再重复显示旧的“你的私人 AI API 网关”。
-- 桌面布局继续保持左侧品牌信息、右侧 API 示例面板；移动布局自动居中。
+- 实现保留了选定稿的核心结构：左侧 Logo，右侧 `star-X` 与版本号同行，`API算力中转站` 独立置于下方。
+- 品牌区继续使用现有 64 px 高度，避免挤压后台导航；底部沿用轻量分隔线。
+- 概念稿中的超大留白按真实侧栏宽度收敛，未引入卡片、阴影或额外装饰。
 
 ## Focused-region comparison
 
-- 首页标题区：字体粗细、蓝色强调、标题与说明间距均与原设计体系一致，文案已更新。
-- 侧栏品牌区：源图中的单行长标题会挤压 Logo；新布局将文字拆为 `star-X` 与 `API算力中转站` 两层，并将 Logo 可视尺寸提高约三分之一。
-- Logo 使用原始高分辨率透明资产，以 `object-fit: contain` 配合受控缩放展示，没有生成或替换品牌资产。
+- Logo 使用现有 `/starx-logo-transparent.png` 原始品牌资产，`object-fit: contain` 与受控缩放确保轮廓清晰，没有重新绘制或替换。
+- `star-X` 使用 15 px、800 字重作为主层级；`vedge` 使用 11 px 中性徽标作为辅助信息；副标题使用 11 px 蓝灰色中等字重。
+- 实际产品文案保留既有标准写法 `API算力中转站`，没有采用概念图因排版生成出的额外空格。
 
 ## Required fidelity surfaces
 
-- Fonts and typography: 沿用现有 Inter、苹方、微软雅黑回退体系；主副标题字重和行高形成清晰层级，无截断。
-- Spacing and layout rhythm: 桌面 Hero 节奏保持不变；侧栏 Logo、两行文字和版本徽标在 64 px 高度内完整容纳。
-- Colors and visual tokens: 沿用现有蓝色强调、灰色辅助文字和深色模式颜色。
-- Image quality and asset fidelity: 沿用 `/starx-logo-transparent.png` 原始 1254 × 1254 RGBA 品牌资产；避免 `object-cover` 缩小裁切导致的模糊观感。
-- Copy and content: 首页旧标题已移除，品牌语义统一为“star-X API算力中转站”。
-
-## Comparison history
-
-1. Initial finding — P2: 510 px 响应式视口中，新的弹性标题保持左对齐，与其余居中 Hero 内容不一致。
-2. Fix: 在 900 px 以下为 `.hero-product-title` 增加居中对齐。
-3. Post-fix evidence: 第二次同尺寸 IAB 对比中，Logo、标题、说明、按钮和能力列表均在同一中轴线上。
+- Fonts and typography: 沿用 Inter、苹方、微软雅黑回退体系；主品牌、版本、副标题三级层级清晰，无换行或截断。
+- Spacing and layout rhythm: 12 px 两侧内边距、12 px Logo/文字间距、8 px 首行元素间距、3 px 上下行间距，与 256 px 侧栏匹配。
+- Colors and visual tokens: 主文字近黑，副标题为 slate 蓝灰，版本徽标沿用既有灰色状态色；深色模式保持现有 token。
+- Image quality and asset fidelity: 使用原始高分辨率透明 Logo，48 px 容器内保留可辨识轮廓，无压扁、拉伸或低清替代。
+- Copy and content: `star-X`、`vedge`、`API算力中转站` 均准确展示。
 
 ## Interaction and console checks
 
-- Tested the Hero API tab interaction: switching to `Responses` updates the response preview to `Responses message routed.`。
-- Console only reports the expected local public-settings request failure because the standalone Vite preview has no backend proxy target; the page and primary interaction render normally。
+- 品牌 Logo、品牌名和副标题继续链接首页；版本徽标仍使用现有版本详情交互。
+- 浏览器预览控制台无 warning 或 error。
+- 组件代码检查、类型检查与 10 项相关单元测试通过。
 
 ## Findings
 
 - No remaining P0/P1/P2 findings.
-- P3: 实际后台侧栏需要登录态才能在本地完整捕获；本次使用同尺寸、同资产、同 CSS 数值的聚焦预览核对品牌组合。
+- P3: 概念稿的 Logo 比例更大，但在真实 256 px 侧栏中继续放大会挤压文字；当前 48 px 容器是清晰度与信息密度之间的合理取舍。
+
+## Comparison history
+
+1. 上一版问题：Logo、品牌名、副标题和版本号纵向堆叠，形成三层拥挤信息。
+2. Fix: 改为 `star-X + vedge` 同行、副标题独立一行，Logo 调整为 48 px 实际容器并收敛间距。
+3. Post-fix evidence: 同轮源图与实现并列比较显示层级、比例和对齐符合选定方向，真实侧栏中无裁切或拥挤。
 
 ## Implementation checklist
 
-- [x] 首页品牌标题统一
-- [x] 移动端标题居中
-- [x] 侧栏双行品牌文字
-- [x] 侧栏 Logo 清晰度与可视尺寸优化
-- [x] 主交互与控制台检查
+- [x] Logo 使用原始高清资产
+- [x] 品牌名与版本号同行
+- [x] 副标题独立一行
+- [x] 轻量分隔线衔接导航
+- [x] 展开与收起状态保留
+- [x] 控制台与相关测试检查
 
 final result: passed
