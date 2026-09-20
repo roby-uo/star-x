@@ -77,7 +77,7 @@ export default {
           us: 'Switch between models freely'
         },
         management: {
-          feature: 'Account Management',
+          feature: 'API Management',
           official: 'Manage each service separately',
           us: 'Unified key, one dashboard'
         },

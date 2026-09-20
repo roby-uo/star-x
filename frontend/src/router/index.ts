@@ -520,7 +520,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: true,
-      title: 'Account Management',
+      title: 'API Management',
       titleKey: 'admin.accounts.title',
       descriptionKey: 'admin.accounts.description'
     }

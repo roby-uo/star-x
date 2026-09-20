@@ -28,7 +28,7 @@ function createPublicSettings(overrides: Partial<PublicSettings> = {}): PublicSe
     turnstile_site_key: '',
     site_name: 'Test Site',
     site_logo: '',
-    site_subtitle: '',
+    site_subtitle: 'star-X API算力中转站',
     api_base_url: '',
     contact_info: '',
     doc_url: '',

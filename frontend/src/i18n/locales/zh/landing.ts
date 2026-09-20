@@ -77,7 +77,7 @@ export default {
           us: '多模型随意切换'
         },
         management: {
-          feature: '账号管理',
+          feature: 'API管理',
           official: '每个服务单独管理',
           us: '统一密钥，一站管理'
         },

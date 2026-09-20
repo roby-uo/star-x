@@ -1,6 +1,6 @@
 export default {
     accounts: {
-      title: 'Account Management',
+      title: 'API Management',
       description: 'Manage AI platform accounts and credentials',
       createAccount: 'Create Account',
       autoRefresh: 'Auto Refresh',

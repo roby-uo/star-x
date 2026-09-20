@@ -8391,9 +8391,9 @@ const form = reactive<SettingsForm>({
   default_subscriptions: [],
   force_email_on_third_party_signup: false,
   default_user_rpm_limit: 0,
-  site_name: "star-X",
+  site_name: "star-X API算力中转站",
   site_logo: "",
-  site_subtitle: "你的私人 AI API 网关",
+  site_subtitle: "star-X API算力中转站",
   api_base_url: "",
   contact_info: "",
   doc_url: "",
@@ -9513,7 +9513,7 @@ async function loadSettings() {
       }
     }
     if (String(form.site_name || '').trim().toLowerCase() === 'sub2api') {
-      form.site_name = 'star-X';
+      form.site_name = 'star-X API算力中转站';
     }
     if (!form.claude_oauth_system_prompt_blocks?.trim()) {
       form.claude_oauth_system_prompt_blocks =

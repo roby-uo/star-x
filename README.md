@@ -8,11 +8,11 @@ star-X is a self-hosted, privately branded distribution for managing authorized 
 
 ## 最新更新
 
-### 2026-09-17
+### 2026-09-20
 
-#### 新增
+#### 优化
 
-- OpenAI OAuth 账号自动调动支持自定义调度时间，可选择 0.5–4 小时并即时更新当前轮次倒计时。
+- 管理后台将“账号管理”统一为“API管理”，默认品牌名称与登录页说明统一为“star-X API算力中转站”。
 
 [查看完整更新记录](docs/releases/release-notes.md)
 

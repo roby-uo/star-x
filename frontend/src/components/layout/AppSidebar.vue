@@ -12,7 +12,7 @@
       <router-link
         :to="homePath"
         class="sidebar-logo flex h-10 items-center justify-center overflow-hidden transition-opacity hover:opacity-80"
-        :class="sidebarCollapsed ? 'sidebar-logo-collapsed w-9 rounded-xl shadow-glow' : 'sidebar-logo-expanded w-20 rounded-lg'"
+        :class="sidebarCollapsed ? 'sidebar-logo-collapsed w-9 rounded-xl shadow-glow' : 'sidebar-logo-expanded w-14 rounded-lg'"
         @click="handleMenuItemClick(homePath)"
       >
         <img v-if="settingsLoaded" :src="siteLogo || '/starx-logo-transparent.png'" alt="star-X" class="h-full w-full object-cover" />
@@ -952,8 +952,14 @@ onBeforeUnmount(() => {
 }
 
 .sidebar-logo-expanded {
-  flex-basis: 5rem;
-  min-width: 5rem;
+  flex-basis: 3.5rem;
+  min-width: 3.5rem;
+}
+
+.sidebar-header:not(.sidebar-header-collapsed) {
+  gap: 0.5rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
 }
 
 .sidebar-header-collapsed {
@@ -986,6 +992,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 0.875rem;
 }
 
 .sidebar-link-collapsed {
