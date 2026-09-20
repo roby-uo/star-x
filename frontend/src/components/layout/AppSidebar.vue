@@ -15,7 +15,12 @@
         :class="sidebarCollapsed ? 'sidebar-logo-collapsed w-9 rounded-xl shadow-glow' : 'sidebar-logo-expanded w-14 rounded-lg'"
         @click="handleMenuItemClick(homePath)"
       >
-        <img v-if="settingsLoaded" :src="siteLogo || '/starx-logo-transparent.png'" alt="star-X" class="h-full w-full object-cover" />
+        <img
+          v-if="settingsLoaded"
+          :src="siteLogo || '/starx-logo-transparent.png'"
+          alt="star-X"
+          class="sidebar-logo-image h-full w-full"
+        />
       </router-link>
       <div class="sidebar-brand" :class="{ 'sidebar-brand-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
         <router-link
@@ -23,7 +28,8 @@
           class="sidebar-brand-title text-lg font-bold text-gray-900 transition-colors hover:text-primary-600 dark:text-white dark:hover:text-primary-400"
           @click="handleMenuItemClick(homePath)"
         >
-          {{ siteName }}
+          <span class="sidebar-brand-primary">{{ brandPrimary }}</span>
+          <span v-if="brandSecondary" class="sidebar-brand-secondary">{{ brandSecondary }}</span>
         </router-link>
         <!-- Version Badge -->
         <VersionBadge :version="siteVersion" />
@@ -201,6 +207,7 @@ import VersionBadge from '@/components/common/VersionBadge.vue'
 import { sanitizeSvg } from '@/utils/sanitize'
 import { sanitizeUrl } from '@/utils/url'
 import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
+import { DEFAULT_SITE_NAME } from '@/utils/siteBrand'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
 
 interface NavItem {
@@ -262,6 +269,8 @@ const expandedGroups = ref<Set<string>>(new Set())
 
 // Site settings from appStore (cached, no flicker)
 const siteName = computed(() => appStore.siteName)
+const brandPrimary = computed(() => siteName.value === DEFAULT_SITE_NAME ? 'star-X' : siteName.value)
+const brandSecondary = computed(() => siteName.value === DEFAULT_SITE_NAME ? 'API算力中转站' : '')
 const siteLogo = computed(() => sanitizeUrl(appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
 const siteVersion = computed(() => appStore.siteVersion)
 const settingsLoaded = computed(() => appStore.publicSettingsLoaded)
@@ -952,14 +961,20 @@ onBeforeUnmount(() => {
 }
 
 .sidebar-logo-expanded {
-  flex-basis: 3.5rem;
-  min-width: 3.5rem;
+  flex-basis: 4.25rem;
+  min-width: 4.25rem;
 }
 
 .sidebar-header:not(.sidebar-header-collapsed) {
-  gap: 0.5rem;
-  padding-left: 1rem;
-  padding-right: 1rem;
+  gap: 0.625rem;
+  padding-left: 0.75rem;
+  padding-right: 0.875rem;
+}
+
+.sidebar-logo-image {
+  object-fit: contain;
+  transform: scale(1.55);
+  transform-origin: center;
 }
 
 .sidebar-header-collapsed {
@@ -988,11 +1003,30 @@ onBeforeUnmount(() => {
 }
 
 .sidebar-brand-title {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.0625rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
+  line-height: 1.12;
+}
+
+.sidebar-brand-primary {
+  font-size: 0.9375rem;
+  font-weight: 800;
+}
+
+.sidebar-brand-secondary {
+  color: rgb(75 85 99);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+:global(.dark) .sidebar-brand-secondary {
+  color: rgb(156 163 175);
 }
 
 .sidebar-link-collapsed {
