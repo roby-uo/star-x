@@ -155,8 +155,8 @@ func TestBuildUpstreamModelsRequestSupportsOpenAIOAuth(t *testing.T) {
 func TestFetchUpstreamSupportedModelsParsesOpenAIOAuthManifest(t *testing.T) {
 	upstream := &httpUpstreamRecorder{resp: &http.Response{
 		StatusCode: http.StatusOK,
-		Header: http.Header{"Content-Type": []string{"application/json"}},
-		Body: io.NopCloser(strings.NewReader(`{"models":[{"slug":"gpt-6-sol"},{"slug":"gpt-6-luna"}]}`)),
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(`{"models":[{"slug":"gpt-6-sol"},{"slug":"gpt-6-luna"}]}`)),
 	}}
 	svc := &AccountTestService{httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
 
