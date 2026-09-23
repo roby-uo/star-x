@@ -8,11 +8,11 @@ star-X is a self-hosted, privately branded distribution for managing authorized 
 
 ## 最新更新
 
-### 2026-09-20
+### 2026-09-23
 
-#### 优化
+#### 修复
 
-- 管理后台将“账号管理”统一为“API管理”；首页、登录页和侧栏品牌统一为“star-X API算力中转站”，侧栏采用 Logo、品牌名与版本号同行、副标题独立一行的紧凑品牌布局。
+- OpenAI OAuth 账号现在可以同步上游 Codex 模型；模型选项增加 GPT-6 系列，失败时会显示具体原因。
 
 [查看完整更新记录](docs/releases/release-notes.md)
 

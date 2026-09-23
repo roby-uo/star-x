@@ -115,6 +115,11 @@ func TestExtractUpstreamModelIDs(t *testing.T) {
 			body: `[{"id":"z-model"},{"name":"models/a-model"}]`,
 			want: []string{"a-model", "z-model"},
 		},
+		{
+			name: "codex manifest uses slug",
+			body: `{"models":[{"slug":"gpt-6-sol"},{"slug":"gpt-6-luna"}]}`,
+			want: []string{"gpt-6-luna", "gpt-6-sol"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -127,6 +132,41 @@ func TestExtractUpstreamModelIDs(t *testing.T) {
 			require.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestBuildUpstreamModelsRequestSupportsOpenAIOAuth(t *testing.T) {
+	svc := &AccountTestService{cfg: upstreamModelSyncTestConfig()}
+	account := &Account{
+		ID: 11, Platform: PlatformOpenAI, Type: AccountTypeOAuth,
+		Credentials: map[string]any{"access_token": "openai-oauth-token", "chatgpt_account_id": "chatgpt-account"},
+	}
+
+	req, err := svc.buildUpstreamModelsRequest(context.Background(), account)
+	require.NoError(t, err)
+	require.Equal(t, chatgptCodexModelsURL, req.URL.Scheme+"://"+req.URL.Host+req.URL.Path)
+	require.Equal(t, openAICodexProbeVersion, req.URL.Query().Get("client_version"))
+	require.Equal(t, "Bearer openai-oauth-token", req.Header.Get("Authorization"))
+	require.Equal(t, "chatgpt-account", req.Header.Get("ChatGPT-Account-ID"))
+	require.NotEmpty(t, req.Header.Get("Originator"))
+	require.NotEmpty(t, req.Header.Get("User-Agent"))
+	require.NotEmpty(t, req.Header.Get("Version"))
+}
+
+func TestFetchUpstreamSupportedModelsParsesOpenAIOAuthManifest(t *testing.T) {
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header: http.Header{"Content-Type": []string{"application/json"}},
+		Body: io.NopCloser(strings.NewReader(`{"models":[{"slug":"gpt-6-sol"},{"slug":"gpt-6-luna"}]}`)),
+	}}
+	svc := &AccountTestService{httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+
+	models, err := svc.FetchUpstreamSupportedModels(context.Background(), &Account{
+		ID: 12, Platform: PlatformOpenAI, Type: AccountTypeOAuth,
+		Credentials: map[string]any{"access_token": "openai-oauth-token"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"gpt-6-luna", "gpt-6-sol"}, models)
+	require.Equal(t, "Bearer openai-oauth-token", upstream.lastReq.Header.Get("Authorization"))
 }
 
 func TestBuildUpstreamModelsRequestsForAPIKeyAccounts(t *testing.T) {
