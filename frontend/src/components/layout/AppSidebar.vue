@@ -707,7 +707,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   }
   items.push(
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
-    { path: '/models', label: t('nav.modelCatalog'), icon: ChannelIcon },
+    { path: '/model-catalog', label: t('nav.modelCatalog'), icon: ChannelIcon },
     { path: '/model-test', label: t('nav.modelTest'), icon: SignalIcon },
     { path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon, hideInSimpleMode: true, featureFlag: flagBatchImageAccess },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },

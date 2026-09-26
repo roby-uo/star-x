@@ -217,7 +217,7 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
-    path: '/models',
+    path: '/model-catalog',
     name: 'Models',
     component: () => import('@/views/user/ModelsView.vue'),
     meta: {
