@@ -1,0 +1,105 @@
+<template>
+  <AppLayout>
+    <TablePageLayout>
+      <template #filters>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-1 flex-wrap items-center gap-3">
+            <div class="relative w-full sm:w-80">
+              <Icon name="search" size="md" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input v-model="query" class="input pl-10" placeholder="搜索模型、服务商或渠道" />
+            </div>
+            <select v-model="type" class="input w-40">
+              <option value="">全部类型</option>
+              <option value="chat">Chat</option>
+              <option value="image">Images</option>
+              <option value="video">Videos</option>
+              <option value="audio">Audio</option>
+            </select>
+          </div>
+          <button class="btn btn-secondary" :disabled="loading" title="刷新" @click="load">
+            <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
+          </button>
+        </div>
+      </template>
+
+      <template #table>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
+            <thead class="bg-gray-50 dark:bg-dark-800">
+              <tr>
+                <th v-for="heading in headings" :key="heading" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">{{ heading }}</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-dark-700">
+              <tr v-for="row in filteredRows" :key="row.key" class="hover:bg-gray-50 dark:hover:bg-dark-800/60">
+                <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ row.model }}</td>
+                <td class="px-4 py-3"><span class="rounded-full bg-primary-50 px-2 py-1 text-xs text-primary-700 dark:bg-primary-900/20 dark:text-primary-300">{{ row.type }}</span></td>
+                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{{ row.platform }}</td>
+                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{{ row.channel }}</td>
+                <td class="px-4 py-3 font-mono text-xs text-gray-500">{{ row.endpoint }}</td>
+                <td class="px-4 py-3 text-right text-sm text-gray-500">{{ row.price }}</td>
+              </tr>
+              <tr v-if="!loading && filteredRows.length === 0"><td colspan="6" class="px-4 py-12 text-center text-sm text-gray-500">暂无模型。请先在渠道管理中配置模型定价和映射。</td></tr>
+              <tr v-if="loading"><td colspan="6" class="px-4 py-12 text-center text-sm text-gray-500">加载中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
+    </TablePageLayout>
+  </AppLayout>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import AppLayout from '@/components/layout/AppLayout.vue'
+import TablePageLayout from '@/components/layout/TablePageLayout.vue'
+import Icon from '@/components/icons/Icon.vue'
+import channelsAPI, { type Channel } from '@/api/admin/channels'
+import { useAppStore } from '@/stores/app'
+import { extractApiErrorMessage } from '@/utils/apiError'
+
+type ModelRow = { key: string; model: string; type: string; platform: string; channel: string; endpoint: string; price: string }
+const appStore = useAppStore()
+const channels = ref<Channel[]>([])
+const loading = ref(false)
+const query = ref('')
+const type = ref('')
+const headings = ['模型', '类型', '协议/平台', '渠道', '对外端点', '计费']
+
+const rows = computed<ModelRow[]>(() => channels.value.flatMap((channel) =>
+  (channel.model_pricing || []).flatMap((pricing) => pricing.models.map((model) => {
+    const image = pricing.billing_mode === 'image'
+    const video = /video|seedance|kling|sora/i.test(model)
+    const audio = /audio|tts|whisper/i.test(model)
+    const modelType = image ? 'Images' : video ? 'Videos' : audio ? 'Audio' : 'Chat'
+    return {
+      key: `${channel.id}-${pricing.platform}-${model}`,
+      model,
+      type: modelType,
+      platform: pricing.platform,
+      channel: channel.name,
+      endpoint: image ? '/v1/images/generations' : video ? '/v1/videos/generations' : '/v1/chat/completions',
+      price: image ? `${pricing.image_output_price ?? pricing.per_request_price ?? '-'} / 次` : `${pricing.output_price ?? pricing.per_request_price ?? '-'} / 输出`,
+    }
+  })),
+))
+
+const filteredRows = computed(() => {
+  const q = query.value.trim().toLowerCase()
+  return rows.value.filter((row) => (!type.value || row.type.toLowerCase() === type.value) && (!q || [row.model, row.platform, row.channel, row.endpoint].some((v) => v.toLowerCase().includes(q))))
+})
+
+async function load() {
+  loading.value = true
+  try {
+    const result = await channelsAPI.list(1, 1000)
+    channels.value = result.items
+  } catch (error) {
+    appStore.showError(extractApiErrorMessage(error, '模型目录加载失败'))
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(load)
+</script>
