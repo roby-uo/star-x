@@ -84,6 +84,8 @@ export default {
       // Filter options
       allPlatforms: '全部平台',
       allTypes: '全部类型',
+      allEndpoints: '全部端点',
+      endpointSelectionRequired: '端点筛选时请先勾选具体账号，再进行批量操作或导出',
       allStatus: '全部状态',
       allGroups: '全部分组',
       ungroupedGroup: '未分配分组',

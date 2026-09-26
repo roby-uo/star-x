@@ -70,7 +70,7 @@
           {{ autoRotationCountdown || t('admin.accounts.autoRotation.waitingForEligible') }}
         </span>
       </div>
-      <button @click="$emit('edit-filtered')" class="btn btn-primary btn-sm">
+      <button @click="$emit('edit-filtered')" class="btn btn-primary btn-sm" :disabled="endpointFilterActive" :title="endpointFilterActive ? t('admin.accounts.endpointSelectionRequired') : undefined">
         {{ t('admin.accounts.bulkEdit.submit') }}
       </button>
     </div>
@@ -82,11 +82,13 @@ import { useI18n } from 'vue-i18n'
 
 const props = withDefaults(defineProps<{
   selectedIds: number[]
+  endpointFilterActive?: boolean
   autoRotationEnabled?: boolean
   autoRotationLoading?: boolean
   autoRotationCountdown?: string
   autoRotationIntervalSeconds?: number
 }>(), {
+  endpointFilterActive: false,
   autoRotationEnabled: false,
   autoRotationLoading: false,
   autoRotationCountdown: '',

@@ -174,6 +174,7 @@
       <template #table>
         <AccountBulkActionsBar
           :selected-ids="selIds"
+          :endpoint-filter-active="Boolean(params.endpoint)"
           :auto-rotation-enabled="autoRotationStatus?.enabled === true"
           :auto-rotation-loading="autoRotationLoading"
           :auto-rotation-countdown="autoRotationCountdownLabel"
@@ -965,6 +966,7 @@ const {
   initialParams: {
     platform: '',
     type: '',
+    endpoint: '',
     status: '',
     privacy_mode: '',
     group: '',
@@ -1736,6 +1738,10 @@ const openBulkEditSelected = () => {
 }
 
 const openBulkEditFiltered = async () => {
+  if (params.endpoint) {
+    appStore.showInfo(t('admin.accounts.endpointSelectionRequired'))
+    return
+  }
   const filters = buildBulkEditFilterSnapshot()
   const preview = await adminAPI.accounts.list(1, 100, filters)
   const { selectedPlatforms, selectedTypes } = collectSelectionMetadata(preview.items)
@@ -1761,6 +1767,7 @@ const ACCOUNT_PRIVACY_MODE_UNSET_QUERY_VALUE = '__unset__'
 const buildAccountQueryFilters = () => ({
   platform: params.platform || '',
   type: params.type || '',
+  endpoint: params.endpoint || '',
   status: params.status || '',
   group: params.group || '',
   privacy_mode: params.privacy_mode || '',
@@ -1833,6 +1840,10 @@ const syncPaginationAfterLocalRemoval = () => {
 }
 
 const patchAccountInList = (updatedAccount: Account) => {
+  if (params.endpoint) {
+    void reload()
+    return
+  }
   const index = accounts.value.findIndex(account => account.id === updatedAccount.id)
   if (index === -1) return
   const mergedAccount = mergeRuntimeFields(accounts.value[index], updatedAccount)
@@ -1887,10 +1898,18 @@ const formatExportTimestamp = () => {
   return `${now.getFullYear()}${pad2(now.getMonth() + 1)}${pad2(now.getDate())}${pad2(now.getHours())}${pad2(now.getMinutes())}${pad2(now.getSeconds())}`
 }
 const openExportDataDialog = () => {
+  if (params.endpoint && selIds.value.length === 0) {
+    appStore.showInfo(t('admin.accounts.endpointSelectionRequired'))
+    return
+  }
   includeProxyOnExport.value = true
   showExportDataDialog.value = true
 }
 const handleExportData = async () => {
+  if (params.endpoint && selIds.value.length === 0) {
+    appStore.showInfo(t('admin.accounts.endpointSelectionRequired'))
+    return
+  }
   if (exportingData.value) return
   exportingData.value = true
   try {

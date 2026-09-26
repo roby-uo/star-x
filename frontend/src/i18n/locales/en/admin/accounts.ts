@@ -84,6 +84,8 @@ export default {
       notesHint: 'Notes are optional',
       allPlatforms: 'All Platforms',
       allTypes: 'All Types',
+      allEndpoints: 'All Endpoints',
+      endpointSelectionRequired: 'Select specific accounts before bulk actions or export while an endpoint filter is active',
       allStatus: 'All Status',
       allGroups: 'All Groups',
       ungroupedGroup: 'Ungrouped',

@@ -153,6 +153,7 @@ export default {
     dashboard: 'Dashboard',
     announcements: 'Announcements',
     apiKeys: 'API Keys',
+    modelTest: 'Model Test',
     batchImage: 'Batch Images',
     usage: 'Usage',
     redeem: 'Redeem',

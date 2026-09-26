@@ -490,6 +490,11 @@ func (h *AccountHandler) List(c *gin.Context) {
 	status := c.Query("status")
 	search := c.Query("search")
 	privacyMode := strings.TrimSpace(c.Query("privacy_mode"))
+	endpoint := strings.ToLower(strings.TrimSpace(c.Query("endpoint")))
+	if endpoint != "" && endpoint != "chat" && endpoint != "responses" && endpoint != "images" {
+		response.ErrorFrom(c, infraerrors.BadRequest("INVALID_ENDPOINT_FILTER", "invalid endpoint filter"))
+		return
+	}
 	sortBy := c.DefaultQuery("sort_by", "name")
 	sortOrder := c.DefaultQuery("sort_order", "asc")
 	// 标准化和验证 search 参数
@@ -519,7 +524,14 @@ func (h *AccountHandler) List(c *gin.Context) {
 		}
 	}
 
-	accounts, total, err := h.adminService.ListAccounts(c.Request.Context(), page, pageSize, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder)
+	var accounts []service.Account
+	var total int64
+	var err error
+	if endpoint == "" {
+		accounts, total, err = h.adminService.ListAccounts(c.Request.Context(), page, pageSize, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder)
+	} else {
+		accounts, total, err = h.listAccountsByEndpoint(c.Request.Context(), page, pageSize, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder, endpoint)
+	}
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -659,7 +671,7 @@ func (h *AccountHandler) List(c *gin.Context) {
 
 	h.enrichShadowParents(c.Request.Context(), result)
 
-	etag := buildAccountsListETag(result, total, page, pageSize, platform, accountType, status, search, lite)
+	etag := buildAccountsListETag(result, total, page, pageSize, platform, accountType, status, search, endpoint, lite)
 	if etag != "" {
 		c.Header("ETag", etag)
 		c.Header("Vary", "If-None-Match")
@@ -672,11 +684,67 @@ func (h *AccountHandler) List(c *gin.Context) {
 	response.Paginated(c, result, total, page, pageSize)
 }
 
+func isAdminImageModel(model string) bool {
+	model = strings.ToLower(strings.TrimSpace(model))
+	return service.IsGPTImageGenerationModel(model) || model == "grok-imagine" || model == "grok-imagine-edit" || strings.HasPrefix(model, "grok-imagine-image")
+}
+
+func accountSupportsAdminEndpoint(account *service.Account, endpoint string) bool {
+	if account == nil {
+		return false
+	}
+	if endpoint == "responses" {
+		if account.Platform == service.PlatformAnthropic {
+			return true
+		}
+		return account.SupportsOpenAIEndpointCapability(service.OpenAIEndpointCapabilityResponses)
+	}
+	if endpoint == "chat" {
+		return !account.IsOpenAICompatible() || account.SupportsOpenAIEndpointCapability(service.OpenAIEndpointCapabilityChatCompletions)
+	}
+	if endpoint != "images" || (account.Platform != service.PlatformOpenAI && account.Platform != service.PlatformGrok) {
+		return false
+	}
+	for clientModel, upstreamModel := range account.GetModelMapping() {
+		for _, model := range []string{clientModel, upstreamModel} {
+			if isAdminImageModel(model) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (h *AccountHandler) listAccountsByEndpoint(ctx context.Context, page, pageSize int, platform, accountType, status, search string, groupID int64, privacyMode, sortBy, sortOrder, endpoint string) ([]service.Account, int64, error) {
+	const scanPageSize = 1000
+	filtered := make([]service.Account, 0)
+	for scanPage := 1; ; scanPage++ {
+		batch, total, err := h.adminService.ListAccounts(ctx, scanPage, scanPageSize, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder)
+		if err != nil {
+			return nil, 0, err
+		}
+		for i := range batch {
+			if accountSupportsAdminEndpoint(&batch[i], endpoint) {
+				filtered = append(filtered, batch[i])
+			}
+		}
+		if scanPage*scanPageSize >= int(total) || len(batch) == 0 {
+			break
+		}
+	}
+	start := (page - 1) * pageSize
+	if start >= len(filtered) {
+		return []service.Account{}, int64(len(filtered)), nil
+	}
+	end := min(start+pageSize, len(filtered))
+	return filtered[start:end], int64(len(filtered)), nil
+}
+
 func buildAccountsListETag(
 	items []AccountWithConcurrency,
 	total int64,
 	page, pageSize int,
-	platform, accountType, status, search string,
+	platform, accountType, status, search, endpoint string,
 	lite bool,
 ) string {
 	payload := struct {
@@ -687,6 +755,7 @@ func buildAccountsListETag(
 		AccountType string                   `json:"type"`
 		Status      string                   `json:"status"`
 		Search      string                   `json:"search"`
+		Endpoint    string                   `json:"endpoint"`
 		Lite        bool                     `json:"lite"`
 		Items       []AccountWithConcurrency `json:"items"`
 	}{
@@ -697,6 +766,7 @@ func buildAccountsListETag(
 		AccountType: accountType,
 		Status:      status,
 		Search:      search,
+		Endpoint:    endpoint,
 		Lite:        lite,
 		Items:       items,
 	}

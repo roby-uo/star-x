@@ -74,7 +74,13 @@
 
         <template #cell-reasoning_effort="{ row }">
           <span class="text-sm text-gray-900 dark:text-white">
-            {{ formatReasoningEffort(row.reasoning_effort) }}
+            {{ formatUsageReasoning(row.reasoning_effort, locale) }}
+          </span>
+        </template>
+
+        <template #cell-agent="{ row }">
+          <span class="text-sm text-gray-900 dark:text-white" :title="row.user_agent || undefined">
+            {{ identifyAgentClient(row.user_agent) || '-' }}
           </span>
         </template>
 
@@ -463,7 +469,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { formatDateTime, formatReasoningEffort } from '@/utils/format'
+import { formatDateTime } from '@/utils/format'
+import { identifyAgentClient } from '@/utils/agentClient'
+import { formatUsageReasoning } from '@/utils/usageReasoning'
 import { formatCacheTokens, formatMultiplier } from '@/utils/formatters'
 import { formatTokenPricePerMillion } from '@/utils/usagePricing'
 import { getUsageServiceTierLabel } from '@/utils/usageServiceTier'
@@ -541,7 +549,7 @@ const emit = defineEmits<{
   sort: [key: string, order: 'asc' | 'desc']
   ipGeoBatchFailed: []
 }>()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const showAccountBilling = props.showAccountBilling
 const showUpstreamEndpoint = props.showUpstreamEndpoint
 const ipGeoBatchLoading = ref(false)

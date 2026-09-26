@@ -313,6 +313,26 @@ Please follow these requirements:
     },
   },
 
+  modelTest: {
+    title: 'Model Test',
+    description: 'See models visible to this key and send a real request through the gateway. Listed models may not work on every endpoint; success confirms only this request path.',
+    apiKey: 'API Key',
+    apiKeyPlaceholder: 'Enter your API key; it is not saved in the browser',
+    loadModels: 'Load Models',
+    loading: 'Loading',
+    loadFailed: 'Failed to load models',
+    endpoint: 'Test endpoint',
+    search: 'Search models',
+    count: '{count} models',
+    noModels: 'No matching models returned for this key',
+    textCharge: 'Text tests limit output but still use your account balance at normal rates; see usage records for the actual charge.',
+    imageCharge: 'Image tests generate one image and incur the normal charge. I understand and agree.',
+    test: 'Test',
+    testing: 'Testing',
+    success: 'Success · {seconds}s',
+    failed: 'Test failed'
+  },
+
   // Usage
   usage: {
     title: 'Usage Records',
@@ -357,6 +377,7 @@ Please follow these requirements:
     requestedModel: 'Requested',
     upstreamModel: 'Upstream',
     reasoningEffort: 'Reasoning Effort',
+    agent: 'Agent',
     endpoint: 'Endpoint',
     endpointDistribution: 'Endpoint Distribution',
     inbound: 'Inbound',

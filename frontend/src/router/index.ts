@@ -206,6 +206,17 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/model-test',
+    name: 'ModelTest',
+    component: () => import('@/views/user/ModelTestView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Model Test',
+      titleKey: 'modelTest.title'
+    }
+  },
+  {
     path: '/batch-image',
     name: 'BatchImageGuide',
     alias: '/docs/batch-image',

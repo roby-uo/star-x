@@ -318,6 +318,26 @@ API Key：{apiKey}
     }
   },
 
+  modelTest: {
+    title: '模型测试',
+    description: '展示该密钥可见的模型，并通过本站网关发起真实请求。列表不保证每个端点都可用；成功仅证明该次请求链路可用。',
+    apiKey: 'API 密钥',
+    apiKeyPlaceholder: '输入本站 API 密钥；不会保存在浏览器中',
+    loadModels: '读取可用模型',
+    loading: '读取中',
+    loadFailed: '读取模型失败',
+    endpoint: '测试端点',
+    search: '搜索模型',
+    count: '{count} 个模型',
+    noModels: '当前密钥未返回符合条件的模型',
+    textCharge: '文本测试限制输出长度，但仍会按正常请求消耗该密钥所属用户的额度；实际费用以使用记录为准。',
+    imageCharge: '图片测试会实际生成一张图片并按正常价格扣费；我已了解并同意。',
+    test: '测试',
+    testing: '测试中',
+    success: '成功 · {seconds}s',
+    failed: '测试失败'
+  },
+
   // Usage
   usage: {
     title: '使用记录',
@@ -362,6 +382,7 @@ API Key：{apiKey}
     requestedModel: '请求',
     upstreamModel: '上游',
     reasoningEffort: '推理强度',
+    agent: '所用 Agent',
     endpoint: '端点',
     endpointDistribution: '端点分布',
     inbound: '入站',
