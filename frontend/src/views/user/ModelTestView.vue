@@ -2,6 +2,7 @@
   <AppLayout>
     <main class="mx-auto w-full max-w-5xl space-y-5 px-4 py-6 sm:px-6">
       <div>
+        <router-link to="/model-catalog" class="text-sm text-primary-600 hover:underline">← {{ t('nav.userModelManagement') }}</router-link>
         <h1 class="text-xl font-semibold text-gray-900 dark:text-white">{{ t('modelTest.title') }}</h1>
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('modelTest.description') }}</p>
       </div>
@@ -34,17 +35,28 @@
           <input v-model="imageChargeAccepted" type="checkbox" class="mt-1" />
           <span>{{ t('modelTest.imageCharge') }}</span>
         </label>
+        <div v-if="endpoint === 'Images'" class="grid gap-3 sm:grid-cols-2">
+          <label class="text-xs text-gray-600 dark:text-gray-300">{{ t('modelTest.imagePrompt') }}
+            <input v-model="imagePrompt" class="input mt-1 w-full" :placeholder="t('modelTest.imagePromptPlaceholder')" />
+          </label>
+          <label class="text-xs text-gray-600 dark:text-gray-300">{{ t('modelTest.seedreamReference') }}
+            <input v-model="seedreamReference" type="url" class="input mt-1 w-full" :placeholder="t('modelTest.seedreamReferencePlaceholder')" />
+          </label>
+        </div>
         <p v-else class="text-xs text-gray-500 dark:text-gray-400">{{ t('modelTest.textCharge') }}</p>
 
         <div class="divide-y divide-gray-200 border-y border-gray-200 dark:divide-dark-600 dark:border-dark-600">
-          <div v-for="model in visibleModels" :key="model" class="flex min-h-14 items-center gap-3 py-2">
-            <span class="min-w-0 flex-1 break-all font-mono text-sm text-gray-900 dark:text-white">{{ model }}</span>
-            <span v-if="results[resultKey(model)]" class="max-w-[40%] truncate text-xs" :class="results[resultKey(model)]?.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'" :title="results[resultKey(model)]?.message">
-              {{ results[resultKey(model)]?.message }}
-            </span>
-            <button type="button" class="btn btn-secondary h-8 shrink-0 px-3 text-xs" :disabled="Boolean(testingModel) || (endpoint === 'Images' && !imageChargeAccepted)" @click="testModel(model)">
-              {{ testingModel === model ? t('modelTest.testing') : t('modelTest.test') }}
-            </button>
+          <div v-for="model in visibleModels" :key="model" class="py-2">
+            <div class="flex min-h-10 items-center gap-3">
+              <span class="min-w-0 flex-1 break-all font-mono text-sm text-gray-900 dark:text-white">{{ model }}</span>
+              <span v-if="results[resultKey(model)]" class="max-w-[40%] truncate text-xs" :class="results[resultKey(model)]?.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'" :title="results[resultKey(model)]?.message">
+                {{ results[resultKey(model)]?.message }}
+              </span>
+              <button type="button" class="btn btn-secondary h-8 shrink-0 px-3 text-xs" :disabled="Boolean(testingModel) || (endpoint === 'Images' && !imageChargeAccepted)" @click="testModel(model)">
+                {{ testingModel === model ? t('modelTest.testing') : t('modelTest.test') }}
+              </button>
+            </div>
+            <img v-if="results[resultKey(model)]?.imageUrl" :src="results[resultKey(model)]?.imageUrl" :alt="t('modelTest.imagePreview')" class="mt-2 max-h-48 max-w-full rounded border border-gray-200 dark:border-dark-600" />
           </div>
           <div v-if="!visibleModels.length" class="py-8 text-center text-sm text-gray-500 dark:text-gray-400">{{ t('modelTest.noModels') }}</div>
         </div>
@@ -55,22 +67,27 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { buildGatewayUrl } from '@/api/url'
 import { buildModelTestRequest, parseModelTestModels, type ModelTestEndpoint } from '@/utils/modelTest'
 
-type TestResult = { ok: boolean; message: string }
+type TestResult = { ok: boolean; message: string; imageUrl?: string }
 const { t } = useI18n()
+const route = useRoute()
 const endpoints: ModelTestEndpoint[] = ['Chat', 'Responses', 'Images']
-const endpoint = ref<ModelTestEndpoint>('Chat')
+const requestedEndpoint = typeof route.query.endpoint === 'string' ? route.query.endpoint : ''
+const endpoint = ref<ModelTestEndpoint>(endpoints.find(item => item === requestedEndpoint) || 'Chat')
 const apiKey = ref('')
 const models = ref<string[]>([])
-const search = ref('')
+const search = ref(typeof route.query.model === 'string' ? route.query.model : '')
 const loadingModels = ref(false)
 const testingModel = ref('')
 const imageChargeAccepted = ref(false)
+const imagePrompt = ref('')
+const seedreamReference = ref('')
 const loadError = ref('')
 const results = ref<Record<string, TestResult>>({})
 
@@ -110,7 +127,7 @@ async function testModel(model: string) {
   testingModel.value = model
   const selectedEndpoint = endpoint.value
   const key = resultKey(model)
-  const { path, body } = buildModelTestRequest(selectedEndpoint, model)
+  const { path, body } = buildModelTestRequest(selectedEndpoint, model, { prompt: imagePrompt.value, image: seedreamReference.value })
   const started = performance.now()
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), selectedEndpoint === 'Images' ? 120_000 : 60_000)
@@ -126,8 +143,20 @@ async function testModel(model: string) {
       const payload = await response.json().catch(() => null)
       throw new Error(payload?.error?.message || `HTTP ${response.status}`)
     }
-    await response.body?.cancel()
-    results.value[key] = { ok: true, message: t('modelTest.success', { seconds: ((performance.now() - started) / 1000).toFixed(1) }) }
+    let imageUrl: string | undefined
+    if (selectedEndpoint === 'Images') {
+      const payload = await response.json()
+      const firstImage = Array.isArray(payload?.data) ? payload.data.find((item: { url?: string; b64_json?: string }) => item?.url || item?.b64_json) : null
+      if (typeof firstImage?.url === 'string' && firstImage.url.startsWith('https://')) imageUrl = firstImage.url
+      else if (typeof firstImage?.b64_json === 'string') {
+        const format = firstImage.output_format === 'jpeg' ? 'jpeg' : firstImage.output_format === 'webp' ? 'webp' : 'png'
+        imageUrl = `data:image/${format};base64,${firstImage.b64_json}`
+      }
+      if (!imageUrl) throw new Error(t('modelTest.noImageReturned'))
+    } else {
+      await response.body?.cancel()
+    }
+    results.value[key] = { ok: true, message: t('modelTest.success', { seconds: ((performance.now() - started) / 1000).toFixed(1) }), imageUrl }
   } catch (error) {
     results.value[key] = { ok: false, message: error instanceof Error ? error.message : t('modelTest.failed') }
   } finally {

@@ -21,12 +21,22 @@ export const getAdminSteps = (t: (key: string) => string, isSimpleMode = false):
 
   // ========== 第一部分：创建分组 ==========
   {
-    element: '#sidebar-group-manage',
+    element: '#sidebar-upstream-group-manage',
     popover: {
       title: t('onboarding.admin.groupManage.title'),
       description: t('onboarding.admin.groupManage.description'),
       side: 'right',
       align: 'center',
+      showButtons: ['close'],
+    }
+  },
+  {
+    element: '#upstream-pools-tab',
+    popover: {
+      title: t('onboarding.admin.openPools.title'),
+      description: t('onboarding.admin.openPools.description'),
+      side: 'bottom',
+      align: 'start',
       showButtons: ['close'],
     }
   },
@@ -232,7 +242,8 @@ export const getAdminSteps = (t: (key: string) => string, isSimpleMode = false):
       const element = step.element as string | undefined
       // 过滤掉分组管理和账号分组选择相关步骤
       return !element || (
-        !element.includes('sidebar-group-manage') &&
+        !element.includes('sidebar-upstream-group-manage') &&
+        !element.includes('upstream-pools-tab') &&
         !element.includes('groups-create-btn') &&
         !element.includes('group-form-') &&
         !element.includes('account-form-groups')

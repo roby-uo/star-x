@@ -47,6 +47,9 @@
             "
           />
           <p v-if="baseUrlHint" class="input-hint">{{ baseUrlHint }}</p>
+          <button v-if="account.platform === 'openai'" type="button" class="mt-1 text-xs text-primary-600 hover:text-primary-700" @click="editBaseUrl = 'https://ark.cn-beijing.volces.com/api/v3'">
+            {{ t('admin.accounts.openai.seedreamArkPreset') }}
+          </button>
           <GrokBaseUrlPresets
             v-if="account.platform === 'grok'"
             class="mt-2"
@@ -65,7 +68,7 @@
             data-bwignore="true"
             :placeholder="
               account.platform === 'openai'
-                ? 'sk-proj-...'
+                ? (editBaseUrl.includes('ark.cn-beijing.volces.com') ? 'ARK_API_KEY' : 'sk-proj-...')
                 : account.platform === 'gemini'
                   ? 'AIza...'
                   : account.platform === 'antigravity'
@@ -76,6 +79,7 @@
             "
           />
           <p class="input-hint">{{ t('admin.accounts.leaveEmptyToKeep') }}</p>
+          <p v-if="account.platform === 'openai' && editBaseUrl.includes('ark.cn-beijing.volces.com')" class="input-hint">{{ t('admin.accounts.openai.seedreamApiKeyHint') }}</p>
         </div>
 
         <!-- Model Restriction Section (不适用于 Antigravity) -->

@@ -58,9 +58,9 @@ const (
 	defaultOpenAIImageTestPrompt = "Generate a cute orange cat astronaut sticker on a clean pastel background."
 )
 
-// isOpenAIImageModel checks if the model is an OpenAI image generation model (e.g. gpt-image-2).
+// isOpenAIImageModel checks image models supported by the OpenAI-compatible account test.
 func isOpenAIImageModel(model string) bool {
-	return strings.HasPrefix(strings.ToLower(model), "gpt-image-")
+	return IsGPTImageGenerationModel(model) || isSeedreamImageGenerationModel(model)
 }
 
 // AccountTestService handles account testing operations
@@ -1698,8 +1698,12 @@ func (s *AccountTestService) testOpenAIImageAPIKey(c *gin.Context, ctx context.C
 	payload := map[string]any{
 		"model":           modelID,
 		"prompt":          prompt,
-		"n":               1,
 		"response_format": "b64_json",
+	}
+	if isSeedreamImageGenerationModel(modelID) {
+		payload["size"] = "2K"
+	} else {
+		payload["n"] = 1
 	}
 	payloadBytes, _ := json.Marshal(payload)
 
@@ -1738,6 +1742,8 @@ func (s *AccountTestService) testOpenAIImageAPIKey(c *gin.Context, ctx context.C
 	var result struct {
 		Data []struct {
 			B64JSON       string `json:"b64_json"`
+			URL           string `json:"url"`
+			OutputFormat  string `json:"output_format"`
 			RevisedPrompt string `json:"revised_prompt"`
 		} `json:"data"`
 	}
@@ -1754,11 +1760,19 @@ func (s *AccountTestService) testOpenAIImageAPIKey(c *gin.Context, ctx context.C
 			s.sendEvent(c, TestEvent{Type: "content", Text: item.RevisedPrompt})
 		}
 		if item.B64JSON != "" {
+			mimeType := "image/png"
+			if item.OutputFormat == "jpeg" {
+				mimeType = "image/jpeg"
+			} else if item.OutputFormat == "webp" {
+				mimeType = "image/webp"
+			}
 			s.sendEvent(c, TestEvent{
 				Type:     "image",
-				ImageURL: "data:image/png;base64," + item.B64JSON,
-				MimeType: "image/png",
+				ImageURL: "data:" + mimeType + ";base64," + item.B64JSON,
+				MimeType: mimeType,
 			})
+		} else if item.URL != "" {
+			s.sendEvent(c, TestEvent{Type: "image", ImageURL: item.URL})
 		}
 	}
 

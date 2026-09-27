@@ -9,18 +9,22 @@ import (
 )
 
 type openAIImageOutputCounter struct {
-	seen         map[string]struct{}
-	seenSizes    map[string]string
-	seenOrder    []string
-	dataSizes    []string
-	count        int
-	maxDataCount int
+	seen            map[string]struct{}
+	seenSizes       map[string]string
+	seenOrder       []string
+	dataSizes       []string
+	streamDataSeen  map[string]struct{}
+	streamDataSizes []string
+	streamDataCount int
+	count           int
+	maxDataCount    int
 }
 
 func newOpenAIImageOutputCounter() *openAIImageOutputCounter {
 	return &openAIImageOutputCounter{
-		seen:      make(map[string]struct{}),
-		seenSizes: make(map[string]string),
+		seen:           make(map[string]struct{}),
+		seenSizes:      make(map[string]string),
+		streamDataSeen: make(map[string]struct{}),
 	}
 }
 
@@ -28,10 +32,7 @@ func (c *openAIImageOutputCounter) Count() int {
 	if c == nil {
 		return 0
 	}
-	if c.maxDataCount > c.count {
-		return c.maxDataCount
-	}
-	return c.count
+	return max(max(c.count, c.maxDataCount), c.streamDataCount)
 }
 
 func (c *openAIImageOutputCounter) Sizes() []string {
@@ -46,6 +47,9 @@ func (c *openAIImageOutputCounter) Sizes() []string {
 	}
 	if len(sizes) == 0 && len(c.dataSizes) > 0 {
 		sizes = append(sizes, c.dataSizes...)
+	}
+	if len(c.streamDataSizes) > len(sizes) {
+		sizes = append([]string(nil), c.streamDataSizes...)
 	}
 	if len(sizes) == 0 {
 		return nil
@@ -68,6 +72,7 @@ func (c *openAIImageOutputCounter) AddSSEData(data []byte) {
 	}
 	root := gjson.ParseBytes(data)
 	c.addDataArray(root.Get("data"))
+	c.addStreamDataArray(root.Get("data"))
 	eventType := strings.TrimSpace(root.Get("type").String())
 	switch eventType {
 	case "response.output_item.done":
@@ -84,6 +89,32 @@ func (c *openAIImageOutputCounter) AddSSEData(data []byte) {
 			return
 		}
 		c.addImageOutputItem(root)
+	}
+}
+
+// Ark emits one data image per SSE event; count distinct images across events
+// rather than only the largest single data array.
+func (c *openAIImageOutputCounter) addStreamDataArray(data gjson.Result) {
+	if !data.IsArray() {
+		return
+	}
+	for _, item := range data.Array() {
+		result := strings.TrimSpace(item.Get("url").String())
+		if result == "" {
+			result = strings.TrimSpace(item.Get("b64_json").String())
+		}
+		if result == "" {
+			continue
+		}
+		key := hashOpenAIImageOutputResult(result)
+		if _, exists := c.streamDataSeen[key]; exists {
+			continue
+		}
+		c.streamDataSeen[key] = struct{}{}
+		c.streamDataCount++
+		if size := strings.TrimSpace(item.Get("size").String()); size != "" {
+			c.streamDataSizes = append(c.streamDataSizes, size)
+		}
 	}
 }
 

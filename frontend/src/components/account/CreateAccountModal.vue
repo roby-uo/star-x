@@ -1117,6 +1117,9 @@
             "
           />
           <p v-if="baseUrlHint" class="input-hint">{{ baseUrlHint }}</p>
+          <button v-if="form.platform === 'openai'" type="button" class="mt-1 text-xs text-primary-600 hover:text-primary-700" @click="apiKeyBaseUrl = 'https://ark.cn-beijing.volces.com/api/v3'">
+            {{ t('admin.accounts.openai.seedreamArkPreset') }}
+          </button>
           <GrokBaseUrlPresets
             v-if="form.platform === 'grok'"
             class="mt-2"
@@ -1132,7 +1135,7 @@
             class="input font-mono"
             :placeholder="
               form.platform === 'openai'
-                ? 'sk-proj-...'
+                ? (apiKeyBaseUrl.includes('ark.cn-beijing.volces.com') ? 'ARK_API_KEY' : 'sk-proj-...')
                 : form.platform === 'gemini'
                   ? 'AIza...'
                   : form.platform === 'grok'
@@ -3603,6 +3606,7 @@ const baseUrlHint = computed(() => {
 })
 
 const apiKeyHint = computed(() => {
+  if (form.platform === 'openai' && apiKeyBaseUrl.value.includes('ark.cn-beijing.volces.com')) return t('admin.accounts.openai.seedreamApiKeyHint')
   if (form.platform === 'openai') return t('admin.accounts.openai.apiKeyHint')
   if (form.platform === 'gemini') return t('admin.accounts.gemini.apiKeyHint')
   if (form.platform === 'grok') return ''

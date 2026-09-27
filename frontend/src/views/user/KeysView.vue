@@ -508,6 +508,10 @@
               />
             </template>
           </Select>
+          <p v-if="selectedImageGroup" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('keys.imageGroupHint') }}
+            <router-link to="/model-catalog" class="text-primary-600 hover:underline">{{ t('keys.viewImageModels') }}</router-link>
+          </p>
         </div>
 
         <!-- Custom Key Section (only for create) -->
@@ -1428,6 +1432,10 @@ const groupOptions = computed(() =>
     platform: group.platform
   }))
 )
+
+const selectedImageGroup = computed(() => groups.value.find(group =>
+  group.id === formData.value.group_id && group.platform === 'openai' && group.allow_image_generation
+))
 
 // Group dropdown search
 const groupSearchQuery = ref('')

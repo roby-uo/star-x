@@ -1218,8 +1218,23 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 		}
 	}
 
-	// If no account has model_mapping, return nil (use default)
+	// Without mappings, Ark-only groups use Seedream defaults; others use the platform defaults.
 	if !hasAnyMapping {
+		allArk := len(accounts) > 0
+		for i := range accounts {
+			if !IsVolcengineArkAccount(&accounts[i]) {
+				allArk = false
+				break
+			}
+		}
+		if allArk {
+			models := SeedreamModelIDs()
+			if s.modelsListCache != nil {
+				s.modelsListCache.Set(cacheKey, cloneStringSlice(models), s.modelsListCacheTTL)
+				modelsListCacheStoreTotal.Add(1)
+			}
+			return models
+		}
 		if s.modelsListCache != nil {
 			s.modelsListCache.Set(cacheKey, []string(nil), s.modelsListCacheTTL)
 			modelsListCacheStoreTotal.Add(1)

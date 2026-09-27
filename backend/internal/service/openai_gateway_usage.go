@@ -515,6 +515,38 @@ func (s *OpenAIGatewayService) calculateOpenAIImageCost(
 	result *OpenAIForwardResult,
 	multiplier float64,
 ) *CostBreakdown {
+	// Seedream sets can contain different resolutions. Price each produced image
+	// at its own tier when Ark returned sizes for every output.
+	if isSeedreamImageGenerationModel(billingModel) && len(result.ImageSizeBreakdown) > 1 {
+		counted := 0
+		for _, count := range result.ImageSizeBreakdown {
+			counted += count
+		}
+		if counted == result.ImageCount {
+			total := &CostBreakdown{}
+			for _, tier := range SortedImageBillingBreakdownKeys(result.ImageSizeBreakdown) {
+				part := *result
+				part.ImageCount = result.ImageSizeBreakdown[tier]
+				part.ImageSize = tier
+				part.ImageSizeBreakdown = nil
+				cost := s.calculateOpenAIImageCostSingleTier(ctx, billingModel, apiKey, &part, multiplier)
+				total.TotalCost += cost.TotalCost
+				total.ActualCost += cost.ActualCost
+				total.BillingMode = cost.BillingMode
+			}
+			return total
+		}
+	}
+	return s.calculateOpenAIImageCostSingleTier(ctx, billingModel, apiKey, result, multiplier)
+}
+
+func (s *OpenAIGatewayService) calculateOpenAIImageCostSingleTier(
+	ctx context.Context,
+	billingModel string,
+	apiKey *APIKey,
+	result *OpenAIForwardResult,
+	multiplier float64,
+) *CostBreakdown {
 	sizeTier := NormalizeImageBillingTierOrDefault(result.ImageSize)
 	groupConfig := imagePriceConfigFromAPIKey(apiKey)
 	if apiKeyHasConfiguredImagePrice(apiKey, sizeTier) {

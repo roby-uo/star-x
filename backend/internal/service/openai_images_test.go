@@ -58,6 +58,25 @@ func TestOpenAIGatewayServiceParseOpenAIImagesRequest_JSON(t *testing.T) {
 	require.False(t, parsed.Multipart)
 }
 
+func TestSeedreamImagesRequestPreservesArkOptionsAndModeratesReferences(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	body := []byte(`{"model":"doubao-seedream-5-0-pro-260628","prompt":"draw a cat","image":["https://example.com/a.png","https://example.com/b.png"],"size":"2K","n":1,"quality":"high","sequential_image_generation":"disabled"}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/images/generations", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = req
+	parsed, err := (&OpenAIGatewayService{}).ParseOpenAIImagesRequest(c, body)
+	require.NoError(t, err)
+	require.Equal(t, []string{"https://example.com/a.png", "https://example.com/b.png"}, parsed.InputImageURLs)
+	require.Contains(t, string(parsed.ModerationBody()), "https://example.com/a.png")
+	forward, err := normalizeSeedreamImagesBody(body)
+	require.NoError(t, err)
+	require.False(t, gjson.GetBytes(forward, "n").Exists())
+	require.False(t, gjson.GetBytes(forward, "quality").Exists())
+	require.Equal(t, "disabled", gjson.GetBytes(forward, "sequential_image_generation").String())
+	require.Len(t, gjson.GetBytes(forward, "image").Array(), 2)
+}
+
 func TestOpenAIGatewayServiceParseOpenAIImagesRequest_MultipartEdit(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

@@ -30,7 +30,10 @@
                 <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{{ row.platform }}</td>
                 <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{{ row.channel }}</td>
                 <td class="px-4 py-3 font-mono text-xs text-gray-500">{{ row.endpoint }}</td>
-                <td class="px-4 py-3 text-right"><router-link to="/model-test" class="btn btn-secondary px-2 py-1 text-xs">测试</router-link></td>
+                <td class="px-4 py-3 text-right">
+                  <router-link v-if="row.testEndpoint" :to="{ path: '/model-test', query: { model: row.model, endpoint: row.testEndpoint } }" class="btn btn-secondary px-2 py-1 text-xs">{{ t('modelTest.test') }}</router-link>
+                  <span v-else class="text-xs text-gray-400">—</span>
+                </td>
               </tr>
               <tr v-if="!loading && filteredRows.length === 0"><td colspan="6" class="px-4 py-12 text-center text-sm text-gray-500">暂无可用模型</td></tr>
               <tr v-if="loading"><td colspan="6" class="px-4 py-12 text-center text-sm text-gray-500">加载中...</td></tr>
@@ -44,14 +47,18 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import userChannelsAPI, { type UserAvailableChannel } from '@/api/channels'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
+import { isSeedreamModel } from '@/utils/modelTest'
+import type { ModelTestEndpoint } from '@/utils/modelTest'
 
-type ModelRow = { key: string; model: string; type: string; platform: string; channel: string; endpoint: string }
+type ModelRow = { key: string; model: string; type: string; platform: string; channel: string; endpoint: string; testEndpoint: ModelTestEndpoint | null }
+const { t } = useI18n()
 const channels = ref<UserAvailableChannel[]>([])
 const loading = ref(false)
 const query = ref('')
@@ -60,11 +67,11 @@ const headings = ['模型', '类型', '平台', '渠道', '端点', '操作']
 const appStore = useAppStore()
 
 const rows = computed<ModelRow[]>(() => channels.value.flatMap((channel) => channel.platforms.flatMap((platform) => platform.supported_models.map((model) => {
-  const image = model.pricing?.billing_mode === 'image'
+  const image = model.pricing?.billing_mode === 'image' || isSeedreamModel(model.name)
   const video = /video|seedance|kling|sora/i.test(model.name)
   const audio = /audio|tts|whisper/i.test(model.name)
   const modelType = image ? 'Images' : video ? 'Videos' : audio ? 'Audio' : 'Chat'
-  return { key: `${channel.name}-${platform.platform}-${model.name}`, model: model.name, type: modelType, platform: platform.platform, channel: channel.name, endpoint: image ? '/v1/images/generations' : video ? '/v1/videos/generations' : '/v1/chat/completions' }
+  return { key: `${channel.name}-${platform.platform}-${model.name}`, model: model.name, type: modelType, platform: platform.platform, channel: channel.name, endpoint: image ? '/v1/images/generations' : video ? '/v1/videos/generations' : '/v1/chat/completions', testEndpoint: (image ? 'Images' : video || audio ? null : 'Chat') as ModelTestEndpoint | null }
 }))))
 const filteredRows = computed(() => { const q = query.value.trim().toLowerCase(); return rows.value.filter((row) => (!type.value || row.type === type.value) && (!q || [row.model, row.platform, row.channel, row.endpoint].some((v) => v.toLowerCase().includes(q)))) })
 

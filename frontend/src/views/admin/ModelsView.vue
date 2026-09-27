@@ -2,6 +2,7 @@
   <AppLayout>
     <TablePageLayout>
       <template #filters>
+        <AdminWorkspaceTabs area="models" />
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="flex flex-1 flex-wrap items-center gap-3">
             <div class="relative w-full sm:w-80">
@@ -16,9 +17,12 @@
               <option value="audio">Audio</option>
             </select>
           </div>
-          <button class="btn btn-secondary" :disabled="loading" title="刷新" @click="load">
-            <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
-          </button>
+          <div class="flex items-center gap-2">
+            <router-link to="/admin/channels/pricing" class="btn btn-primary">{{ t('nav.modelPublishing') }}</router-link>
+            <button class="btn btn-secondary" :disabled="loading" title="刷新" @click="load">
+              <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
+            </button>
+          </div>
         </div>
       </template>
 
@@ -51,15 +55,19 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
+import AdminWorkspaceTabs from '@/components/admin/AdminWorkspaceTabs.vue'
 import Icon from '@/components/icons/Icon.vue'
 import channelsAPI, { type Channel } from '@/api/admin/channels'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
+import { isSeedreamModel } from '@/utils/modelTest'
 
 type ModelRow = { key: string; model: string; type: string; platform: string; channel: string; endpoint: string; price: string }
 const appStore = useAppStore()
+const { t } = useI18n()
 const channels = ref<Channel[]>([])
 const loading = ref(false)
 const query = ref('')
@@ -68,7 +76,7 @@ const headings = ['模型', '类型', '协议/平台', '渠道', '对外端点',
 
 const rows = computed<ModelRow[]>(() => channels.value.flatMap((channel) =>
   (channel.model_pricing || []).flatMap((pricing) => pricing.models.map((model) => {
-    const image = pricing.billing_mode === 'image'
+    const image = pricing.billing_mode === 'image' || isSeedreamModel(model)
     const video = /video|seedance|kling|sora/i.test(model)
     const audio = /audio|tts|whisper/i.test(model)
     const modelType = image ? 'Images' : video ? 'Videos' : audio ? 'Audio' : 'Chat'
@@ -79,7 +87,7 @@ const rows = computed<ModelRow[]>(() => channels.value.flatMap((channel) =>
       platform: pricing.platform,
       channel: channel.name,
       endpoint: image ? '/v1/images/generations' : video ? '/v1/videos/generations' : '/v1/chat/completions',
-      price: image ? `${pricing.image_output_price ?? pricing.per_request_price ?? '-'} / 次` : `${pricing.output_price ?? pricing.per_request_price ?? '-'} / 输出`,
+      price: pricing.billing_mode === 'image' ? `${pricing.per_request_price ?? (pricing.intervals?.length ? '按尺寸' : '-')} / 张` : `${pricing.output_price ?? pricing.per_request_price ?? '-'} / 输出`,
     }
   })),
 ))

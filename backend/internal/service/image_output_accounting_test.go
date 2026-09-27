@@ -4,6 +4,19 @@ import (
 	"testing"
 )
 
+func TestOpenAIImageOutputCounter_SeedreamStreamCountsDistinctImages(t *testing.T) {
+	counter := newOpenAIImageOutputCounter()
+	counter.AddSSEData([]byte(`{"data":[{"url":"https://example.com/one.png","size":"1024x1024"}]}`))
+	counter.AddSSEData([]byte(`{"data":[{"url":"https://example.com/two.png","size":"2048x2048"}]}`))
+	counter.AddSSEData([]byte(`{"data":[{"url":"https://example.com/two.png","size":"2048x2048"}]}`))
+	if counter.Count() != 2 {
+		t.Fatalf("expected 2 images, got %d", counter.Count())
+	}
+	if len(counter.Sizes()) != 2 {
+		t.Fatalf("expected 2 output sizes, got %v", counter.Sizes())
+	}
+}
+
 func TestOpenAIImageOutputCounter_TextOnlyMessage(t *testing.T) {
 	// Simulate a text-only response from /v1/responses
 	// The response.output_item.done event for a text message

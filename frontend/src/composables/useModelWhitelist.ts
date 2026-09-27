@@ -2,6 +2,8 @@
 // 模型列表（硬编码，与 new-api 一致）
 // =====================
 
+import { SEEDREAM_MODELS } from '@/utils/modelTest'
+
 // OpenAI
 const openaiModels = [
   // GPT-6 系列（实际可用模型仍以账号的上游同步结果为准）
@@ -19,7 +21,9 @@ const openaiModels = [
   'gpt-5.3-codex-spark', 'codex-auto-review',
   'gpt-4o-audio-preview', 'gpt-4o-realtime-preview',
   // GPT Image 系列
-  'gpt-image-1', 'gpt-image-1.5', 'gpt-image-2'
+  'gpt-image-1', 'gpt-image-1.5', 'gpt-image-2',
+  // 火山方舟 Seedream（作为 OpenAI 兼容 API Key 账号接入）
+  ...SEEDREAM_MODELS
 ]
 
 // Anthropic Claude

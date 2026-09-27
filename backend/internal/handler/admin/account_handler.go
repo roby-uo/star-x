@@ -2439,8 +2439,16 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 
 	// Handle OpenAI accounts
 	if account.IsOpenAI() {
+		if service.IsVolcengineArkAccount(account) && len(account.GetModelMapping()) == 0 {
+			models := make([]openai.Model, 0, len(service.SeedreamModelIDs()))
+			for _, id := range service.SeedreamModelIDs() {
+				models = append(models, openai.Model{ID: id, Object: "model", Type: "model", DisplayName: id, OwnedBy: "volcengine"})
+			}
+			response.Success(c, models)
+			return
+		}
 		// OpenAI 自动透传会绕过常规模型改写，测试/模型列表也应回落到默认模型集。
-		if account.IsOpenAIPassthroughEnabled() {
+		if account.IsOpenAIPassthroughEnabled() && !service.IsVolcengineArkAccount(account) {
 			response.Success(c, openai.DefaultModels)
 			return
 		}

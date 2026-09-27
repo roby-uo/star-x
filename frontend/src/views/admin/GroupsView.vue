@@ -2,6 +2,7 @@
   <AppLayout>
     <TablePageLayout>
       <template #filters>
+        <AdminWorkspaceTabs area="upstream" />
         <div
           class="flex flex-col justify-between gap-4 lg:flex-row lg:items-start"
         >
@@ -3590,6 +3591,7 @@ import type { AdminGroup, GroupPlatform, SubscriptionType } from "@/types";
 import type { Column } from "@/components/common/types";
 import AppLayout from "@/components/layout/AppLayout.vue";
 import TablePageLayout from "@/components/layout/TablePageLayout.vue";
+import AdminWorkspaceTabs from "@/components/admin/AdminWorkspaceTabs.vue";
 import DataTable from "@/components/common/DataTable.vue";
 import Pagination from "@/components/common/Pagination.vue";
 import BaseDialog from "@/components/common/BaseDialog.vue";

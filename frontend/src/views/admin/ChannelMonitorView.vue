@@ -2,6 +2,7 @@
   <AppLayout>
     <TablePageLayout>
       <template #filters>
+        <AdminWorkspaceTabs area="upstream" />
         <MonitorFiltersBar
           v-model:search="searchQuery"
           v-model:provider="providerFilter"
@@ -129,6 +130,7 @@ import type {
 import type { Column } from '@/components/common/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
+import AdminWorkspaceTabs from '@/components/admin/AdminWorkspaceTabs.vue'
 import DataTable from '@/components/common/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'

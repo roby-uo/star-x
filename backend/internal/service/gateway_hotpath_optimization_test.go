@@ -580,6 +580,15 @@ func TestGetAvailableModels_ErrorAndGlobalListBranches(t *testing.T) {
 	require.Equal(t, int64(1), okRepo.listAllCalls.Load())
 }
 
+func TestGetAvailableModels_ArkWithoutMappingListsSeedream(t *testing.T) {
+	groupID := int64(77)
+	repo := &modelsListAccountRepoStub{byGroup: map[int64][]Account{
+		groupID: {{ID: 77, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Credentials: map[string]any{"base_url": "https://ark.cn-beijing.volces.com/api/v3"}}},
+	}}
+	svc := &GatewayService{accountRepo: repo}
+	require.Contains(t, svc.GetAvailableModels(context.Background(), &groupID, PlatformOpenAI), "doubao-seedream-5-0-pro-260628")
+}
+
 func TestGatewayHotpathHelpers_CacheTTLAndStickyContext(t *testing.T) {
 	t.Run("resolve_user_group_rate_cache_ttl", func(t *testing.T) {
 		require.Equal(t, defaultUserGroupRateCacheTTL, resolveUserGroupRateCacheTTL(nil))

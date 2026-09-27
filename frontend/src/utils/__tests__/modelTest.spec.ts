@@ -7,6 +7,10 @@ describe('model test requests', () => {
     expect(buildModelTestRequest('Chat', 'gpt-5.4')).toMatchObject({ path: '/v1/chat/completions', body: { max_completion_tokens: 32 } })
     expect(buildModelTestRequest('Responses', 'gpt-5.4')).toMatchObject({ path: '/v1/responses', body: { max_output_tokens: 64 } })
     expect(buildModelTestRequest('Images', 'gpt-image-2')).toMatchObject({ path: '/v1/images/generations', body: { n: 1 } })
+    expect(buildModelTestRequest('Images', 'doubao-seedream-5-0-pro-260628')).toEqual({
+      path: '/v1/images/generations',
+      body: { model: 'doubao-seedream-5-0-pro-260628', prompt: 'A single black dot on a white background', size: '2K', response_format: 'url' }
+    })
   })
 
   it('uses model IDs returned by the key without hard-coded provider filtering', () => {

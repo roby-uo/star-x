@@ -218,6 +218,17 @@ func (s *OpenAIGatewayService) ParseOpenAIImagesRequest(c *gin.Context, body []b
 	if err := validateOpenAIImagesModel(req.Model); err != nil {
 		return nil, err
 	}
+	if isSeedreamImageGenerationModel(req.Model) {
+		if req.IsEdits() {
+			return nil, fmt.Errorf("Seedream image editing uses /v1/images/generations with an image field")
+		}
+		if req.Multipart {
+			return nil, fmt.Errorf("Seedream image generation requires a JSON request body")
+		}
+		if req.N > 1 {
+			return nil, fmt.Errorf("Seedream does not support n; use sequential_image_generation for supported multi-image models")
+		}
+	}
 	req.SizeTier = normalizeOpenAIImageSizeTier(req.Size)
 	req.RequiredCapability = classifyOpenAIImagesCapability(req)
 	return req, nil
@@ -259,6 +270,31 @@ func parseOpenAIImagesJSONRequest(body []byte, req *OpenAIImagesRequest) error {
 	req.InputFidelity = strings.TrimSpace(gjson.GetBytes(body, "input_fidelity").String())
 	req.Style = strings.TrimSpace(gjson.GetBytes(body, "style").String())
 	req.HasMask = gjson.GetBytes(body, "mask").Exists()
+	// Ark uses image on the generations endpoint for image-to-image requests.
+	if image := gjson.GetBytes(body, "image"); image.Exists() {
+		switch {
+		case image.Type == gjson.String:
+			if imageURL := strings.TrimSpace(image.String()); imageURL != "" {
+				req.InputImageURLs = append(req.InputImageURLs, imageURL)
+			}
+		case image.IsArray():
+			for _, item := range image.Array() {
+				if item.Type != gjson.String {
+					if !isSeedreamImageGenerationModel(req.Model) {
+						continue
+					}
+					return fmt.Errorf("image entries must be strings")
+				}
+				if imageURL := strings.TrimSpace(item.String()); imageURL != "" {
+					req.InputImageURLs = append(req.InputImageURLs, imageURL)
+				}
+			}
+		default:
+			if isSeedreamImageGenerationModel(req.Model) {
+				return fmt.Errorf("image must be a string or an array of strings")
+			}
+		}
+	}
 	if outputCompression := gjson.GetBytes(body, "output_compression"); outputCompression.Exists() {
 		if outputCompression.Type != gjson.Number {
 			return fmt.Errorf("invalid output_compression field type")
@@ -458,6 +494,11 @@ func isOpenAIImageGenerationModel(model string) bool {
 	return IsGPTImageGenerationModel(model) || isGrokImageGenerationModel(model)
 }
 
+func isSeedreamImageGenerationModel(model string) bool {
+	model = strings.ToLower(strings.TrimSpace(model))
+	return strings.HasPrefix(model, "doubao-seedream-") || strings.HasPrefix(model, "seedream-")
+}
+
 // IsGPTImageGenerationModel identifies the GPT native image-generation model family.
 func IsGPTImageGenerationModel(model string) bool {
 	model = strings.ToLower(strings.TrimSpace(model))
@@ -473,7 +514,7 @@ func isGrokImageGenerationModel(model string) bool {
 
 func validateOpenAIImagesModel(model string) error {
 	model = strings.TrimSpace(model)
-	if isOpenAIImageGenerationModel(model) {
+	if isOpenAIImageGenerationModel(model) || isSeedreamImageGenerationModel(model) {
 		return nil
 	}
 	if model == "" {
@@ -589,6 +630,17 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 	if err := validateOpenAIImagesModel(upstreamModel); err != nil {
 		return nil, err
 	}
+	if isSeedreamImageGenerationModel(upstreamModel) {
+		if parsed.IsEdits() {
+			return nil, fmt.Errorf("Seedream image editing uses /v1/images/generations with an image field")
+		}
+		if parsed.Multipart {
+			return nil, fmt.Errorf("Seedream image generation requires a JSON request body")
+		}
+		if parsed.N > 1 {
+			return nil, fmt.Errorf("Seedream does not support n; use sequential_image_generation for supported multi-image models")
+		}
+	}
 	logger.LegacyPrintf(
 		"service.openai_gateway",
 		"[OpenAI] Images request routing request_model=%s upstream_model=%s endpoint=%s account_type=%s",
@@ -600,6 +652,12 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 	forwardBody, forwardContentType, err := rewriteOpenAIImagesModel(body, parsed.ContentType, upstreamModel)
 	if err != nil {
 		return nil, err
+	}
+	if isSeedreamImageGenerationModel(upstreamModel) {
+		forwardBody, err = normalizeSeedreamImagesBody(forwardBody)
+		if err != nil {
+			return nil, err
+		}
 	}
 	upstreamCtx, releaseUpstreamCtx := detachStreamUpstreamContext(ctx, parsed.Stream)
 	defer releaseUpstreamCtx()
@@ -806,6 +864,20 @@ func rewriteOpenAIImagesModel(body []byte, contentType string, model string) ([]
 		return nil, "", fmt.Errorf("rewrite image request model: %w", err)
 	}
 	return rewritten, contentType, nil
+}
+
+// The public images endpoint accepts common OpenAI options. Ark rejects these
+// options, while its own options (image, sequential_image_generation, etc.)
+// must pass through unchanged.
+func normalizeSeedreamImagesBody(body []byte) ([]byte, error) {
+	var err error
+	for _, field := range []string{"n", "quality", "style", "moderation", "input_fidelity", "partial_images", "output_compression"} {
+		body, err = sjson.DeleteBytes(body, field)
+		if err != nil {
+			return nil, fmt.Errorf("normalize Seedream image request: %w", err)
+		}
+	}
+	return body, nil
 }
 
 func rewriteOpenAIImagesMultipartModel(body []byte, contentType string, model string) ([]byte, string, error) {

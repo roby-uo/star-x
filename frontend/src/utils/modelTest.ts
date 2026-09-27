@@ -1,5 +1,15 @@
 export type ModelTestEndpoint = 'Chat' | 'Responses' | 'Images'
 
+export const SEEDREAM_MODELS = [
+  'doubao-seedream-5-0-pro-260628',
+  'doubao-seedream-5-0-flash-260915',
+  'doubao-seedream-5-0-260128',
+  'doubao-seedream-4-5-251128',
+  'doubao-seedream-4-0-250828'
+] as const
+
+export const isSeedreamModel = (model: string): boolean => /^(doubao-)?seedream-/i.test(model)
+
 export function parseModelTestModels(payload: unknown): string[] {
   if (!payload || typeof payload !== 'object' || !('data' in payload) || !Array.isArray(payload.data)) return []
   const ids = payload.data
@@ -8,11 +18,15 @@ export function parseModelTestModels(payload: unknown): string[] {
   return [...new Set(ids)].sort((a, b) => a.localeCompare(b))
 }
 
-export function buildModelTestRequest(endpoint: ModelTestEndpoint, model: string): { path: string; body: Record<string, unknown> } {
+export function buildModelTestRequest(endpoint: ModelTestEndpoint, model: string, options: { prompt?: string; image?: string } = {}): { path: string; body: Record<string, unknown> } {
   if (endpoint === 'Images') {
+    const prompt = options.prompt?.trim() || 'A single black dot on a white background'
+    const image = options.image?.trim()
     return {
       path: '/v1/images/generations',
-      body: { model, prompt: 'A single black dot on a white background', size: '1024x1024', n: 1 }
+      body: isSeedreamModel(model)
+        ? { model, prompt, size: '2K', response_format: 'url', ...(image ? { image } : {}) }
+        : { model, prompt, size: '1024x1024', n: 1 }
     }
   }
   if (endpoint === 'Responses') {

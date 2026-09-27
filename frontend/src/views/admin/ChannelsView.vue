@@ -2,6 +2,7 @@
   <AppLayout>
     <TablePageLayout>
       <template #filters>
+        <AdminWorkspaceTabs area="models" />
         <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
           <!-- Left: Search + Filters -->
           <div class="flex flex-1 flex-wrap items-center gap-3">
@@ -430,11 +431,15 @@
                   >
                     {{ syncingPlatform === section.platform ? t('admin.channels.form.syncingModels') : t('admin.channels.form.syncLatestModels') }}
                   </button>
+                  <button v-if="section.platform === 'openai'" type="button" @click="addSeedreamPricingEntry(sIdx)" class="text-xs text-primary-600 hover:text-primary-700">
+                    + {{ t('admin.channels.form.addSeedreamPricing') }}
+                  </button>
                   <button type="button" @click="addPricingEntry(sIdx)" class="text-xs text-primary-600 hover:text-primary-700">
                     + {{ t('common.add', 'Add') }}
                   </button>
                 </div>
               </div>
+              <p v-if="section.platform === 'openai'" class="mb-2 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.channels.form.seedreamPricingHint') }}</p>
               <div
                 v-if="section.model_pricing.length === 0"
                 class="rounded border border-dashed border-gray-300 p-2 text-center text-xs text-gray-400 dark:border-dark-500"
@@ -629,6 +634,7 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
+import { SEEDREAM_MODELS, isSeedreamModel } from '@/utils/modelTest'
 import { adminAPI } from '@/api/admin'
 import type { Channel, ChannelModelPricing, CreateChannelRequest, UpdateChannelRequest, AccountStatsPricingRule } from '@/api/admin/channels'
 import type { PricingFormEntry } from '@/components/admin/channel/types'
@@ -638,6 +644,7 @@ import type { Column } from '@/components/common/types'
 import { platformTextClass, platformBadgeLightClass } from '@/utils/platformColors'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
+import AdminWorkspaceTabs from '@/components/admin/AdminWorkspaceTabs.vue'
 import DataTable from '@/components/common/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
@@ -848,9 +855,13 @@ function toggleGroupInSection(sectionIdx: number, groupId: number) {
 
 // ── Pricing helpers ──
 function addPricingEntry(sectionIdx: number) {
-  form.platforms[sectionIdx].model_pricing.push({
-    models: [],
-    billing_mode: 'token',
+  form.platforms[sectionIdx].model_pricing.push(makePricingEntry([], 'token'))
+}
+
+function makePricingEntry(models: string[], billingMode: PricingFormEntry['billing_mode']): PricingFormEntry {
+  return {
+    models,
+    billing_mode: billingMode,
     input_price: null,
     output_price: null,
     cache_write_price: null,
@@ -859,7 +870,18 @@ function addPricingEntry(sectionIdx: number) {
     image_output_price: null,
     per_request_price: null,
     intervals: []
-  })
+  }
+}
+
+function addSeedreamPricingEntry(sectionIdx: number) {
+  const entries = form.platforms[sectionIdx].model_pricing
+  const configured = new Set(entries.flatMap(entry => entry.models))
+  const model = SEEDREAM_MODELS.find(candidate => !configured.has(candidate))
+  if (!model) {
+    appStore.showSuccess(t('admin.channels.form.seedreamPricingAlreadyAdded'))
+    return
+  }
+  entries.push(makePricingEntry([model], 'image'))
 }
 
 const syncingPlatform = ref<string | null>(null)
@@ -880,19 +902,12 @@ async function syncLatestModels(sectionIdx: number) {
       appStore.showSuccess(t('admin.channels.form.syncModelsAlreadyUpToDate'))
       return
     }
-    // Add new models as a single new pricing entry (user fills in prices)
-    form.platforms[sectionIdx].model_pricing.push({
-      models: newModels,
-      billing_mode: 'token',
-      input_price: null,
-      output_price: null,
-      cache_write_price: null,
-      cache_read_price: null,
-      image_input_price: null,
-      image_output_price: null,
-      per_request_price: null,
-      intervals: []
-    })
+    // Seedream uses per-image billing; keep it separate from text models.
+    const textModels = newModels.filter(model => !isSeedreamModel(model))
+    if (textModels.length) form.platforms[sectionIdx].model_pricing.push(makePricingEntry(textModels, 'token'))
+    for (const model of newModels.filter(isSeedreamModel)) {
+      form.platforms[sectionIdx].model_pricing.push(makePricingEntry([model], 'image'))
+    }
     appStore.showSuccess(t('admin.channels.form.syncModelsSuccess', { count: newModels.length }))
   } catch (error) {
     appStore.showError(extractApiErrorMessage(error, t('admin.channels.form.syncModelsError')))

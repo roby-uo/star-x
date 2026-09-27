@@ -452,6 +452,8 @@ export default {
       // OpenAI specific hints
       openai: {
         baseUrlHint: 'Leave default for official OpenAI API',
+        seedreamArkPreset: 'Use Volcengine Ark Base URL (Seedream)',
+        seedreamApiKeyHint: 'Enter an Ark API Key. Add Seedream models to this account’s model list to select them in account tests.',
         apiKeyHint: 'Your OpenAI API Key',
         oauthPassthrough: 'Auto passthrough (auth only)',
         oauthPassthroughDesc:
