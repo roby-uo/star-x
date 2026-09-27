@@ -220,13 +220,13 @@ func (s *OpenAIGatewayService) ParseOpenAIImagesRequest(c *gin.Context, body []b
 	}
 	if isSeedreamImageGenerationModel(req.Model) {
 		if req.IsEdits() {
-			return nil, fmt.Errorf("Seedream image editing uses /v1/images/generations with an image field")
+			return nil, fmt.Errorf("seedream image editing uses /v1/images/generations with an image field")
 		}
 		if req.Multipart {
-			return nil, fmt.Errorf("Seedream image generation requires a JSON request body")
+			return nil, fmt.Errorf("seedream image generation requires a JSON request body")
 		}
 		if req.N > 1 {
-			return nil, fmt.Errorf("Seedream does not support n; use sequential_image_generation for supported multi-image models")
+			return nil, fmt.Errorf("seedream does not support n; use sequential_image_generation for supported multi-image models")
 		}
 	}
 	req.SizeTier = normalizeOpenAIImageSizeTier(req.Size)
@@ -632,13 +632,13 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 	}
 	if isSeedreamImageGenerationModel(upstreamModel) {
 		if parsed.IsEdits() {
-			return nil, fmt.Errorf("Seedream image editing uses /v1/images/generations with an image field")
+			return nil, fmt.Errorf("seedream image editing uses /v1/images/generations with an image field")
 		}
 		if parsed.Multipart {
-			return nil, fmt.Errorf("Seedream image generation requires a JSON request body")
+			return nil, fmt.Errorf("seedream image generation requires a JSON request body")
 		}
 		if parsed.N > 1 {
-			return nil, fmt.Errorf("Seedream does not support n; use sequential_image_generation for supported multi-image models")
+			return nil, fmt.Errorf("seedream does not support n; use sequential_image_generation for supported multi-image models")
 		}
 	}
 	logger.LegacyPrintf(

@@ -1761,9 +1761,10 @@ func (s *AccountTestService) testOpenAIImageAPIKey(c *gin.Context, ctx context.C
 		}
 		if item.B64JSON != "" {
 			mimeType := "image/png"
-			if item.OutputFormat == "jpeg" {
+			switch item.OutputFormat {
+			case "jpeg":
 				mimeType = "image/jpeg"
-			} else if item.OutputFormat == "webp" {
+			case "webp":
 				mimeType = "image/webp"
 			}
 			s.sendEvent(c, TestEvent{
