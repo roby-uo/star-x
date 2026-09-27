@@ -6,6 +6,7 @@
       class="mb-0.5 flex items-center"
     >
       <div class="flex items-center gap-1.5 text-[9px] text-gray-500 dark:text-gray-400">
+        <span v-if="windowStatsLabel" class="whitespace-nowrap" :title="windowStatsLabel">{{ windowStatsLabel }}</span>
         <span class="rounded bg-gray-100 px-1.5 py-0.5 dark:bg-gray-800">
           {{ formatRequests }} req
         </span>
@@ -68,6 +69,7 @@ const props = defineProps<{
   resetsAt?: string | null
   color: 'indigo' | 'emerald' | 'purple' | 'amber'
   windowStats?: WindowStats | null
+  windowStatsLabel?: string
   showNowWhenIdle?: boolean
   remainingCapacity?: boolean
 }>()
@@ -153,6 +155,7 @@ const barWidth = computed(() => {
 
 // Display percentage (cap at 999% for readability)
 const displayPercent = computed(() => {
+  if (props.utilization > 0 && props.utilization < 1) return '<1%'
   const percent = Math.round(
     props.remainingCapacity
       ? Math.min(Math.max(props.utilization, 0), 100)

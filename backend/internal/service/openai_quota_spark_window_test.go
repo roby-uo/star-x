@@ -88,6 +88,24 @@ func newQuotaRedirectingFactory(srv *httptest.Server) PrivacyClientFactory {
 
 // ── Part A: buildCodexSparkWindowExtraUpdates ─────────────────────────────────
 
+func TestBuildCodexRateLimitWindowExtraUpdates(t *testing.T) {
+	now := time.Date(2026, 9, 27, 8, 0, 0, 0, time.UTC)
+	rateLimit := &OpenAIRateLimit{
+		PrimaryWindow: &OpenAIRateLimitWindow{
+			UsedPercent: 12.5, LimitWindowSeconds: 5 * 3600, ResetAfterSeconds: 3600,
+		},
+		SecondaryWindow: &OpenAIRateLimitWindow{
+			UsedPercent: 3, LimitWindowSeconds: 7 * 24 * 3600, ResetAfterSeconds: 2 * 24 * 3600,
+		},
+	}
+	updates := buildCodexRateLimitWindowExtraUpdates(rateLimit, now)
+	require.InDelta(t, 12.5, updates["codex_5h_used_percent"], 1e-9)
+	require.InDelta(t, 3, updates["codex_7d_used_percent"], 1e-9)
+	require.Equal(t, now.Format(time.RFC3339), updates["codex_usage_updated_at"])
+	require.Equal(t, 1800, quotaWindowResetAfterSeconds(&OpenAIRateLimitWindow{ResetAt: now.Unix() + 1800}, now))
+	require.Nil(t, buildCodexRateLimitWindowExtraUpdates(nil, now))
+}
+
 // TestBuildCodexSparkWindowExtraUpdates_ContainsCodexKeys 验证:
 //   - 产出包含 codex_5h_used_percent / codex_7d_used_percent
 //   - 不含任何 codex_spark_ 前缀的 key（Method Z 前缀已禁止）

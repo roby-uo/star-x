@@ -3,6 +3,9 @@
     <TablePageLayout>
       <template #filters>
         <AdminWorkspaceTabs area="models" />
+        <div class="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200">
+          对外服务把资源池中的上游账号、模型映射和收费规则组合起来。只有需要向用户发布模型并计费时才需创建；上游账号已接入但这里为空是正常的。
+        </div>
         <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
           <!-- Left: Search + Filters -->
           <div class="flex flex-1 flex-wrap items-center gap-3">
@@ -118,9 +121,9 @@
 
           <template #empty>
             <EmptyState
-              :title="t('admin.channels.noChannelsYet', 'No Channels Yet')"
-              :description="t('admin.channels.createFirstChannel', 'Create your first channel to manage model pricing')"
-              :action-text="t('admin.channels.createChannel', 'Create Channel')"
+              title="尚未配置对外服务"
+              description="先在上游连接配置账号，并将账号加入资源池；需要向用户发布模型时，再创建对外服务和定价。"
+              action-text="创建对外服务"
               @action="openCreateDialog"
             />
           </template>

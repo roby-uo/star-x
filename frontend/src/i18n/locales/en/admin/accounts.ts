@@ -585,7 +585,8 @@ export default {
       targetNoWildcard: 'Target model cannot contain wildcard *',
       searchModels: 'Search models...',
       noMatchingModels: 'No matching models',
-      fillRelatedModels: 'Sync latest supported models',
+      fillRelatedModels: 'Add platform presets (not live)',
+      removeMisplacedSeedream: 'Remove misplaced Seedream models ({count})',
       syncUpstreamModels: 'Sync upstream supported models',
       syncUpstreamModelsLoading: 'Syncing upstream...',
       syncUpstreamModelsSuccess: 'Synced {count} new model(s) from upstream ({total} upstream total)',
@@ -1288,6 +1289,9 @@ export default {
         noData: 'No usage data available for this account'
       },
       usageWindow: {
+        upstreamQuota: 'Upstream quota used',
+        localStats: 'Local usage',
+        upstreamUnavailable: 'Upstream quota unavailable. Query to retry.',
         statsTitle: '5-Hour Window Usage Statistics',
         statsTitleDaily: 'Daily Usage Statistics',
         geminiProDaily: 'Pro',

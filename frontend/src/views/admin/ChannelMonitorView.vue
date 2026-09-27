@@ -3,6 +3,9 @@
     <TablePageLayout>
       <template #filters>
         <AdminWorkspaceTabs area="upstream" />
+        <div class="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200">
+          定时探测会按你创建的监控项主动请求模型端点，记录可用率和延迟。此处为空表示尚未配置监控，不代表上游连接不可用；普通账号状态请到 <router-link class="underline" to="/admin/accounts">上游连接</router-link> 查看。
+        </div>
         <MonitorFiltersBar
           v-model:search="searchQuery"
           v-model:provider="providerFilter"

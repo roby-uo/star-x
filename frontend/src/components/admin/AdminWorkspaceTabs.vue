@@ -21,13 +21,11 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
 import { useOnboardingStore } from '@/stores'
 
 const props = defineProps<{ area: 'upstream' | 'models' }>()
 const route = useRoute()
 const { t } = useI18n()
-const showMonitor = makeSidebarFlag(FeatureFlags.channelMonitor)
 const onboardingStore = useOnboardingStore()
 
 function handleTabClick(path: string) {
@@ -39,8 +37,7 @@ function handleTabClick(path: string) {
 const tabs = computed(() => props.area === 'upstream'
   ? [
       { path: '/admin/accounts', label: 'nav.upstreamConnections' },
-      { path: '/admin/groups', label: 'nav.upstreamPools' },
-      ...(showMonitor() === false ? [] : [{ path: '/admin/channels/monitor', label: 'nav.upstreamMonitor' }])
+      { path: '/admin/groups', label: 'nav.upstreamPools' }
     ]
   : [
       { path: '/admin/models', label: 'nav.modelCatalogAdmin' },

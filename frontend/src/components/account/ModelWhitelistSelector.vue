@@ -79,6 +79,14 @@
     <!-- Quick Actions -->
     <div class="mb-4 flex flex-wrap gap-2">
       <button
+        v-if="misplacedSeedreamCount > 0"
+        type="button"
+        @click="removeMisplacedSeedream"
+        class="rounded-lg border border-amber-300 px-3 py-1.5 text-sm text-amber-700 hover:bg-amber-50 dark:text-amber-300"
+      >
+        {{ t('admin.accounts.removeMisplacedSeedream', { count: misplacedSeedreamCount }) }}
+      </button>
+      <button
         type="button"
         @click="fillRelated"
         class="rounded-lg border border-blue-200 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/30"
@@ -137,6 +145,7 @@ import type { SyncUpstreamPreviewParams } from '@/api/admin/accounts'
 import ModelIcon from '@/components/common/ModelIcon.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { allModels, getModelsByPlatform } from '@/composables/useModelWhitelist'
+import { isSeedreamModel } from '@/utils/modelTest'
 
 const { t } = useI18n()
 
@@ -151,6 +160,8 @@ const props = defineProps<{
     base_url?: string
     api_key: string
   }
+  baseUrl?: string
+  accountType?: string
 }>()
 
 const emit = defineEmits<{
@@ -193,6 +204,19 @@ const canSyncUpstream = computed(() => {
   return false
 })
 
+const presetModels = (platform: string) => getModelsByPlatform(platform, {
+  type: props.syncCredentials?.type || props.accountType,
+  baseUrl: props.syncCredentials?.base_url || props.baseUrl
+})
+const misplacedSeedreamCount = computed(() =>
+  props.accountType === 'oauth' && normalizedPlatforms.value.includes('openai')
+    ? props.modelValue.filter(isSeedreamModel).length
+    : 0
+)
+const removeMisplacedSeedream = () => {
+  emit('update:modelValue', props.modelValue.filter(model => !isSeedreamModel(model)))
+}
+
 const availableOptions = computed(() => {
   if (normalizedPlatforms.value.length === 0) {
     return allModels
@@ -200,7 +224,7 @@ const availableOptions = computed(() => {
 
   const allowedModels = new Set<string>()
   for (const platform of normalizedPlatforms.value) {
-    for (const model of getModelsByPlatform(platform)) {
+    for (const model of presetModels(platform)) {
       allowedModels.add(model)
     }
   }
@@ -251,7 +275,7 @@ const handleEnter = () => {
 const fillRelated = () => {
   const newModels = [...props.modelValue]
   for (const platform of normalizedPlatforms.value) {
-    for (const model of getModelsByPlatform(platform)) {
+    for (const model of presetModels(platform)) {
       if (!newModels.includes(model)) {
         newModels.push(model)
       }

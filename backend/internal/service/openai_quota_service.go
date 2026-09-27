@@ -536,23 +536,31 @@ func buildCodexSparkWindowExtraUpdates(usage *OpenAIQuotaUsage, now time.Time) m
 	if spark == nil {
 		return nil
 	}
+	return buildCodexRateLimitWindowExtraUpdates(spark, now)
+}
 
+func buildCodexRateLimitWindowExtraUpdates(rateLimit *OpenAIRateLimit, now time.Time) map[string]any {
+	if rateLimit == nil {
+		return nil
+	}
 	// Reuse OpenAICodexUsageSnapshot / Normalize to map primary/secondary windows
 	// to canonical 5h/7d buckets (same logic as probeOpenAICodexSnapshot).
 	snap := &OpenAICodexUsageSnapshot{}
-	if w := spark.PrimaryWindow; w != nil {
+	if w := rateLimit.PrimaryWindow; w != nil {
 		p := w.UsedPercent
 		snap.PrimaryUsedPercent = &p
-		ra := int(w.ResetAfterSeconds)
-		snap.PrimaryResetAfterSeconds = &ra
+		if seconds := quotaWindowResetAfterSeconds(w, now); seconds > 0 {
+			snap.PrimaryResetAfterSeconds = &seconds
+		}
 		wm := int(w.LimitWindowSeconds / 60)
 		snap.PrimaryWindowMinutes = &wm
 	}
-	if w := spark.SecondaryWindow; w != nil {
+	if w := rateLimit.SecondaryWindow; w != nil {
 		p := w.UsedPercent
 		snap.SecondaryUsedPercent = &p
-		ra := int(w.ResetAfterSeconds)
-		snap.SecondaryResetAfterSeconds = &ra
+		if seconds := quotaWindowResetAfterSeconds(w, now); seconds > 0 {
+			snap.SecondaryResetAfterSeconds = &seconds
+		}
 		wm := int(w.LimitWindowSeconds / 60)
 		snap.SecondaryWindowMinutes = &wm
 	}
@@ -592,6 +600,19 @@ func buildCodexSparkWindowExtraUpdates(usage *OpenAIQuotaUsage, now time.Time) m
 	}
 	updates["codex_usage_updated_at"] = now.Format(time.RFC3339)
 	return updates
+}
+
+func quotaWindowResetAfterSeconds(window *OpenAIRateLimitWindow, now time.Time) int {
+	if window == nil {
+		return 0
+	}
+	if window.ResetAfterSeconds > 0 {
+		return int(window.ResetAfterSeconds)
+	}
+	if window.ResetAt > now.Unix() {
+		return int(window.ResetAt - now.Unix())
+	}
+	return 0
 }
 
 // mapUpstreamStatus collapses upstream HTTP statuses into a stable set we

@@ -121,13 +121,17 @@
     <!-- OpenAI OAuth accounts: single source from /usage API -->
     <template v-else-if="account.platform === 'openai' && account.type === 'oauth'">
       <div v-if="hasOpenAIUsageFallback" class="space-y-1">
+        <div class="text-[10px] text-gray-500 dark:text-gray-400" :title="usageInfo?.updated_at || ''">
+          {{ t('admin.accounts.usageWindow.upstreamQuota') }}
+          <span v-if="usageInfo?.updated_at">· {{ new Date(usageInfo.updated_at).toLocaleString() }}</span>
+        </div>
         <UsageProgressBar
           v-if="usageInfo?.five_hour"
           label="5h"
           :utilization="usageInfo.five_hour.utilization"
           :resets-at="usageInfo.five_hour.resets_at"
           :window-stats="usageInfo.five_hour.window_stats"
-          :show-now-when-idle="true"
+          :window-stats-label="t('admin.accounts.usageWindow.localStats')"
           color="indigo"
         />
         <UsageProgressBar
@@ -136,7 +140,7 @@
           :utilization="usageInfo.seven_day.utilization"
           :resets-at="usageInfo.seven_day.resets_at"
           :window-stats="usageInfo.seven_day.window_stats"
-          :show-now-when-idle="true"
+          :window-stats-label="t('admin.accounts.usageWindow.localStats')"
           color="emerald"
         />
         <!--
@@ -184,7 +188,7 @@
         </div>
       </div>
       <div v-else>
-        <div class="text-xs text-gray-400">-</div>
+        <div class="text-xs text-amber-600 dark:text-amber-400">{{ t('admin.accounts.usageWindow.upstreamUnavailable') }}</div>
         <!-- Always allow on-demand upstream quota query, even before local data exists. -->
         <OpenAIQuotaResetCell :account="account" class="mt-1" />
       </div>
@@ -1342,7 +1346,9 @@ const attachVisibilityObserver = () => {
 const loadActiveUsage = async () => {
   activeQueryLoading.value = true
   try {
-    usageInfo.value = await adminAPI.accounts.getUsage(props.account.id, 'active', true)
+    const result = await adminAPI.accounts.getUsage(props.account.id, 'active', true)
+    usageInfo.value = result
+    _usageCache.set(props.account.id, { data: result, ts: Date.now() })
   } catch (e: any) {
     console.error('Failed to load active usage:', e)
   } finally {

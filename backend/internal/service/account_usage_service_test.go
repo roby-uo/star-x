@@ -104,14 +104,14 @@ func TestShouldRefreshOpenAICodexSnapshot_SparkShadowIgnoresWSv2(t *testing.T) {
 		t.Fatal("expected fresh spark shadow to skip refresh (TTL not elapsed)")
 	}
 
-	// 反向对照:普通账号无 WSv2 + 过期时间戳→仍不刷(WSv2 门控普通账号的 probe 刷新)。
+	// 普通账号无 WSv2 仍可通过 /wham/usage 刷新快照。
 	normalNoWS := &Account{
 		Platform: PlatformOpenAI,
 		Type:     AccountTypeOAuth,
 		Extra:    map[string]any{"codex_usage_updated_at": staleAt},
 	}
-	if shouldRefreshOpenAICodexSnapshot(normalNoWS, usage, now) {
-		t.Fatal("expected non-WSv2 normal account to skip codex probe refresh")
+	if !shouldRefreshOpenAICodexSnapshot(normalNoWS, usage, now) {
+		t.Fatal("expected non-WSv2 normal account to refresh codex quota")
 	}
 }
 
@@ -182,10 +182,11 @@ func TestAccountUsageService_GetOpenAIUsage_DoesNotPromoteCodexExtraToRateLimit(
 		Platform: PlatformOpenAI,
 		Type:     AccountTypeOAuth,
 		Extra: map[string]any{
-			"codex_5h_used_percent": 1.0,
-			"codex_5h_reset_at":     time.Now().Add(2 * time.Hour).UTC().Truncate(time.Second).Format(time.RFC3339),
-			"codex_7d_used_percent": 100.0,
-			"codex_7d_reset_at":     resetAt.Format(time.RFC3339),
+			"codex_usage_updated_at": time.Now().UTC().Format(time.RFC3339),
+			"codex_5h_used_percent":  1.0,
+			"codex_5h_reset_at":      time.Now().Add(2 * time.Hour).UTC().Truncate(time.Second).Format(time.RFC3339),
+			"codex_7d_used_percent":  100.0,
+			"codex_7d_reset_at":      resetAt.Format(time.RFC3339),
 		},
 	}
 
@@ -203,6 +204,18 @@ func TestAccountUsageService_GetOpenAIUsage_DoesNotPromoteCodexExtraToRateLimit(
 	case got := <-repo.rateLimitCh:
 		t.Fatalf("不应将已耗尽的 codex extra 持久化为运行时限流状态: %v", got)
 	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+func TestAccountUsageService_GetOpenAIUsage_MissingSnapshotIsUnknown(t *testing.T) {
+	t.Parallel()
+	svc := &AccountUsageService{}
+	usage, err := svc.getOpenAIUsage(context.Background(), &Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if usage.FiveHour != nil || usage.SevenDay != nil || usage.UpdatedAt != nil {
+		t.Fatalf("missing upstream snapshot must remain unknown, got %#v", usage)
 	}
 }
 

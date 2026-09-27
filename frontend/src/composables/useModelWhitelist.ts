@@ -21,9 +21,7 @@ const openaiModels = [
   'gpt-5.3-codex-spark', 'codex-auto-review',
   'gpt-4o-audio-preview', 'gpt-4o-realtime-preview',
   // GPT Image 系列
-  'gpt-image-1', 'gpt-image-1.5', 'gpt-image-2',
-  // 火山方舟 Seedream（作为 OpenAI 兼容 API Key 账号接入）
-  ...SEEDREAM_MODELS
+  'gpt-image-1', 'gpt-image-1.5', 'gpt-image-2'
 ]
 
 // Anthropic Claude
@@ -237,6 +235,7 @@ const perplexityModels = [
 // 所有模型（去重）
 const allModelsList: string[] = [
   ...openaiModels,
+  ...SEEDREAM_MODELS,
   ...claudeModels,
   ...geminiModels,
   ...zhipuModels,
@@ -412,9 +411,21 @@ export const commonErrorCodes = [
 // =====================
 
 // 按平台获取模型
-export function getModelsByPlatform(platform: string): string[] {
+export function getModelsByPlatform(platform: string, account?: { type?: string; baseUrl?: string }): string[] {
   switch (platform) {
-    case 'openai': return openaiModels
+    case 'openai': {
+      // Ark uses the OpenAI compatible protocol, but its models must never
+      // appear in the preset list for an official OpenAI account.
+      let ark = false
+      if (account?.type === 'apikey' && account.baseUrl) {
+        try {
+          ark = new URL(account.baseUrl).hostname.toLowerCase() === 'ark.cn-beijing.volces.com'
+        } catch {
+          ark = false
+        }
+      }
+      return ark ? [...SEEDREAM_MODELS] : openaiModels
+    }
     case 'anthropic':
     case 'claude': return claudeModels
     case 'gemini': return geminiModels

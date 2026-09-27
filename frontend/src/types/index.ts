@@ -922,6 +922,7 @@ export interface UpstreamBillingProbeResult {
 
 export interface Account {
   id: number
+  configured_models?: Record<string, string>
   name: string
   notes?: string | null
   platform: AccountPlatform

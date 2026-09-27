@@ -352,6 +352,9 @@ export default {
         }
       },
       usageWindow: {
+        upstreamQuota: '上游额度已用',
+        localStats: '本站统计',
+        upstreamUnavailable: '上游额度暂不可用，请点查询重试',
         statsTitle: '5小时窗口用量统计',
         statsTitleDaily: '每日用量统计',
         geminiProDaily: 'Pro',
@@ -644,7 +647,8 @@ export default {
       targetNoWildcard: '目标模型不能包含通配符 *',
       searchModels: '搜索模型...',
       noMatchingModels: '没有匹配的模型',
-      fillRelatedModels: '同步最新支持模型',
+      fillRelatedModels: '填充平台预置模型（非实时）',
+      removeMisplacedSeedream: '移除误加的 Seedream（{count}）',
       syncUpstreamModels: '同步上游支持的模型',
       syncUpstreamModelsLoading: '同步上游中...',
       syncUpstreamModelsSuccess: '已从上游同步 {count} 个新模型（上游共 {total} 个）',

@@ -576,7 +576,7 @@ func (s *AccountUsageService) syncActiveToPassive(ctx context.Context, accountID
 
 func (s *AccountUsageService) getOpenAIUsage(ctx context.Context, account *Account, force bool) (*UsageInfo, error) {
 	now := time.Now()
-	usage := &UsageInfo{UpdatedAt: &now}
+	usage := &UsageInfo{Source: "active"}
 
 	if account == nil {
 		return usage, nil
@@ -603,13 +603,32 @@ func (s *AccountUsageService) getOpenAIUsage(ctx context.Context, account *Accou
 				}
 			}
 		} else {
-			if updates, err := s.probeOpenAICodexSnapshot(ctx, account); err == nil && len(updates) > 0 {
-				mergeAccountExtra(account, updates)
-				if usage.UpdatedAt == nil {
-					usage.UpdatedAt = &now
+			var updates map[string]any
+			if s.openAIQuotaService != nil {
+				if quotaUsage, err := s.openAIQuotaService.QueryUsage(ctx, account.ID); err == nil {
+					updates = buildCodexRateLimitWindowExtraUpdates(quotaUsage.RateLimit, now)
 				}
+			}
+			// The response-header probe remains a fallback for accounts where the
+			// quota endpoint does not expose windows. It requires WSv2 support.
+			if len(updates) == 0 && account.IsOpenAIResponsesWebSocketV2Enabled() {
+				updates, _ = s.probeOpenAICodexSnapshot(ctx, account)
+			}
+			if len(updates) > 0 {
+				mergeAccountExtra(account, updates)
+				s.persistOpenAICodexProbeSnapshot(account.ID, updates)
 				applyExtraToUsage(usage, account.Extra, now)
 			}
+		}
+	}
+	if isOpenAICodexSnapshotStale(account, now) {
+		// A failed refresh must not turn an old or expired upstream snapshot
+		// into a seemingly current 0% quota display.
+		usage.FiveHour = nil
+		usage.SevenDay = nil
+	} else if raw, ok := account.Extra["codex_usage_updated_at"]; ok {
+		if updatedAt, err := parseTime(fmt.Sprint(raw)); err == nil {
+			usage.UpdatedAt = &updatedAt
 		}
 	}
 
@@ -617,18 +636,16 @@ func (s *AccountUsageService) getOpenAIUsage(ctx context.Context, account *Accou
 		return usage, nil
 	}
 
-	if stats, err := s.usageLogRepo.GetAccountWindowStats(ctx, account.ID, codexWindowStatsStart(usage.FiveHour, 5*time.Hour, now)); err == nil {
-		if usage.FiveHour == nil {
-			usage.FiveHour = &UsageProgress{Utilization: 0}
+	if usage.FiveHour != nil {
+		if stats, err := s.usageLogRepo.GetAccountWindowStats(ctx, account.ID, codexWindowStatsStart(usage.FiveHour, 5*time.Hour, now)); err == nil {
+			usage.FiveHour.WindowStats = windowStatsFromAccountStats(stats)
 		}
-		usage.FiveHour.WindowStats = windowStatsFromAccountStats(stats)
 	}
 
-	if stats, err := s.usageLogRepo.GetAccountWindowStats(ctx, account.ID, codexWindowStatsStart(usage.SevenDay, 7*24*time.Hour, now)); err == nil {
-		if usage.SevenDay == nil {
-			usage.SevenDay = &UsageProgress{Utilization: 0}
+	if usage.SevenDay != nil {
+		if stats, err := s.usageLogRepo.GetAccountWindowStats(ctx, account.ID, codexWindowStatsStart(usage.SevenDay, 7*24*time.Hour, now)); err == nil {
+			usage.SevenDay.WindowStats = windowStatsFromAccountStats(stats)
 		}
-		usage.SevenDay.WindowStats = windowStatsFromAccountStats(stats)
 	}
 
 	return usage, nil
@@ -654,13 +671,8 @@ func isOpenAICodexSnapshotStale(account *Account, now time.Time) bool {
 	if account == nil || !account.IsOpenAIOAuth() {
 		return false
 	}
-	// 普通账号的 codex 刷新走 probe(/responses 头),要求 WSv2;但 spark 影子走 QueryUsage
-	// (/wham/usage body 的 codex_bengalfox),与 WSv2 无关——不能用 WSv2 门控其 staleness,否则首刷后
-	// codex_5h/7d 已存在→staleness 恒 false→spark 窗口永久冻结(外审第9轮 P1)。影子改按
-	// codex_usage_updated_at TTL 判定;实际查询频率仍由 shouldProbeOpenAICodexSnapshot 的缓存 TTL 节流。
-	if !account.IsShadow() && !account.IsOpenAIResponsesWebSocketV2Enabled() {
-		return false
-	}
+	// /wham/usage works for regular OAuth accounts regardless of the WSv2
+	// forwarding setting. Both regular and Spark snapshots require a fresh timestamp.
 	if account.Extra == nil {
 		return true
 	}

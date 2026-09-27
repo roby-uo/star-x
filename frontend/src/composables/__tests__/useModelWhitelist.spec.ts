@@ -17,6 +17,12 @@ describe('useModelWhitelist', () => {
     expect(models).toContain('gpt-5.6')
   })
 
+  it('只在方舟 API Key 地址提供 Seedream 预置模型', () => {
+    expect(getModelsByPlatform('openai')).not.toContain('doubao-seedream-5-0-pro-260628')
+    expect(getModelsByPlatform('openai', { type: 'oauth', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3' })).not.toContain('doubao-seedream-5-0-pro-260628')
+    expect(getModelsByPlatform('openai', { type: 'apikey', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3' })).toContain('doubao-seedream-5-0-pro-260628')
+  })
+
   it('openai 模型列表不再暴露已下线的 ChatGPT 登录 Codex 模型', () => {
     const models = getModelsByPlatform('openai')
 
