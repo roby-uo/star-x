@@ -586,6 +586,8 @@ export default {
       searchModels: 'Search models...',
       noMatchingModels: 'No matching models',
       fillRelatedModels: 'Add platform presets (not live)',
+      addMiniMaxH3: 'Add MiniMax-H3 video model',
+      miniMaxVideoModelHint: 'MiniMax video uses a separate task API, so upstream model sync may omit H3. Confirm that this API key has video generation access after adding it.',
       removeMisplacedSeedream: 'Remove misplaced Seedream models ({count})',
       syncUpstreamModels: 'Sync upstream supported models',
       syncUpstreamModelsLoading: 'Syncing upstream...',

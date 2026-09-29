@@ -94,6 +94,15 @@
         {{ t('admin.accounts.fillRelatedModels') }}
       </button>
       <button
+        v-if="isMiniMaxVideoAccount"
+        type="button"
+        @click="addMiniMaxH3"
+        :disabled="modelValue.includes(MINIMAX_H3_MODEL)"
+        class="rounded-lg border border-violet-200 px-3 py-1.5 text-sm text-violet-700 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-violet-800 dark:text-violet-300"
+      >
+        {{ t('admin.accounts.addMiniMaxH3') }}
+      </button>
+      <button
         v-if="canSyncUpstream"
         type="button"
         @click="syncUpstreamModels"
@@ -110,6 +119,9 @@
         {{ t('admin.accounts.clearAllModels') }}
       </button>
     </div>
+    <p v-if="isMiniMaxVideoAccount" class="mb-3 text-xs text-gray-500 dark:text-gray-400">
+      {{ t('admin.accounts.miniMaxVideoModelHint') }}
+    </p>
 
     <!-- Custom Model Input -->
     <div class="mb-3">
@@ -144,7 +156,7 @@ import { accountsAPI } from '@/api/admin/accounts'
 import type { SyncUpstreamPreviewParams } from '@/api/admin/accounts'
 import ModelIcon from '@/components/common/ModelIcon.vue'
 import Icon from '@/components/icons/Icon.vue'
-import { allModels, getModelsByPlatform } from '@/composables/useModelWhitelist'
+import { allModels, getModelsByPlatform, MINIMAX_H3_MODEL } from '@/composables/useModelWhitelist'
 import { isSeedreamModel } from '@/utils/modelTest'
 
 const { t } = useI18n()
@@ -208,6 +220,14 @@ const presetModels = (platform: string) => getModelsByPlatform(platform, {
   type: props.syncCredentials?.type || props.accountType,
   baseUrl: props.syncCredentials?.base_url || props.baseUrl
 })
+const isMiniMaxVideoAccount = computed(() =>
+  normalizedPlatforms.value.includes('openai') && presetModels('openai').includes(MINIMAX_H3_MODEL)
+)
+const addMiniMaxH3 = () => {
+  if (!props.modelValue.includes(MINIMAX_H3_MODEL)) {
+    emit('update:modelValue', [...props.modelValue, MINIMAX_H3_MODEL])
+  }
+}
 const misplacedSeedreamCount = computed(() =>
   props.accountType === 'oauth' && normalizedPlatforms.value.includes('openai')
     ? props.modelValue.filter(isSeedreamModel).length

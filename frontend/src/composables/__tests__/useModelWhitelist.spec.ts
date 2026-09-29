@@ -23,6 +23,16 @@ describe('useModelWhitelist', () => {
     expect(getModelsByPlatform('openai', { type: 'apikey', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3' })).toContain('doubao-seedream-5-0-pro-260628')
   })
 
+  it('MiniMax API Key 地址提供 H3 视频模型，不混入官方 OpenAI 预置模型', () => {
+    for (const baseUrl of ['https://api.minimax.cn/v1', 'https://api.minimax.io']) {
+      const models = getModelsByPlatform('openai', { type: 'apikey', baseUrl })
+      expect(models).toContain('MiniMax-H3')
+      expect(models).not.toContain('gpt-5.4')
+    }
+    expect(getModelsByPlatform('openai', { type: 'oauth', baseUrl: 'https://api.minimax.cn/v1' })).not.toContain('MiniMax-H3')
+    expect(getModelsByPlatform('openai', { type: 'apikey', baseUrl: 'https://api.minimax.cn.example.com/v1' })).not.toContain('MiniMax-H3')
+  })
+
   it('openai 模型列表不再暴露已下线的 ChatGPT 登录 Codex 模型', () => {
     const models = getModelsByPlatform('openai')
 

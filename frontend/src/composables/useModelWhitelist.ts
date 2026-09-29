@@ -196,7 +196,9 @@ const doubaoModels = [
 ]
 
 // MiniMax
+export const MINIMAX_H3_MODEL = 'MiniMax-H3'
 const minimaxModels = [
+  MINIMAX_H3_MODEL,
   'abab6.5-chat', 'abab6.5s-chat', 'abab6.5s-chat-pro',
   'abab6-chat',
   'abab5.5-chat', 'abab5.5s-chat'
@@ -417,14 +419,21 @@ export function getModelsByPlatform(platform: string, account?: { type?: string;
       // Ark uses the OpenAI compatible protocol, but its models must never
       // appear in the preset list for an official OpenAI account.
       let ark = false
+      let minimax = false
       if (account?.type === 'apikey' && account.baseUrl) {
         try {
-          ark = new URL(account.baseUrl).hostname.toLowerCase() === 'ark.cn-beijing.volces.com'
+          const hostname = new URL(account.baseUrl).hostname.toLowerCase()
+          ark = hostname === 'ark.cn-beijing.volces.com'
+          minimax = hostname === 'api.minimax.cn' || hostname === 'api.minimax.io'
         } catch {
           ark = false
         }
       }
-      return ark ? [...SEEDREAM_MODELS] : openaiModels
+      if (ark) return [...SEEDREAM_MODELS]
+      // MiniMax H3 uses its native video-task endpoint and may be absent from
+      // the language-model list returned by upstream model sync.
+      if (minimax) return [MINIMAX_H3_MODEL]
+      return openaiModels
     }
     case 'anthropic':
     case 'claude': return claudeModels

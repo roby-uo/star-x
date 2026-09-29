@@ -17,6 +17,7 @@ star-X is a self-hosted, privately branded distribution for managing authorized 
 #### 修复
 
 - 修复图片模型筛选为空和用户端模型管理为空的问题；移除 Audio 类型筛选。
+- MiniMax 账号可直接添加 H3 视频模型，避免只看到语言模型。
 
 [查看完整更新记录](docs/releases/release-notes.md)
 
