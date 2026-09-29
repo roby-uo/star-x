@@ -78,7 +78,7 @@ func newRollbackTestService(current string, releases []*GitHubRelease) *UpdateSe
 	)
 }
 
-func TestUpdateServiceListRollbackVersionsFiltersAndCaps(t *testing.T) {
+func TestUpdateServiceListRollbackVersionsDisabledWithAvailableReleases(t *testing.T) {
 	releases := []*GitHubRelease{
 		{TagName: "v0.1.148", PublishedAt: "2026-07-09T00:00:00Z"},                       // newer than current: excluded
 		{TagName: "v0.1.147", PublishedAt: "2026-07-08T00:00:00Z"},                       // current: excluded
@@ -95,13 +95,10 @@ func TestUpdateServiceListRollbackVersionsFiltersAndCaps(t *testing.T) {
 	versions, err := svc.ListRollbackVersions(context.Background())
 
 	require.NoError(t, err)
-	require.Len(t, versions, 3)
-	require.Equal(t, "0.1.146", versions[0].Version)
-	require.Equal(t, "0.1.144", versions[1].Version)
-	require.Equal(t, "0.1.143", versions[2].Version)
+	require.Empty(t, versions)
 }
 
-func TestUpdateServiceListRollbackVersionsSortsUnorderedInput(t *testing.T) {
+func TestUpdateServiceListRollbackVersionsDisabledWithUnorderedInput(t *testing.T) {
 	releases := []*GitHubRelease{
 		{TagName: "v0.1.144"},
 		{TagName: "v0.1.146"},
@@ -112,10 +109,7 @@ func TestUpdateServiceListRollbackVersionsSortsUnorderedInput(t *testing.T) {
 	versions, err := svc.ListRollbackVersions(context.Background())
 
 	require.NoError(t, err)
-	require.Len(t, versions, 3)
-	require.Equal(t, "0.1.146", versions[0].Version)
-	require.Equal(t, "0.1.145", versions[1].Version)
-	require.Equal(t, "0.1.144", versions[2].Version)
+	require.Empty(t, versions)
 }
 
 func TestUpdateServiceListRollbackVersionsEmptyWhenNoneOlder(t *testing.T) {
@@ -131,7 +125,7 @@ func TestUpdateServiceListRollbackVersionsEmptyWhenNoneOlder(t *testing.T) {
 	require.Empty(t, versions)
 }
 
-func TestUpdateServiceListRollbackVersionsPropagatesFetchError(t *testing.T) {
+func TestUpdateServiceListRollbackVersionsDoesNotFetchReleases(t *testing.T) {
 	svc := NewUpdateService(
 		&updateServiceCacheStub{},
 		&updateServiceGitHubClientStub{recentErr: errors.New("github unavailable")},
@@ -139,10 +133,9 @@ func TestUpdateServiceListRollbackVersionsPropagatesFetchError(t *testing.T) {
 		"release",
 	)
 
-	_, err := svc.ListRollbackVersions(context.Background())
-
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "github unavailable")
+	versions, err := svc.ListRollbackVersions(context.Background())
+	require.NoError(t, err)
+	require.Empty(t, versions)
 }
 
 func TestUpdateServiceRollbackToVersionRejectsDisallowedTargets(t *testing.T) {
@@ -170,9 +163,7 @@ func TestUpdateServiceRollbackToVersionRejectsDisallowedTargets(t *testing.T) {
 	}
 }
 
-func TestUpdateServiceRollbackToVersionAcceptsVPrefix(t *testing.T) {
-	// No platform asset in the release: the target passes the allowlist check
-	// and fails later at asset lookup, proving the version itself was accepted.
+func TestUpdateServiceRollbackToVersionRejectsVPrefixWhenDisabled(t *testing.T) {
 	releases := []*GitHubRelease{
 		{TagName: "v0.1.147"},
 		{TagName: "v0.1.146"},
@@ -181,7 +172,5 @@ func TestUpdateServiceRollbackToVersionAcceptsVPrefix(t *testing.T) {
 
 	err := svc.RollbackToVersion(context.Background(), "v0.1.146")
 
-	require.Error(t, err)
-	require.NotErrorIs(t, err, ErrRollbackVersionNotAllowed)
-	require.Contains(t, err.Error(), "no compatible release found")
+	require.ErrorIs(t, err, ErrRollbackVersionNotAllowed)
 }
