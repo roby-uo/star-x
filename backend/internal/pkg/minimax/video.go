@@ -178,7 +178,7 @@ func (c *VideoClient) do(ctx context.Context, method, path, apiKey string, body 
 	if err != nil {
 		return fmt.Errorf("MiniMax video request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	responseBody, err := io.ReadAll(io.LimitReader(resp.Body, maxVideoResponseBytes+1))
 	if err != nil {
 		return err
