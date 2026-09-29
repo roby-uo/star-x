@@ -139,7 +139,7 @@ func (s *MediaTaskService) List(ctx context.Context, userID int64, offset int) (
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	result := make([]*MediaTask, 0)
 	for rows.Next() {
 		t, e := scanMediaTask(rows)
@@ -394,7 +394,7 @@ func (s *MediaTaskService) run() {
 						tasks = append(tasks, t)
 					}
 				}
-				rows.Close()
+				_ = rows.Close()
 				for _, t := range tasks {
 					select {
 					case <-s.stop:

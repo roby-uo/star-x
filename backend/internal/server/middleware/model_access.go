@@ -69,10 +69,10 @@ func ModelAccessCheck(tasks *service.MediaTaskService) func(*gin.Context, *servi
 					if part.FormName() == "model" {
 						value, _ := io.ReadAll(io.LimitReader(part, 512))
 						model = string(value)
-						part.Close()
+						_ = part.Close()
 						break
 					}
-					part.Close()
+					_ = part.Close()
 				}
 			}
 		}
