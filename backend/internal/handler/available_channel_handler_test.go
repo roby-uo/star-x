@@ -27,6 +27,17 @@ func TestUserAvailableChannel_Unauthenticated401(t *testing.T) {
 	require.Equal(t, http.StatusUnauthorized, w.Code)
 }
 
+func TestCollectUserAvailableModels_OnlyAccessibleGroups(t *testing.T) {
+	groups := []service.Group{{ID: 7, Name: "public", Platform: "openai"}}
+	models := collectUserAvailableModels(groups, func(group service.Group) []string {
+		require.Equal(t, int64(7), group.ID)
+		return []string{"doubao-seedream-5-0-pro-260628", "MiniMax-H3"}
+	})
+	require.Len(t, models, 2)
+	require.Equal(t, "public", models[0].GroupName)
+	require.Equal(t, "MiniMax-H3", models[1].Name)
+}
+
 func TestFilterUserVisibleGroups_IntersectionOnly(t *testing.T) {
 	// 渠道挂在 {g1, g2, g3}，用户只允许 {g1, g3} —— 响应必须仅含 g1/g3。
 	groups := []service.AvailableGroupRef{

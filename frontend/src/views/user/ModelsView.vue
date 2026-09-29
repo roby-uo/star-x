@@ -13,7 +13,6 @@
               <option value="Chat">Chat</option>
               <option value="Images">Images</option>
               <option value="Videos">Videos</option>
-              <option value="Audio">Audio</option>
             </select>
           </div>
           <button class="btn btn-secondary" :disabled="loading" title="刷新" @click="load"><Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" /></button>
@@ -28,7 +27,7 @@
                 <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ row.model }}</td>
                 <td class="px-4 py-3"><span class="rounded-full bg-primary-50 px-2 py-1 text-xs text-primary-700 dark:bg-primary-900/20 dark:text-primary-300">{{ row.type }}</span></td>
                 <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{{ row.platform }}</td>
-                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{{ row.channel }}</td>
+                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{{ row.group }}</td>
                 <td class="px-4 py-3 font-mono text-xs text-gray-500">{{ row.endpoint }}</td>
                 <td class="px-4 py-3 text-right">
                   <router-link v-if="row.testEndpoint" :to="{ path: '/model-test', query: { model: row.model, endpoint: row.testEndpoint } }" class="btn btn-secondary px-2 py-1 text-xs">{{ t('modelTest.test') }}</router-link>
@@ -51,30 +50,27 @@ import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
-import userChannelsAPI, { type UserAvailableChannel } from '@/api/channels'
+import userChannelsAPI, { type UserAvailableModel } from '@/api/channels'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
-import { isSeedreamModel } from '@/utils/modelTest'
+import { catalogModelEndpoint, catalogModelType, isAudioModel } from '@/utils/modelCatalog'
 import type { ModelTestEndpoint } from '@/utils/modelTest'
 
-type ModelRow = { key: string; model: string; type: string; platform: string; channel: string; endpoint: string; testEndpoint: ModelTestEndpoint | null }
+type ModelRow = { key: string; model: string; type: string; platform: string; group: string; endpoint: string; testEndpoint: ModelTestEndpoint | null }
 const { t } = useI18n()
-const channels = ref<UserAvailableChannel[]>([])
+const models = ref<UserAvailableModel[]>([])
 const loading = ref(false)
 const query = ref('')
 const type = ref('')
-const headings = ['模型', '类型', '平台', '渠道', '端点', '操作']
+const headings = ['模型', '类型', '平台', '可用分组', '端点', '操作']
 const appStore = useAppStore()
 
-const rows = computed<ModelRow[]>(() => channels.value.flatMap((channel) => channel.platforms.flatMap((platform) => platform.supported_models.map((model) => {
-  const image = model.pricing?.billing_mode === 'image' || isSeedreamModel(model.name)
-  const video = /video|seedance|kling|sora/i.test(model.name)
-  const audio = /audio|tts|whisper/i.test(model.name)
-  const modelType = image ? 'Images' : video ? 'Videos' : audio ? 'Audio' : 'Chat'
-  return { key: `${channel.name}-${platform.platform}-${model.name}`, model: model.name, type: modelType, platform: platform.platform, channel: channel.name, endpoint: image ? '/v1/images/generations' : video ? '/v1/videos/generations' : '/v1/chat/completions', testEndpoint: (image ? 'Images' : video || audio ? null : 'Chat') as ModelTestEndpoint | null }
-}))))
-const filteredRows = computed(() => { const q = query.value.trim().toLowerCase(); return rows.value.filter((row) => (!type.value || row.type === type.value) && (!q || [row.model, row.platform, row.channel, row.endpoint].some((v) => v.toLowerCase().includes(q)))) })
+const rows = computed<ModelRow[]>(() => models.value.filter((model) => !isAudioModel(model.name)).map((model) => {
+  const modelType = catalogModelType(model.name)
+  return { key: `${model.group_id}-${model.platform}-${model.name}`, model: model.name, type: modelType, platform: model.platform, group: model.group_name, endpoint: catalogModelEndpoint(modelType, model.platform, model.name), testEndpoint: modelType === 'Videos' ? null : modelType as ModelTestEndpoint }
+}))
+const filteredRows = computed(() => { const q = query.value.trim().toLowerCase(); return rows.value.filter((row) => (!type.value || row.type === type.value) && (!q || [row.model, row.platform, row.group, row.endpoint].some((v) => v.toLowerCase().includes(q)))) })
 
-async function load() { loading.value = true; try { channels.value = await userChannelsAPI.getAvailable() } catch (error) { appStore.showError(extractApiErrorMessage(error, '模型目录加载失败')) } finally { loading.value = false } }
+async function load() { loading.value = true; try { models.value = await userChannelsAPI.getAvailableModels() } catch (error) { appStore.showError(extractApiErrorMessage(error, '模型目录加载失败')) } finally { loading.value = false } }
 onMounted(load)
 </script>

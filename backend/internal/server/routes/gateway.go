@@ -71,6 +71,10 @@ func RegisterGatewayRoutes(
 			h.OpenAIGateway.GrokVideoGeneration(c)
 			return
 		}
+		if getGroupPlatform(c) == service.PlatformOpenAI {
+			h.OpenAIGateway.MiniMaxVideoGeneration(c)
+			return
+		}
 		service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": gin.H{
@@ -82,6 +86,10 @@ func RegisterGatewayRoutes(
 	videoStatusHandler := func(c *gin.Context) {
 		if getGroupPlatform(c) == service.PlatformGrok {
 			h.OpenAIGateway.GrokVideoStatus(c)
+			return
+		}
+		if getGroupPlatform(c) == service.PlatformOpenAI {
+			h.OpenAIGateway.MiniMaxVideoStatus(c)
 			return
 		}
 		service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
@@ -225,6 +233,10 @@ func RegisterGatewayRoutes(
 		gateway.GET("/videos/:request_id", videoStatusHandler)
 		gateway.GET("/videos/:request_id/content", videoContentHandler)
 	}
+	miniMaxVideo := r.Group("/v2")
+	miniMaxVideo.Use(bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), requireGroupAnthropic)
+	miniMaxVideo.POST("/video_generation", h.OpenAIGateway.MiniMaxVideoGeneration)
+	miniMaxVideo.GET("/query/video_generation/:task_id", h.OpenAIGateway.MiniMaxVideoStatus)
 
 	// Gemini 原生 API 兼容层（Gemini SDK/CLI 直连）
 	gemini := r.Group("/v1beta")

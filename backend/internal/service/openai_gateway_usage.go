@@ -408,6 +408,9 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 		return s.billingService.CalculateWebSearchCost(result.WebSearchCalls, webSearchPricePerCallFromAPIKey(apiKey), webSearchMultiplier), nil
 	}
 	if isGrokVideoUsageResult(result, billingModels) {
+		if strings.EqualFold(billingModel, "MiniMax-H3") {
+			return s.billingService.CalculateVideoCost(billingModel, result.VideoResolution, result.VideoCount, result.VideoDurationSeconds, nil, videoMultiplier), nil
+		}
 		if resolved := s.resolveOpenAIChannelPricing(ctx, billingModel, apiKey); resolved == nil || resolved.Mode != BillingModeToken {
 			return s.calculateOpenAIVideoCost(ctx, billingModel, apiKey, result, videoMultiplier), nil
 		}
@@ -448,7 +451,8 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 }
 
 func isGrokVideoBillingModel(model string) bool {
-	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(model)), "grok-imagine-video")
+	model = strings.ToLower(strings.TrimSpace(model))
+	return strings.HasPrefix(model, "grok-imagine-video") || model == "minimax-h3"
 }
 
 func isGrokVideoUsageResult(result *OpenAIForwardResult, billingModels []string) bool {

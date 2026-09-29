@@ -14,10 +14,9 @@
             </div>
             <select v-model="type" class="input w-40">
               <option value="">全部类型</option>
-              <option value="chat">Chat</option>
-              <option value="image">Images</option>
-              <option value="video">Videos</option>
-              <option value="audio">Audio</option>
+              <option value="Chat">Chat</option>
+              <option value="Images">Images</option>
+              <option value="Videos">Videos</option>
             </select>
           </div>
           <div class="flex items-center gap-2">
@@ -70,7 +69,7 @@ import { accountsAPI } from '@/api/admin/accounts'
 import type { Account } from '@/types'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
-import { isSeedreamModel } from '@/utils/modelTest'
+import { catalogModelType, isAudioModel } from '@/utils/modelCatalog'
 
 type ModelRow = { key: string; model: string; type: string; platform: string; accounts: string; channels: string; targets: string }
 const appStore = useAppStore()
@@ -100,14 +99,11 @@ const rows = computed<ModelRow[]>(() => {
       for (const model of pricing.models) add(pricing.platform, model, undefined, channel.name, pricing.billing_mode === 'image')
     }
   }
-  return [...inventory.entries()].map(([key, row]) => {
-    const image = row.image || isSeedreamModel(row.model) || /^gpt-image/i.test(row.model)
-    const video = /video|seedance|kling|sora/i.test(row.model)
-    const audio = /audio|tts|whisper/i.test(row.model)
+  return [...inventory.entries()].filter(([, row]) => !isAudioModel(row.model)).map(([key, row]) => {
     return {
       key,
       model: row.model,
-      type: image ? 'Images' : video ? 'Videos' : audio ? 'Audio' : 'Chat',
+      type: catalogModelType(row.model, row.image ? 'image' : undefined),
       platform: row.platform,
       accounts: [...row.accounts].join('、'),
       channels: [...row.channels].join('、'),
@@ -118,7 +114,7 @@ const rows = computed<ModelRow[]>(() => {
 
 const filteredRows = computed(() => {
   const q = query.value.trim().toLowerCase()
-  return rows.value.filter((row) => (!type.value || row.type.toLowerCase() === type.value) && (!q || [row.model, row.platform, row.accounts, row.channels, row.targets].some((v) => v.toLowerCase().includes(q))))
+  return rows.value.filter((row) => (!type.value || row.type === type.value) && (!q || [row.model, row.platform, row.accounts, row.channels, row.targets].some((v) => v.toLowerCase().includes(q))))
 })
 
 async function load() {

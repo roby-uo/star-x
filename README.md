@@ -8,11 +8,15 @@ star-X is a self-hosted, privately branded distribution for managing authorized 
 
 ## 最新更新
 
-### 2026-09-23
+### 2026-09-29
+
+#### 新增
+
+- 配置 MiniMax 上游账号后，可调用 MiniMax-H3 生成视频并查询任务结果。
 
 #### 修复
 
-- OpenAI OAuth 账号现在可以同步上游 Codex 模型；模型选项增加 GPT-6 系列，失败时会显示具体原因。
+- 修复图片模型筛选为空和用户端模型管理为空的问题；移除 Audio 类型筛选。
 
 [查看完整更新记录](docs/releases/release-notes.md)
 

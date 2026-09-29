@@ -6,6 +6,8 @@ const (
 	VideoBillingResolution480P  = "480p"
 	VideoBillingResolution720P  = "720p"
 	VideoBillingResolution1080P = "1080p"
+	VideoBillingResolution768P  = "768p"
+	VideoBillingResolution2K    = "2k"
 )
 
 // xAI 视频生成按秒计费，duration 请求参数允许 1-15 秒；未指定时上游默认生成 8 秒。
@@ -39,6 +41,10 @@ func NormalizeVideoBillingResolutionOrDefault(resolution string) string {
 		return VideoBillingResolution720P
 	case "1080", "1080p", "full_hd", "full-hd", "fhd":
 		return VideoBillingResolution1080P
+	case "768", "768p":
+		return VideoBillingResolution768P
+	case "2k", "1440p":
+		return VideoBillingResolution2K
 	default:
 		return VideoBillingResolution480P
 	}

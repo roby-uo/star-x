@@ -24,6 +24,7 @@ type AvailableChannelHandler struct {
 	channelService *service.ChannelService
 	apiKeyService  *service.APIKeyService
 	settingService *service.SettingService
+	gatewayService *service.GatewayService
 }
 
 // NewAvailableChannelHandler 创建用户侧可用渠道 handler。
@@ -31,12 +32,53 @@ func NewAvailableChannelHandler(
 	channelService *service.ChannelService,
 	apiKeyService *service.APIKeyService,
 	settingService *service.SettingService,
+	gatewayService *service.GatewayService,
 ) *AvailableChannelHandler {
 	return &AvailableChannelHandler{
 		channelService: channelService,
 		apiKeyService:  apiKeyService,
 		settingService: settingService,
+		gatewayService: gatewayService,
 	}
+}
+
+// userAvailableModel is scoped to an accessible group. The catalog is independent
+// of the optional public-channel feature and never exposes upstream accounts.
+type userAvailableModel struct {
+	Name      string `json:"name"`
+	Platform  string `json:"platform"`
+	GroupID   int64  `json:"group_id"`
+	GroupName string `json:"group_name"`
+}
+
+// ListModels returns the gateway's available models for schedulable accounts in
+// groups the current user may bind to an API key.
+func (h *AvailableChannelHandler) ListModels(c *gin.Context) {
+	subject, ok := middleware.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+	groups, err := h.apiKeyService.GetAvailableGroups(c.Request.Context(), subject.UserID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, collectUserAvailableModels(groups, func(group service.Group) []string {
+		return h.gatewayService.GetAvailableModels(c.Request.Context(), &group.ID, group.Platform)
+	}))
+}
+
+func collectUserAvailableModels(groups []service.Group, modelsForGroup func(service.Group) []string) []userAvailableModel {
+	models := make([]userAvailableModel, 0)
+	for _, group := range groups {
+		for _, name := range modelsForGroup(group) {
+			models = append(models, userAvailableModel{
+				Name: name, Platform: group.Platform, GroupID: group.ID, GroupName: group.Name,
+			})
+		}
+	}
+	return models
 }
 
 // featureEnabled 返回 available-channels 开关是否启用。默认关闭（opt-in）。

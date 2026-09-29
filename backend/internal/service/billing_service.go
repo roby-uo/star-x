@@ -1377,6 +1377,10 @@ const (
 	defaultGrokImagineVideo15Price480P  = 0.08
 	defaultGrokImagineVideo15Price720P  = 0.14
 	defaultGrokImagineVideo15Price1080P = 0.25
+	// MiniMax global API list prices in USD per output second. CN upstream cost
+	// may differ; public billing remains in USD and group multipliers still apply.
+	defaultMiniMaxH3Price768P = 0.08
+	defaultMiniMaxH3Price2K   = 0.13
 
 	// Codex alpha/search 网页搜索单次默认价：OpenAI 官方 web search 定价 $10/1000 次。
 	defaultWebSearchPricePerCall = 0.01
@@ -1545,6 +1549,12 @@ func (s *BillingService) getDefaultImagePrice(model string, imageSize string) fl
 }
 
 func (s *BillingService) getDefaultVideoPrice(model string, resolution string) float64 {
+	if strings.EqualFold(strings.TrimSpace(model), "MiniMax-H3") {
+		if NormalizeVideoBillingResolutionOrDefault(resolution) == VideoBillingResolution2K {
+			return defaultMiniMaxH3Price2K
+		}
+		return defaultMiniMaxH3Price768P
+	}
 	if price, ok := getDefaultGrokImagineVideoPrice(model, resolution); ok {
 		return price
 	}

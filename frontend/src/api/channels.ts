@@ -68,6 +68,19 @@ export interface UserAvailableChannel {
   platforms: UserChannelPlatformSection[]
 }
 
+export interface UserAvailableModel {
+  name: string
+  platform: string
+  group_id: number
+  group_name: string
+}
+
+/** Models from schedulable accounts in groups available to the current user. */
+export async function getAvailableModels(): Promise<UserAvailableModel[]> {
+  const { data } = await apiClient.get<UserAvailableModel[]>('/channels/models')
+  return data
+}
+
 /** 列出当前用户可见的「可用渠道」（与 /groups/available 保持一致，返回平数组）。 */
 export async function getAvailable(options?: { signal?: AbortSignal }): Promise<UserAvailableChannel[]> {
   const { data } = await apiClient.get<UserAvailableChannel[]>('/channels/available', {
@@ -76,6 +89,6 @@ export async function getAvailable(options?: { signal?: AbortSignal }): Promise<
   return data
 }
 
-export const userChannelsAPI = { getAvailable }
+export const userChannelsAPI = { getAvailable, getAvailableModels }
 
 export default userChannelsAPI
