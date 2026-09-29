@@ -73,6 +73,10 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return
 	}
+	if err := h.gatewayService.ValidateImageServiceRequest(c.Request.Context(), apiKey, parsed); err != nil {
+		h.errorResponse(c, http.StatusForbidden, "permission_error", err.Error())
+		return
+	}
 	requestModel := parsed.Model
 
 	reqLog = reqLog.With(

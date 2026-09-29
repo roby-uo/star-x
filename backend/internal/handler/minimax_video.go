@@ -3,19 +3,42 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/minimax"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
+
+// MiniMaxVideoQuote is authenticated with the same API key as generation, so
+// user-specific rates and group permissions cannot drift from the displayed price.
+func (h *OpenAIGatewayHandler) MiniMaxVideoQuote(c *gin.Context) {
+	key, ok := middleware.GetAPIKeyFromContext(c)
+	if !ok || key == nil || key.Group == nil || key.Group.Platform != service.PlatformOpenAI {
+		h.errorResponse(c, http.StatusForbidden, "permission_error", "需要有效的 OpenAI 兼容分组密钥")
+		return
+	}
+	var input minimax.CreateVideoRequest
+	if c.ShouldBindJSON(&input) != nil || input.Validate() != nil || !miniMaxPublicContentAllowed(input.Content) {
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "视频规格或输入无效")
+		return
+	}
+	quote, err := h.gatewayService.QuoteMiniMaxVideo(c.Request.Context(), key, input)
+	if err != nil {
+		h.errorResponse(c, http.StatusForbidden, "permission_error", err.Error())
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, quote)
+}
 
 // MiniMaxVideoGeneration accepts the native H3 request body. The OpenAI-style
 // /v1/videos/generations alias also accepts a text-only prompt shortcut.
@@ -62,8 +85,25 @@ func (h *OpenAIGatewayHandler) MiniMaxVideoGeneration(c *gin.Context) {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "MiniMax-H3 requires a text prompt and supports up to two first/last-frame images at 768P or 2K")
 		return
 	}
-	if !service.GroupAllowsImageGeneration(apiKey.Group) {
-		h.errorResponse(c, http.StatusForbidden, "permission_error", service.ImageGenerationPermissionMessage())
+	if h.mediaTasks != nil && c.GetHeader("Idempotency-Key") != "" {
+		task, lookupErr := h.mediaTasks.ByIdempotency(c.Request.Context(), apiKey.ID, c.GetHeader("Idempotency-Key"))
+		if lookupErr == nil {
+			payload, _ := json.Marshal(input)
+			if task.RequestHash != service.HashUsageRequestPayload(payload) {
+				h.errorResponse(c, http.StatusConflict, "idempotency_conflict", "幂等键已用于不同请求")
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"id": task.ID, "task_id": task.UpstreamTaskID, "state": task.State, "quote": task.Quote})
+			return
+		}
+	}
+	quote, err := h.gatewayService.QuoteMiniMaxVideo(c.Request.Context(), apiKey, input)
+	if err != nil {
+		h.errorResponse(c, http.StatusForbidden, "permission_error", err.Error())
+		return
+	}
+	if version := c.GetHeader("X-Video-Quote"); version != "" && version != quote.Version {
+		h.errorResponse(c, http.StatusConflict, "quote_changed", "价格或开放规格已变化，请重新获取报价")
 		return
 	}
 	reqLog := requestLogger(c, "handler.openai_gateway.minimax_video", zap.Int64("user_id", subject.UserID), zap.Int64("api_key_id", apiKey.ID))
@@ -109,38 +149,52 @@ func (h *OpenAIGatewayHandler) MiniMaxVideoGeneration(c *gin.Context) {
 		h.errorResponse(c, http.StatusBadGateway, "upstream_error", "MiniMax account URL is invalid")
 		return
 	}
-	start := time.Now()
-	created, err := client.Create(ctx, account.GetCredential("api_key"), input)
-	if err != nil {
-		h.errorResponse(c, http.StatusBadGateway, "upstream_error", "MiniMax video task creation failed")
+	if h.mediaTasks == nil {
+		h.errorResponse(c, http.StatusServiceUnavailable, "storage_unavailable", "视频任务存储尚未就绪")
 		return
 	}
-	if err := h.gatewayService.BindMiniMaxVideoTaskAccount(ctx, apiKey.GroupID, created.TaskID, subject.UserID, apiKey.ID, account.ID); err != nil {
-		logger.L().Error("minimax_video.bind_task_failed", zap.String("task_id", created.TaskID), zap.Error(err))
-		c.JSON(http.StatusServiceUnavailable, gin.H{"task_id": created.TaskID, "error": "Video task created but status lookup is temporarily unavailable"})
+	idempotency := strings.TrimSpace(c.GetHeader("Idempotency-Key"))
+	if len(idempotency) > 128 {
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Idempotency-Key 太长")
 		return
+	}
+	if idempotency == "" {
+		idempotency = uuid.NewString()
+	}
+	task, fresh, err := h.mediaTasks.Begin(ctx, apiKey, account.ID, input, quote, idempotency, subscription)
+	if err != nil {
+		h.errorResponse(c, http.StatusConflict, "video_task_error", err.Error())
+		return
+	}
+	if !fresh {
+		c.JSON(http.StatusOK, gin.H{"id": task.ID, "task_id": task.UpstreamTaskID, "state": task.State, "quote": task.Quote})
+		return
+	}
+	created, err := client.Create(ctx, account.GetCredential("api_key"), input)
+	// Give persistence its own full timeout after the upstream request completes.
+	persistCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 60*time.Second)
+	defer cancel()
+	if err != nil {
+		var upstream *minimax.HTTPError
+		if errors.As(err, &upstream) && upstream.Status >= 400 && upstream.Status < 500 && upstream.Status != 408 {
+			_ = h.mediaTasks.Reject(persistCtx, task.ID)
+		} else {
+			_ = h.mediaTasks.Uncertain(persistCtx, task.ID)
+		}
+		c.JSON(http.StatusBadGateway, gin.H{"id": task.ID, "error": gin.H{"message": "视频提交未完成，请在任务记录中核对状态，勿重复提交"}})
+		return
+	}
+	if err = h.mediaTasks.Accepted(persistCtx, task.ID, created.TaskID); err != nil {
+		logger.L().Error("minimax_video.persist_task_failed", zap.String("id", task.ID), zap.String("task_id", created.TaskID), zap.Error(err))
+		c.JSON(http.StatusServiceUnavailable, gin.H{"id": task.ID, "task_id": created.TaskID, "error": gin.H{"message": "上游已受理，任务记录待核对；请保留任务编号，不要重新提交"}})
+		return
+	}
+	task.UpstreamTaskID = created.TaskID
+	if err = h.mediaTasks.Settle(persistCtx, task); err != nil {
+		logger.L().Error("minimax_video.settlement_pending", zap.String("id", task.ID), zap.Error(err))
 	}
 	setOpsSelectedAccount(c, account.ID, account.Platform)
-	result := &service.OpenAIForwardResult{
-		RequestID: created.TaskID, ResponseID: created.TaskID, Model: input.Model,
-		UpstreamModel: input.Model, UpstreamEndpoint: "/v2/video_generation",
-		VideoCount: 1, VideoResolution: input.Resolution, VideoDurationSeconds: input.Duration,
-		Duration: time.Since(start),
-	}
-	userAgent, clientIP := c.GetHeader("User-Agent"), ip.GetClientIP(c)
-	quotaPlatform := service.QuotaPlatform(ctx, apiKey)
-	h.submitOpenAIUsageRecordTask(ctx, result, func(billCtx context.Context) {
-		if err := h.gatewayService.RecordUsage(billCtx, &service.OpenAIRecordUsageInput{
-			Result: result, APIKey: apiKey, User: apiKey.User, Account: account,
-			Subscription: subscription, InboundEndpoint: "/v2/video_generation",
-			UpstreamEndpoint: "/v2/video_generation", UserAgent: userAgent,
-			IPAddress: clientIP, RequestPayloadHash: service.HashUsageRequestPayload([]byte(created.TaskID)),
-			APIKeyService: h.apiKeyService, QuotaPlatform: quotaPlatform,
-		}); err != nil {
-			logger.L().Error("minimax_video.record_usage_failed", zap.String("task_id", created.TaskID), zap.Error(err))
-		}
-	})
-	c.JSON(http.StatusOK, created)
+	c.JSON(http.StatusOK, gin.H{"id": task.ID, "task_id": created.TaskID, "quote": quote, "state": "queued"})
 }
 
 func miniMaxPublicContentAllowed(items []minimax.VideoContent) bool {
@@ -180,6 +234,26 @@ func (h *OpenAIGatewayHandler) MiniMaxVideoStatus(c *gin.Context) {
 	taskID := c.Param("task_id")
 	if taskID == "" {
 		taskID = c.Param("request_id")
+	}
+	if h.mediaTasks != nil {
+		task, err := h.mediaTasks.ByUpstream(c.Request.Context(), taskID, subject.UserID, apiKey.ID)
+		if err == nil {
+			if err = h.mediaTasks.Refresh(c.Request.Context(), task); err != nil {
+				h.errorResponse(c, http.StatusBadGateway, "upstream_error", "视频状态刷新失败，请稍后重试")
+				return
+			}
+			task, err = h.mediaTasks.Get(c.Request.Context(), task.ID, subject.UserID)
+			if err != nil {
+				h.errorResponse(c, http.StatusServiceUnavailable, "storage_error", "任务读取失败")
+				return
+			}
+			if task.Result != nil {
+				c.JSON(http.StatusOK, task.Result)
+			} else {
+				c.JSON(http.StatusOK, gin.H{"task": gin.H{"id": task.UpstreamTaskID, "status": task.State}})
+			}
+			return
+		}
 	}
 	account, err := h.gatewayService.ResolveMiniMaxVideoTaskAccount(c.Request.Context(), apiKey.GroupID, taskID, subject.UserID, apiKey.ID)
 	if err != nil {

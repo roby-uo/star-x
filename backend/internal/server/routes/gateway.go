@@ -235,6 +235,7 @@ func RegisterGatewayRoutes(
 	}
 	miniMaxVideo := r.Group("/v2")
 	miniMaxVideo.Use(bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), requireGroupAnthropic)
+	miniMaxVideo.POST("/video_generation/quote", h.OpenAIGateway.MiniMaxVideoQuote)
 	miniMaxVideo.POST("/video_generation", h.OpenAIGateway.MiniMaxVideoGeneration)
 	miniMaxVideo.GET("/query/video_generation/:task_id", h.OpenAIGateway.MiniMaxVideoStatus)
 
@@ -245,6 +246,7 @@ func RegisterGatewayRoutes(
 	gemini.Use(opsErrorLogger)
 	gemini.Use(endpointNorm)
 	gemini.Use(middleware.APIKeyAuthWithSubscriptionGoogle(apiKeyService, subscriptionService, cfg))
+	gemini.Use(h.AvailableChannel.CheckModelAccess)
 	gemini.Use(requireGroupGoogle)
 	{
 		gemini.GET("/models", h.Gateway.GeminiV1BetaListModels)
@@ -337,6 +339,7 @@ func RegisterGatewayRoutes(
 	antigravityV1Beta.Use(endpointNorm)
 	antigravityV1Beta.Use(middleware.ForcePlatform(service.PlatformAntigravity))
 	antigravityV1Beta.Use(middleware.APIKeyAuthWithSubscriptionGoogle(apiKeyService, subscriptionService, cfg))
+	antigravityV1Beta.Use(h.AvailableChannel.CheckModelAccess)
 	antigravityV1Beta.Use(requireGroupGoogle)
 	{
 		antigravityV1Beta.GET("/models", h.Gateway.GeminiV1BetaListModels)

@@ -404,6 +404,7 @@
                 <span class="text-xs">{{ row.status === 'active' ? t('keys.disable') : t('keys.enable') }}</span>
               </button>
               <!-- Edit Button -->
+              <button class="rounded-lg p-1.5 text-xs text-primary-600" @click="modelAccessKey = row">模型权限</button>
               <button
                 @click="editKey(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
@@ -1122,10 +1123,12 @@
         </div>
       </div>
     </Teleport>
+    <KeyModelAccessEditor v-if="modelAccessKey" :api-key="modelAccessKey" @close="modelAccessKey = null" />
   </AppLayout>
 </template>
 
 <script setup lang="ts">
+import KeyModelAccessEditor from '@/components/models/KeyModelAccessEditor.vue'
 	import { ref, reactive, computed, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
 	import { useI18n } from 'vue-i18n'
 	import { useAppStore } from '@/stores/app'
@@ -1303,6 +1306,7 @@ const filterSearch = ref('')
 const filterStatus = ref('')
 const filterGroupId = ref<string | number>('')
 
+const modelAccessKey = ref<ApiKey | null>(null)
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
 const showDeleteDialog = ref(false)

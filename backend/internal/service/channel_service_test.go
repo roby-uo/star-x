@@ -1149,16 +1149,10 @@ func TestBuildCache_DBError(t *testing.T) {
 	require.Contains(t, err.Error(), "database down")
 	require.Equal(t, 1, callCount)
 
-	// Second call within error-TTL should use error cache, but still return error
-	// Because buildCache stores error-TTL cache and returns error, the cached value
-	// is still within TTL and loadCache returns it (which is an empty cache).
-	// Actually, re-reading the code: buildCache returns nil, err, and the error cache
-	// only serves as a "don't retry immediately" mechanism. The singleflight.Do
-	// returns the error. On next call within error-TTL, the cache has an empty but
-	// valid entry, so loadCache returns it (with empty maps). GetChannelForGroup
-	// will find nothing and return nil, nil.
+	// Error caching must retain failure, otherwise missing policy would reopen models.
 	result, err := svc.GetChannelForGroup(context.Background(), 10)
-	require.NoError(t, err)
+	require.Error(t, err)
+	require.True(t, svc.IsModelRestricted(context.Background(), 10, "MiniMax-H3"))
 	require.Nil(t, result)
 	// Should NOT have hit DB again (error-TTL cache is active)
 	require.Equal(t, 1, callCount)
@@ -1188,9 +1182,9 @@ func TestBuildCache_GroupPlatformError(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, result)
 
-	// Within error-TTL, second call should hit cache (empty) and return nil, nil
+	// Within error-TTL, failure must remain visible without another DB query.
 	result2, err2 := svc.GetChannelForGroup(context.Background(), 10)
-	require.NoError(t, err2)
+	require.Error(t, err2)
 	require.Nil(t, result2)
 }
 

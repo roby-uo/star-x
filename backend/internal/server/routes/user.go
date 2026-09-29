@@ -65,6 +65,8 @@ func RegisterUserRoutes(
 		{
 			keys.GET("", h.APIKey.List)
 			keys.GET("/:id", h.APIKey.GetByID)
+			keys.GET("/:id/model-access", h.AvailableChannel.GetKeyModelAccess)
+			keys.PUT("/:id/model-access", h.AvailableChannel.SaveKeyModelAccess)
 			keys.POST("", h.APIKey.Create)
 			keys.PUT("/:id", h.APIKey.Update)
 			keys.DELETE("/:id", h.APIKey.Delete)
@@ -82,6 +84,8 @@ func RegisterUserRoutes(
 		{
 			channels.GET("/available", h.AvailableChannel.List)
 			channels.GET("/models", h.AvailableChannel.ListModels)
+			channels.GET("/media-tasks", h.AvailableChannel.ListMediaTasks)
+			channels.POST("/media-tasks/:id/refresh", h.AvailableChannel.RefreshMediaTask)
 		}
 
 		// 使用记录

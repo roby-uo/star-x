@@ -24,6 +24,10 @@ func RegisterAdminRoutes(
 	admin.Use(gin.HandlerFunc(auditLog))
 	admin.Use(middleware.AdminComplianceGuard(settingService))
 	{
+		admin.GET("/media-tasks", h.AvailableChannel.ListAdminMediaTasks)
+		admin.POST("/media-tasks/:id/refresh", h.AvailableChannel.RefreshAdminMediaTask)
+		admin.POST("/media-tasks/:id/release", h.AvailableChannel.ReleaseUncertainMediaTask)
+		admin.POST("/media-tasks/:id/refund", h.AvailableChannel.RefundMediaTask)
 		// 部署与运营合规确认
 		registerAdminComplianceRoutes(admin, h)
 

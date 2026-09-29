@@ -178,7 +178,31 @@ func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, t
 		}
 	}
 
-	if cmd.BalanceCost > 0 {
+	if cmd.MediaTaskID != "" {
+		var hold float64
+		var state string
+		if err := tx.QueryRowContext(ctx, `SELECT hold_amount,billing_state FROM media_tasks WHERE id=$1 AND user_id=$2 AND api_key_id=$3 FOR UPDATE`, cmd.MediaTaskID, cmd.UserID, cmd.APIKeyID).Scan(&hold, &state); err != nil {
+			return err
+		}
+		if state != "reserved" {
+			return errors.New("video task reservation already settled")
+		}
+		if hold > 0 {
+			if cmd.BalanceCost != hold {
+				return errors.New("video cost differs from reservation")
+			}
+			var balance float64
+			if err := tx.QueryRowContext(ctx, `UPDATE users SET frozen_balance=frozen_balance-$1,updated_at=NOW() WHERE id=$2 AND frozen_balance >= $1 RETURNING balance`, hold, cmd.UserID).Scan(&balance); err != nil {
+				return err
+			}
+			result.NewBalance = &balance
+		} else if cmd.BalanceCost > 0 {
+			return errors.New("video balance reservation is missing")
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE media_tasks SET billing_state='charged',updated_at=NOW() WHERE id=$1`, cmd.MediaTaskID); err != nil {
+			return err
+		}
+	} else if cmd.BalanceCost > 0 {
 		newBalance, sufficient, err := deductUsageBillingBalance(ctx, tx, cmd.UserID, cmd.BalanceCost)
 		if err != nil {
 			return err

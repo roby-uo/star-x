@@ -73,6 +73,7 @@ func provideServiceBuildInfo(buildInfo handler.BuildInfo) service.BuildInfo {
 }
 
 func provideCleanup(
+	mediaTasks *service.MediaTaskService,
 	entClient *ent.Client,
 	rdb *redis.Client,
 	opsMetricsCollector *service.OpsMetricsCollector,
@@ -126,6 +127,12 @@ func provideCleanup(
 
 		// 应用层清理步骤可并行执行，基础设施资源（Redis/Ent）最后按顺序关闭。
 		parallelSteps := []cleanupStep{
+			{name: "MediaTaskService", fn: func() error {
+				if mediaTasks != nil {
+					mediaTasks.Stop()
+				}
+				return nil
+			}},
 			{"AccountAutoRotationService", func() error {
 				if accountAutoRotation != nil {
 					accountAutoRotation.Stop()

@@ -3,8 +3,9 @@
     <TablePageLayout>
       <template #filters>
         <AdminWorkspaceTabs area="models" />
+        <div class="mb-4 flex gap-2"><button class="btn btn-secondary" @click="showTasks = false">模型目录与开放</button><button class="btn btn-secondary" @click="showTasks = true">视频任务与账务</button></div>
         <div class="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200">
-          此处汇总上游账号中明确配置的模型，并标出已配置定价的对外服务。账号设置为“支持全部模型”时，不会凭空推断上游实际支持哪些模型；请在上游连接中配置模型，或用“同步上游支持的模型”获取实时列表。
+          统一管理文本、图片与视频模型。先配置渠道与分组，再点击模型的“管理开放”设置发布状态、视频规格与售价。未配置服务规则的模型沿用原有权限和计费。
         </div>
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="flex flex-1 flex-wrap items-center gap-3">
@@ -14,9 +15,9 @@
             </div>
             <select v-model="type" class="input w-40">
               <option value="">全部类型</option>
-              <option value="Chat">Chat</option>
-              <option value="Images">Images</option>
-              <option value="Videos">Videos</option>
+              <option value="Chat">文本</option>
+              <option value="Images">图片</option>
+              <option value="Videos">视频</option>
             </select>
           </div>
           <div class="flex items-center gap-2">
@@ -29,7 +30,8 @@
       </template>
 
       <template #table>
-        <div class="overflow-x-auto">
+        <MediaTaskList v-if="showTasks" admin />
+        <div v-else class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
             <thead class="bg-gray-50 dark:bg-dark-800">
               <tr>
@@ -43,18 +45,20 @@
                 <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{{ row.platform }}</td>
                 <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{{ row.accounts || '—' }}</td>
                 <td class="px-4 py-3 font-mono text-xs text-gray-500">{{ row.targets || '—' }}</td>
-                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{{ row.channels || '未配置对外服务' }}</td>
+                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{{ row.channels || '沿用分组配置' }}</td>
+                <td class="px-4 py-3"><button class="btn btn-secondary text-xs" @click="editing = row">管理开放</button></td>
               </tr>
-              <tr v-if="!loading && filteredRows.length === 0"><td colspan="6" class="px-4 py-12 text-center text-sm text-gray-500">
+              <tr v-if="!loading && filteredRows.length === 0"><td colspan="7" class="px-4 py-12 text-center text-sm text-gray-500">
                 <span v-if="rows.length">没有符合筛选条件的模型。</span>
                 <span v-else>尚无明确配置的模型。请先到 <router-link class="text-primary-600 underline" to="/admin/accounts">上游连接</router-link> 配置模型白名单；定价仅在需要对外提供服务时配置。</span>
               </td></tr>
-              <tr v-if="loading"><td colspan="6" class="px-4 py-12 text-center text-sm text-gray-500">加载中...</td></tr>
+              <tr v-if="loading"><td colspan="7" class="px-4 py-12 text-center text-sm text-gray-500">加载中...</td></tr>
             </tbody>
           </table>
         </div>
       </template>
     </TablePageLayout>
+    <ModelServiceEditor v-if="editing" :model="editing.model" :platform="editing.platform" :kind="editing.type === 'Videos' ? 'video' : editing.type === 'Images' ? 'image' : 'chat'" :channels="channels" @close="editing = null" @saved="editing = null; load()" />
   </AppLayout>
 </template>
 
@@ -63,6 +67,9 @@ import { computed, onMounted, ref } from 'vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import AdminWorkspaceTabs from '@/components/admin/AdminWorkspaceTabs.vue'
+import MediaTaskList from '@/components/models/MediaTaskList.vue'
+import ModelServiceEditor from '@/components/admin/ModelServiceEditor.vue'
+import type { ModelServicePolicy } from '@/types/modelService'
 import Icon from '@/components/icons/Icon.vue'
 import channelsAPI, { type Channel } from '@/api/admin/channels'
 import { accountsAPI } from '@/api/admin/accounts'
@@ -72,13 +79,15 @@ import { extractApiErrorMessage } from '@/utils/apiError'
 import { catalogModelType, isAudioModel } from '@/utils/modelCatalog'
 
 type ModelRow = { key: string; model: string; type: string; platform: string; accounts: string; channels: string; targets: string }
+const showTasks = ref(false)
+const editing = ref<ModelRow | null>(null)
 const appStore = useAppStore()
 const channels = ref<Channel[]>([])
 const accounts = ref<Account[]>([])
 const loading = ref(false)
 const query = ref('')
 const type = ref('')
-const headings = ['对外模型', '类型', '协议/平台', '上游账号', '上游模型', '对外服务']
+const headings = ['对外模型', '类型', '协议/平台', '上游账号', '上游模型', '对外服务', '操作']
 
 const rows = computed<ModelRow[]>(() => {
   const inventory = new Map<string, { model: string; platform: string; accounts: Set<string>; channels: Set<string>; targets: Set<string>; image: boolean }>()
@@ -95,6 +104,9 @@ const rows = computed<ModelRow[]>(() => {
     for (const [model, target] of Object.entries(account.configured_models || {})) add(account.platform, model, account.name, undefined, false, target)
   }
   for (const channel of channels.value) {
+    for (const policy of (channel.features_config?.model_services as ModelServicePolicy[] | undefined) || []) {
+      add(policy.platform, policy.model, undefined, `${channel.name} · ${{draft:"草稿",published:"已发布",paused:"暂停"}[policy.state]}`, policy.kind === "image")
+    }
     for (const pricing of channel.model_pricing || []) {
       for (const model of pricing.models) add(pricing.platform, model, undefined, channel.name, pricing.billing_mode === 'image')
     }

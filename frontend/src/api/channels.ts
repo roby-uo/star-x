@@ -1,3 +1,4 @@
+import type { ModelServicePolicy } from '@/types/modelService'
 /**
  * User Channels API endpoints (non-admin)
  * 用户侧「可用渠道」聚合查询：渠道 + 用户可访问的分组 + 支持模型（含定价）。
@@ -69,6 +70,9 @@ export interface UserAvailableChannel {
 }
 
 export interface UserAvailableModel {
+  pricing?: UserSupportedModelPricing
+  policy?: ModelServicePolicy
+  rate_multiplier: number
   name: string
   platform: string
   group_id: number

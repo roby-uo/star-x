@@ -20,6 +20,7 @@ import (
 
 // OpenAIRecordUsageInput input for recording usage
 type OpenAIRecordUsageInput struct {
+	MediaTaskID        string
 	Result             *OpenAIForwardResult
 	APIKey             *APIKey
 	User               *User
@@ -161,6 +162,9 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	baseMultiplier := multiplier
 	multiplier, imageMultiplier := computePeakAwareMultipliers(apiKey, baseMultiplier, timezone.Now())
 	videoMultiplier := resolveVideoRateMultiplier(apiKey, baseMultiplier)
+	if result.VideoQuote != nil {
+		videoMultiplier = result.VideoQuote.Multiplier
+	}
 
 	var cost *CostBreakdown
 	var err error
@@ -224,7 +228,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	}
 
 	// Determine billing type
-	isSubscriptionBilling := subscription != nil && apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
+	isSubscriptionBilling := subscription != nil && ((apiKey.Group != nil && apiKey.Group.IsSubscriptionType()) || input.MediaTaskID != "")
 	billingType := BillingTypeBalance
 	if isSubscriptionBilling {
 		billingType = BillingTypeSubscription
@@ -365,6 +369,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	billingErr := func() error {
 		_, err := applyUsageBilling(ctx, requestID, usageLog, &postUsageBillingParams{
 			Cost:                  cost,
+			MediaTaskID:           input.MediaTaskID,
 			User:                  user,
 			APIKey:                apiKey,
 			Account:               account,
@@ -409,6 +414,9 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 	}
 	if isGrokVideoUsageResult(result, billingModels) {
 		if strings.EqualFold(billingModel, "MiniMax-H3") {
+			if result.VideoQuote != nil {
+				return &CostBreakdown{TotalCost: result.VideoQuote.UnitPrice * float64(result.VideoDurationSeconds) * float64(result.VideoCount), ActualCost: result.VideoQuote.Total, BillingMode: string(BillingModeVideo)}, nil
+			}
 			return s.billingService.CalculateVideoCost(billingModel, result.VideoResolution, result.VideoCount, result.VideoDurationSeconds, nil, videoMultiplier), nil
 		}
 		if resolved := s.resolveOpenAIChannelPricing(ctx, billingModel, apiKey); resolved == nil || resolved.Mode != BillingModeToken {

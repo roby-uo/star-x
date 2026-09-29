@@ -61,6 +61,12 @@ type QueryVideoResponse struct {
 	Task VideoTask `json:"task"`
 }
 
+type HTTPError struct{ Status int }
+
+func (e *HTTPError) Error() string {
+	return fmt.Sprintf("MiniMax video API returned HTTP %d", e.Status)
+}
+
 type VideoClient struct {
 	baseURL string
 	http    *http.Client
@@ -187,7 +193,7 @@ func (c *VideoClient) do(ctx context.Context, method, path, apiKey string, body 
 		return errors.New("MiniMax video response too large")
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("MiniMax video API returned HTTP %d", resp.StatusCode)
+		return &HTTPError{Status: resp.StatusCode}
 	}
 	if err := json.Unmarshal(responseBody, out); err != nil {
 		return fmt.Errorf("decode MiniMax video response: %w", err)

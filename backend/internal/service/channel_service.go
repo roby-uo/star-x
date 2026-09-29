@@ -79,6 +79,7 @@ type wildcardMappingEntry struct {
 
 // channelCache 渠道缓存快照（扁平化哈希结构，热路径 O(1) 查找）
 type channelCache struct {
+	loadError error
 	// 热路径查找
 	pricingByGroupModel     map[channelModelKey]*ChannelModelPricing            // (groupID, platform, model) → 定价
 	wildcardByGroupPlatform map[channelGroupPlatformKey][]*wildcardPricingEntry // (groupID, platform) → 通配符定价（按配置顺序，先匹配先使用）
@@ -166,7 +167,7 @@ func NewChannelService(repo ChannelRepository, groupRepo GroupRepository, authCa
 func (s *ChannelService) loadCache(ctx context.Context) (*channelCache, error) {
 	if cached, ok := s.cache.Load().(*channelCache); ok && cached != nil {
 		if time.Since(cached.loadedAt) < channelCacheTTL {
-			return cached, nil
+			return cached, cached.loadError
 		}
 	}
 
@@ -174,7 +175,7 @@ func (s *ChannelService) loadCache(ctx context.Context) (*channelCache, error) {
 		// 双重检查
 		if cached, ok := s.cache.Load().(*channelCache); ok && cached != nil {
 			if time.Since(cached.loadedAt) < channelCacheTTL {
-				return cached, nil
+				return cached, cached.loadError
 			}
 		}
 		return s.buildCache(ctx)
@@ -258,6 +259,7 @@ func expandMappingToCache(cache *channelCache, ch *Channel, gid int64, platform 
 // 通过回退 loadedAt 使剩余 TTL = channelErrorTTL。
 func (s *ChannelService) storeErrorCache() {
 	errorCache := newEmptyChannelCache()
+	errorCache.loadError = fmt.Errorf("channel configuration unavailable")
 	errorCache.loadedAt = time.Now().Add(-(channelCacheTTL - channelErrorTTL))
 	s.cache.Store(errorCache)
 }
@@ -499,6 +501,13 @@ func (s *ChannelService) ResolveChannelMapping(ctx context.Context, groupID int6
 // 返回 true 表示模型被限制（不在允许列表中）。
 // 如果渠道未启用模型限制或分组无渠道关联，返回 false。
 func (s *ChannelService) IsModelRestricted(ctx context.Context, groupID int64, model string) bool {
+	policy, policyErr := s.ResolveModelServicePolicy(ctx, groupID, model)
+	if policyErr != nil {
+		return true
+	}
+	if policy != nil {
+		return policy.State != "published"
+	}
 	lk, err := s.lookupGroupChannel(ctx, groupID)
 	if err != nil {
 		slog.Warn("failed to load channel cache for model restriction check", "group_id", groupID, "error", err)
@@ -711,6 +720,9 @@ func (s *ChannelService) Create(ctx context.Context, input *CreateChannelInput) 
 	}
 	channel.normalizeBillingModelSource()
 
+	if err := ValidateModelServicePolicies(channel.FeaturesConfig); err != nil {
+		return nil, err
+	}
 	if err := validateChannelConfig(channel.ModelPricing, channel.ModelMapping); err != nil {
 		return nil, err
 	}
@@ -755,6 +767,9 @@ func (s *ChannelService) Update(ctx context.Context, id int64, input *UpdateChan
 		return nil, err
 	}
 
+	if err := ValidateModelServicePolicies(channel.FeaturesConfig); err != nil {
+		return nil, err
+	}
 	if err := validateChannelConfig(channel.ModelPricing, channel.ModelMapping); err != nil {
 		return nil, err
 	}

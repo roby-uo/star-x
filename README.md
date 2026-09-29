@@ -13,6 +13,8 @@ star-X is a self-hosted, privately branded distribution for managing authorized 
 #### 新增
 
 - 配置 MiniMax 上游账号后，可调用 MiniMax-H3 生成视频并查询任务结果。
+- 管理端可按模型和分组设置发布状态、图片规格及 H3 视频规格与售价；用户端可选规格、查看报价、生成图片和视频。
+- 增加视频任务历史、余额预占与异常任务处理，以及 API 密钥的模型和视频规格限制。
 
 #### 修复
 

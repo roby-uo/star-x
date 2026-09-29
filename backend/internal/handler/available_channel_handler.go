@@ -25,6 +25,8 @@ type AvailableChannelHandler struct {
 	apiKeyService  *service.APIKeyService
 	settingService *service.SettingService
 	gatewayService *service.GatewayService
+	openAIService  *service.OpenAIGatewayService
+	mediaTasks     *service.MediaTaskService
 }
 
 // NewAvailableChannelHandler 创建用户侧可用渠道 handler。
@@ -33,22 +35,29 @@ func NewAvailableChannelHandler(
 	apiKeyService *service.APIKeyService,
 	settingService *service.SettingService,
 	gatewayService *service.GatewayService,
+	openAIService *service.OpenAIGatewayService,
+	mediaTasks *service.MediaTaskService,
 ) *AvailableChannelHandler {
 	return &AvailableChannelHandler{
 		channelService: channelService,
 		apiKeyService:  apiKeyService,
 		settingService: settingService,
 		gatewayService: gatewayService,
+		openAIService:  openAIService,
+		mediaTasks:     mediaTasks,
 	}
 }
 
 // userAvailableModel is scoped to an accessible group. The catalog is independent
 // of the optional public-channel feature and never exposes upstream accounts.
 type userAvailableModel struct {
-	Name      string `json:"name"`
-	Platform  string `json:"platform"`
-	GroupID   int64  `json:"group_id"`
-	GroupName string `json:"group_name"`
+	Name           string                      `json:"name"`
+	Platform       string                      `json:"platform"`
+	GroupID        int64                       `json:"group_id"`
+	GroupName      string                      `json:"group_name"`
+	Pricing        *userSupportedModelPricing  `json:"pricing,omitempty"`
+	Policy         *service.ModelServicePolicy `json:"policy,omitempty"`
+	RateMultiplier float64                     `json:"rate_multiplier"`
 }
 
 // ListModels returns the gateway's available models for schedulable accounts in
@@ -64,9 +73,32 @@ func (h *AvailableChannelHandler) ListModels(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	response.Success(c, collectUserAvailableModels(groups, func(group service.Group) []string {
+	models := collectUserAvailableModels(groups, func(group service.Group) []string {
 		return h.gatewayService.GetAvailableModels(c.Request.Context(), &group.ID, group.Platform)
-	}))
+	})
+	visible := make([]userAvailableModel, 0, len(models))
+	for _, model := range models {
+		policy, policyErr := h.channelService.ResolveModelServicePolicy(c.Request.Context(), model.GroupID, model.Name)
+		if policyErr != nil {
+			response.ErrorFrom(c, policyErr)
+			return
+		}
+		if policy != nil && policy.State != "published" {
+			continue
+		}
+		model.Policy = policy
+		model.Pricing = toUserPricing(h.channelService.GetChannelModelPricing(c.Request.Context(), model.GroupID, model.Name))
+		for _, group := range groups {
+			if group.ID == model.GroupID {
+				model.RateMultiplier = h.openAIService.ResolveUserGroupRateMultiplier(c.Request.Context(), subject.UserID, group.ID, group.RateMultiplier)
+				if model.Name == "MiniMax-H3" && group.VideoRateIndependent {
+					model.RateMultiplier = group.VideoRateMultiplier
+				}
+			}
+		}
+		visible = append(visible, model)
+	}
+	response.Success(c, visible)
 }
 
 func collectUserAvailableModels(groups []service.Group, modelsForGroup func(service.Group) []string) []userAvailableModel {

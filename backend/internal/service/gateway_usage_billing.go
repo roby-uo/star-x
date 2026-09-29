@@ -70,6 +70,7 @@ type usageLogBestEffortWriter interface {
 
 // postUsageBillingParams 统一扣费所需的参数
 type postUsageBillingParams struct {
+	MediaTaskID           string
 	Cost                  *CostBreakdown
 	User                  *User
 	APIKey                *APIKey
@@ -228,6 +229,7 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 	}
 
 	cmd := &UsageBillingCommand{
+		MediaTaskID:        p.MediaTaskID,
 		RequestID:          requestID,
 		APIKeyID:           p.APIKey.ID,
 		UserID:             p.User.ID,
