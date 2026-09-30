@@ -32,3 +32,13 @@ func TestMiniMaxH3OutputSecondPricing(t *testing.T) {
 	require.InDelta(t, 1.3, high.ActualCost, 1e-10)
 	require.Equal(t, VideoBillingResolution2K, NormalizeVideoBillingResolutionOrDefault("2K"))
 }
+
+func TestMiniMaxH3MaxOutputSecondPricing(t *testing.T) {
+	billing := newTestBillingService()
+	low := billing.CalculateVideoCost("MiniMax-H3-Max", "480P", 1, 5, nil, 1.4)
+	high := billing.CalculateVideoCost("MiniMax-H3-Max", "768P", 1, 15, nil, 1.4)
+	require.InDelta(t, .25, low.TotalCost, 1e-10)
+	require.InDelta(t, .35, low.ActualCost, 1e-10)
+	require.InDelta(t, 1.2, high.TotalCost, 1e-10)
+	require.InDelta(t, 1.68, high.ActualCost, 1e-10)
+}

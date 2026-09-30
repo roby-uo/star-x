@@ -40,3 +40,29 @@ func TestModelAccessGuardEnforcesHTTPAndWebSocket(t *testing.T) {
 		})
 	}
 }
+
+func TestMiniMaxMaxShortcutCannotBypassKeyVideoRestrictions(t *testing.T) {
+	for _, tc := range []struct {
+		name, rules string
+		allowed     bool
+	}{
+		{"allowed", `{"restrict_models":true,"models":["MiniMax-H3-Max"],"video_resolutions":["768P"],"video_max_duration":5}`, true},
+		{"default-duration-exceeds-key", `{"video_max_duration":4}`, false},
+		{"default-resolution-denied", `{"video_resolutions":["480P"]}`, false},
+		{"h3-whitelist-is-not-max", `{"restrict_models":true,"models":["MiniMax-H3"]}`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			require.NoError(t, err)
+			defer db.Close()
+			tasks := service.NewMediaTaskService(db, nil, nil, &service.OpenAIGatewayService{})
+			defer tasks.Stop()
+			mock.ExpectQuery("SELECT rules FROM api_key_model_access").WithArgs(int64(1)).WillReturnRows(sqlmock.NewRows([]string{"rules"}).AddRow(tc.rules))
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos/generations", strings.NewReader(`{"model":"MiniMax-H3-Max","prompt":"sunrise"}`))
+			c.Request.Header.Set("Content-Type", "application/json")
+			require.Equal(t, tc.allowed, ModelAccessCheck(tasks)(c, &service.APIKey{ID: 1}))
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}

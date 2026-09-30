@@ -14,6 +14,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/minimax"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"go.uber.org/zap"
 )
@@ -198,6 +199,11 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		}
 	}
 	longContextBillingEnabled := billingAccount.IsOpenAILongContextBillingEnabled()
+	miniMaxPriority := miniMaxM3PriorityBilling(billingAccount, result, serviceTier)
+	billingServiceTier := serviceTier
+	if miniMaxPriority {
+		billingServiceTier = ""
+	}
 	cost, err = s.calculateOpenAIRecordUsageCost(
 		ctx,
 		result,
@@ -208,7 +214,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		videoMultiplier,
 		baseMultiplier,
 		tokens,
-		serviceTier,
+		billingServiceTier,
 		longContextBillingEnabled,
 	)
 	if err != nil {
@@ -225,6 +231,9 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 			zap.Int64("account_id", account.ID),
 		).Warn("openai_usage.pricing_missing_record_zero_cost", zap.Error(err))
 		cost = &CostBreakdown{BillingMode: string(BillingModeToken)}
+	}
+	if miniMaxPriority {
+		applyMiniMaxM3PriorityCost(cost)
 	}
 
 	// Determine billing type
@@ -413,7 +422,7 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 		return s.billingService.CalculateWebSearchCost(result.WebSearchCalls, webSearchPricePerCallFromAPIKey(apiKey), webSearchMultiplier), nil
 	}
 	if isGrokVideoUsageResult(result, billingModels) {
-		if strings.EqualFold(billingModel, "MiniMax-H3") {
+		if minimax.IsVideoModel(billingModel) {
 			if result.VideoQuote != nil {
 				return &CostBreakdown{TotalCost: result.VideoQuote.UnitPrice * float64(result.VideoDurationSeconds) * float64(result.VideoCount), ActualCost: result.VideoQuote.Total, BillingMode: string(BillingModeVideo)}, nil
 			}
@@ -460,7 +469,7 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 
 func isGrokVideoBillingModel(model string) bool {
 	model = strings.ToLower(strings.TrimSpace(model))
-	return strings.HasPrefix(model, "grok-imagine-video") || model == "minimax-h3"
+	return strings.HasPrefix(model, "grok-imagine-video") || minimax.IsVideoModel(model)
 }
 
 func isGrokVideoUsageResult(result *OpenAIForwardResult, billingModels []string) bool {

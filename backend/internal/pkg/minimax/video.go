@@ -9,11 +9,37 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 )
 
 const DefaultVideoBaseURL = "https://api.minimax.cn"
 const maxVideoResponseBytes = 2 << 20
+
+// VideoModelSpec describes the generation models supported by this adapter.
+// Prices are the global API's USD list prices per output second, not CN costs.
+type VideoModelSpec struct {
+	Resolutions []string
+	MinDuration int
+	MaxDuration int
+	PricesUSD   map[string]float64
+}
+
+func VideoModelSpecFor(model string) (VideoModelSpec, bool) {
+	switch strings.ToLower(strings.TrimSpace(model)) {
+	case "minimax-h3":
+		return VideoModelSpec{Resolutions: []string{"768P", "2K"}, MinDuration: 4, MaxDuration: 15, PricesUSD: map[string]float64{"768P": .08, "2K": .13}}, true
+	case "minimax-h3-max":
+		return VideoModelSpec{Resolutions: []string{"480P", "768P"}, MinDuration: 5, MaxDuration: 15, PricesUSD: map[string]float64{"480P": .05, "768P": .08}}, true
+	default:
+		return VideoModelSpec{}, false
+	}
+}
+
+func IsVideoModel(model string) bool {
+	_, ok := VideoModelSpecFor(model)
+	return ok
+}
 
 type MediaURL struct {
 	URL string `json:"url"`
@@ -89,14 +115,15 @@ func NewVideoClient(baseURL string, httpClient *http.Client) (*VideoClient, erro
 }
 
 func (r CreateVideoRequest) Validate() error {
-	if r.Model != "MiniMax-H3" {
-		return errors.New("model must be MiniMax-H3")
+	if r.Model != "MiniMax-H3" && r.Model != "MiniMax-H3-Max" {
+		return errors.New("model must be MiniMax-H3 or MiniMax-H3-Max")
 	}
-	if r.Resolution != "768P" && r.Resolution != "2K" {
-		return errors.New("resolution must be 768P or 2K")
+	spec, _ := VideoModelSpecFor(r.Model)
+	if !slices.Contains(spec.Resolutions, r.Resolution) {
+		return fmt.Errorf("%s resolution must be %s", r.Model, strings.Join(spec.Resolutions, " or "))
 	}
-	if r.Duration < 4 || r.Duration > 15 {
-		return errors.New("duration must be between 4 and 15 seconds")
+	if r.Duration < spec.MinDuration || r.Duration > spec.MaxDuration {
+		return fmt.Errorf("%s duration must be between %d and %d seconds", r.Model, spec.MinDuration, spec.MaxDuration)
 	}
 	hasPrompt := false
 	hasMedia := false

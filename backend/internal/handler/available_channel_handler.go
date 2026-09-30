@@ -3,6 +3,7 @@ package handler
 import (
 	"sort"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/minimax"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -91,7 +92,7 @@ func (h *AvailableChannelHandler) ListModels(c *gin.Context) {
 		for _, group := range groups {
 			if group.ID == model.GroupID {
 				model.RateMultiplier = h.openAIService.ResolveUserGroupRateMultiplier(c.Request.Context(), subject.UserID, group.ID, group.RateMultiplier)
-				if model.Name == "MiniMax-H3" && group.VideoRateIndependent {
+				if minimax.IsVideoModel(model.Name) && group.VideoRateIndependent {
 					model.RateMultiplier = group.VideoRateMultiplier
 				}
 			}

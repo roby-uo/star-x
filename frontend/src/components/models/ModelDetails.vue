@@ -46,7 +46,7 @@
           <p v-else-if="!selectedKey" class="rounded-xl bg-gray-50 p-4 text-sm text-gray-500 dark:bg-dark-900">请选择可用的调用密钥后开始测试。</p>
           <TextModelTester v-else-if="item.type === 'Chat'" :key="contextId" :model="model" :api-key="selectedKey.key" @busy="busy = $event" />
           <ImageWorkbench v-else-if="item.type === 'Images' && ['openai', 'grok'].includes(model.platform)" :key="contextId" embedded :model="model" :selected-key-id="selectedKey.id" :context-keys="keys" @busy="busy = $event" />
-          <VideoWorkbench v-else-if="item.type === 'Videos' && item.name === 'MiniMax-H3' && model.platform === 'openai'" :key="contextId" embedded :model="model" :selected-key-id="selectedKey.id" :context-keys="keys" @busy="busy = $event" />
+          <VideoWorkbench v-else-if="item.type === 'Videos' && miniMaxVideoSpec(item.name) && model.platform === 'openai'" :key="contextId" embedded :model="model" :selected-key-id="selectedKey.id" :context-keys="keys" @busy="busy = $event" />
           <p v-else class="rounded-xl bg-gray-50 p-4 text-sm text-gray-500 dark:bg-dark-900">此模型暂不支持页面内测试，请使用 API 接入示例调用。</p>
         </section>
       </div>
@@ -65,6 +65,7 @@ import { useAppStore } from '@/stores/app'
 import type { ApiKey } from '@/types'
 import { catalogModelEndpoint } from '@/utils/modelCatalog'
 import { isSeedreamModel } from '@/utils/modelTest'
+import { miniMaxVideoSpec } from '@/utils/minimaxVideo'
 import { buildTextRequest, catalogTypeLabels, modelSupplier, protocolLabel, type UserCatalogItem } from './userModelCatalog'
 const props = withDefaults(defineProps<{ item: UserCatalogItem; initialTab?: 'api' | 'test' }>(), { initialTab: 'api' })
 const emit = defineEmits<{ close: [] }>()
@@ -103,8 +104,9 @@ const example = computed(() => {
   const content: Record<string, unknown>[] = [{ type: 'text', text: '一只猫在阳光下缓慢走过花园' }]
   if (mode !== 'text') content.push({ type: 'image_url', role: 'first_frame', image_url: { url: 'https://example.com/first-frame.png' } })
   if (mode === 'first_last_frame') content.push({ type: 'image_url', role: 'last_frame', image_url: { url: 'https://example.com/last-frame.png' } })
-  const payload = { model: selectedModel.name, resolution: selectedModel.policy?.resolutions?.[0] || '768P', duration: Math.max(4, selectedModel.policy?.min_duration || 4), ratio: mode === 'text' ? '16:9' : 'adaptive', content }
-  if (selectedModel.name === 'MiniMax-H3') {
+  const spec = miniMaxVideoSpec(selectedModel.name)
+  const payload = { model: selectedModel.name, resolution: spec?.resolutions.find(value => !selectedModel.policy?.resolutions || selectedModel.policy.resolutions.includes(value)) || '', duration: Math.max(spec?.minDuration || 0, selectedModel.policy?.min_duration || 0), ratio: mode === 'text' ? '16:9' : 'adaptive', content }
+  if (spec && selectedModel.platform === 'openai') {
     return `# 1. 获取本次请求的报价版本\n${curl('/v2/video_generation/quote', payload)}\n\n# 2. 将响应的 version 填入 X-Video-Quote；同一次请求始终使用同一 Idempotency-Key\n${curl('/v2/video_generation', payload, { 'X-Video-Quote': 'QUOTE_VERSION', 'Idempotency-Key': 'YOUR_UNIQUE_REQUEST_ID' })}\n\n# 3. 保存创建响应的 task_id，查询生成状态\ncurl '${origin.value}/v2/query/video_generation/TASK_ID' \\\n  -H 'Authorization: Bearer YOUR_API_KEY'`
   }
   return curl(endpoint.value, { model: selectedModel.name, prompt: '一只猫在阳光下缓慢走过花园' }) + `\n\n# 保存创建响应的 request_id，查询生成状态\ncurl '${origin.value}/v1/videos/REQUEST_ID' \\\n  -H 'Authorization: Bearer YOUR_API_KEY'`

@@ -81,8 +81,12 @@ func (h *OpenAIGatewayHandler) MiniMaxVideoGeneration(c *gin.Context) {
 			}
 		}
 	}
-	if err := input.Validate(); err != nil || !miniMaxPublicContentAllowed(input.Content) {
-		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "MiniMax-H3 requires a text prompt and supports up to two first/last-frame images at 768P or 2K")
+	if err := input.Validate(); err != nil {
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		return
+	}
+	if !miniMaxPublicContentAllowed(input.Content) {
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "MiniMax video generation supports a text prompt and up to two first/last-frame images")
 		return
 	}
 	if h.mediaTasks != nil && c.GetHeader("Idempotency-Key") != "" {
@@ -129,7 +133,7 @@ func (h *OpenAIGatewayHandler) MiniMaxVideoGeneration(c *gin.Context) {
 		var err error
 		selection, _, err = h.gatewayService.SelectAccountWithSchedulerForCapability(ctx, apiKey.GroupID, "", "", input.Model, failed, service.OpenAIUpstreamTransportHTTPSSE, "", false, false, false, service.PlatformOpenAI)
 		if err != nil || selection == nil || selection.Account == nil {
-			h.errorResponse(c, http.StatusServiceUnavailable, "no_available_account", "No MiniMax-H3 account is available in this group")
+			h.errorResponse(c, http.StatusServiceUnavailable, "no_available_account", "No account for the requested MiniMax video model is available in this group")
 			return
 		}
 		account = selection.Account

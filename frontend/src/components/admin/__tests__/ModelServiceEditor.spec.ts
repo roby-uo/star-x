@@ -94,4 +94,27 @@ describe('model service publishing flow', () => {
     }))
     wrapper.unmount()
   })
+
+  it('publishes H3-Max with independent specs and prices while preserving H3 configuration', async () => {
+    const original = channel()
+    const h3 = { model: 'MiniMax-H3', platform: 'openai', kind: 'video', state: 'published', resolutions: ['2K'], min_duration: 4, max_duration: 15, prices: { '2K': 0.13 } }
+    original.features_config = { model_services: [h3] }
+    vi.mocked(channelsAPI.getById).mockResolvedValue(original)
+    const wrapper = mount(ModelServiceEditor, { props: { model: 'MiniMax-H3-Max', platform: 'openai', kind: 'video', channels: [original], accounts: [{ id: 1, name: 'MiniMax', platform: 'openai', status: 'active', schedulable: true, group_ids: [1], configured_models: { 'MiniMax-H3-Max': 'MiniMax-H3-Max' } }] as Account[] }, global: { plugins: [createI18n({ legacy: false, locale: 'zh', messages: { zh: {} } })], stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+    await flushPromises()
+    expect(wrapper.find('[aria-label="480P 每秒基础售价"]').exists()).toBe(true)
+    expect(wrapper.find('[aria-label="2K 每秒基础售价"]').exists()).toBe(false)
+    const durationFields = wrapper.findAll('input[type="number"][max="15"]')
+    expect(durationFields.every(field => field.attributes('min') === '5')).toBe(true)
+    await durationFields[0]!.setValue(4)
+    await wrapper.findAll('button').find(button => button.text() === '预览并应用')!.trigger('click')
+    expect(wrapper.get('[role="alert"]').text()).toContain('5–15 秒')
+    expect(wrapper.find('[role="alertdialog"]').exists()).toBe(false)
+    await durationFields[0]!.setValue(5)
+    await wrapper.findAll('button').find(button => button.text() === '预览并应用')!.trigger('click')
+    await wrapper.findAll('button').find(button => button.text() === '确认')!.trigger('click')
+    await flushPromises()
+    expect(channelsAPI.update).toHaveBeenCalledWith(4, { features_config: { model_services: [h3, expect.objectContaining({ model: 'MiniMax-H3-Max', resolutions: ['480P', '768P'], min_duration: 5, prices: { '480P': 0.05, '768P': 0.08 }, state: 'published' })] } })
+    wrapper.unmount()
+  })
 })

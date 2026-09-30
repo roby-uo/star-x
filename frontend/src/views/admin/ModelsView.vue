@@ -71,6 +71,7 @@ import { catalogModelProvider, catalogModelType, isAudioModel, type CatalogModel
 import { configuredModelOpen, modelPolicy, modelPricing } from '@/components/admin/modelServiceAdmin'
 import type { ModelServicePolicy } from '@/types/modelService'
 import { formatScaled } from '@/utils/pricing'
+import { miniMaxVideoSpec } from '@/utils/minimaxVideo'
 
 type ModelStatus = 'open' | 'partial' | 'paused' | 'draft' | 'unassigned'
 type ModelRow = { key: string; model: string; type: CatalogModelType; platform: string; accounts: string; sources: Account[]; groupNames: string[]; status: ModelStatus; legacy: boolean; specs: string; price: string }
@@ -124,8 +125,9 @@ const rows = computed<ModelRow[]>(() => {
       : policies.some(({ channel, policy }) => channel.status !== 'active' || policy.state === 'paused') ? 'paused'
       : policies.some(({ policy }) => policy.state === 'draft') ? 'draft' : 'unassigned'
     const selectedPolicies = policies.map(item => item.policy)
+    const videoSpec = entry.platform === 'openai' ? miniMaxVideoSpec(entry.model) : undefined
     const specs = modelType === 'Videos'
-      ? selectedPolicies.length ? [...new Set(selectedPolicies.flatMap(policy => policy.resolutions || []))].join(' / ') + ' · ' + `${Math.min(...selectedPolicies.map(policy => policy.min_duration || 4))}–${Math.max(...selectedPolicies.map(policy => policy.max_duration || 15))} 秒` : entry.model === 'MiniMax-H3' ? '768P / 2K · 4–15 秒' : '沿用上游规格'
+      ? selectedPolicies.length ? [...new Set(selectedPolicies.flatMap(policy => policy.resolutions || []))].join(' / ') + ' · ' + `${Math.min(...selectedPolicies.map(policy => policy.min_duration || videoSpec?.minDuration || 4))}–${Math.max(...selectedPolicies.map(policy => policy.max_duration || videoSpec?.maxDuration || 15))} 秒` : videoSpec ? `${videoSpec.resolutions.join(' / ')} · ${videoSpec.minDuration}–${videoSpec.maxDuration} 秒` : '沿用上游规格'
       : modelType === 'Images' ? [...new Set(selectedPolicies.flatMap(policy => policy.image_sizes || []))].join(' / ') || '沿用上游图片规格' : '文本输入与输出'
     const pricingEntries = channels.value.flatMap(channel => { const pricing = modelPricing(channel, entry.model, entry.platform); return pricing ? [pricing] : [] })
     const summaries = modelType === 'Videos' ? [...new Set(selectedPolicies.map(policy => (policy.resolutions || []).map(resolution => `${resolution} ${formatScaled(policy.prices?.[resolution] ?? null, 1)}/秒`).join(' · ')).filter(Boolean))] : [...new Set(pricingEntries.map(pricing => pricing.intervals.length ? '已配置分档价格' : pricing.billing_mode === 'token' ? `输入 ${formatScaled(pricing.input_price, 1_000_000)} · 输出 ${formatScaled(pricing.output_price, 1_000_000)}/百万词元` : `${formatScaled(pricing.per_request_price, 1)}/${pricing.billing_mode === 'image' ? '张' : '次'}`))]

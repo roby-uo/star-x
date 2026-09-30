@@ -105,6 +105,9 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 		return nil, policyErr
 	}
 	upstreamBody = updatedBody
+	if isMiniMaxM3Account(account, upstreamModel) {
+		serviceTier = extractOpenAIServiceTierFromBody(upstreamBody)
+	}
 
 	// Grok Composer does not accept image_url parts directly, but Grok Build
 	// can describe the images first. Bridge only this exact failure mode.

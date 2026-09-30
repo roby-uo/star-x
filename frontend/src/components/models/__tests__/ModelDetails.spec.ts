@@ -59,4 +59,18 @@ describe('model connection details', () => {
     expect(wrapper.findComponent({ name: 'VideoWorkbench' }).props('selectedKeyId')).toBe(20)
     wrapper.unmount()
   })
+
+  it('offers H3-Max API generation and testing with its own minimum specification', async () => {
+    const maxItem = aggregateUserModels([{ name: 'MiniMax-H3-Max', platform: 'openai', group_id: 1, group_name: '普通用户', rate_multiplier: 1 }])[0]
+    const wrapper = mount(ModelDetails, { props: { item: maxItem, initialTab: 'test' }, global: { stubs: { RouterLink: { template: '<a><slot /></a>' }, VideoWorkbench: workbench } } })
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'VideoWorkbench' }).props('model').name).toBe('MiniMax-H3-Max')
+    const example = wrapper.get('pre').text()
+    expect(example).toContain('/v2/video_generation/quote')
+    expect(example).toContain('"resolution": "480P"')
+    expect(example).toContain('"duration": 5')
+    expect(example).not.toContain('"duration": 4')
+    expect(wrapper.text()).not.toContain('价格与限制')
+    wrapper.unmount()
+  })
 })

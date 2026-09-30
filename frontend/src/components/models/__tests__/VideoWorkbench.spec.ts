@@ -79,6 +79,33 @@ describe('VideoWorkbench', () => {
     expect(wrapper.find('[aria-label="本次测试结果"]').exists()).toBe(false)
   })
 
+  it('uses H3-Max capabilities and never offers H3-only specs even with an outdated policy', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { restrict_models: false } })
+    const fetchMock = vi.fn().mockResolvedValueOnce(reply(quote)).mockResolvedValueOnce(reply({ task_id: 'max-task', state: 'queued' }))
+    vi.stubGlobal('fetch', fetchMock)
+    const wrapper = create({ model: { ...model, name: 'MiniMax-H3-Max', policy: { resolutions: ['480P', '768P', '2K'], min_duration: 4, max_duration: 15, modes: ['text', 'first_frame', 'first_last_frame', 'reference'] } } })
+    await prepare(wrapper)
+    const selects = wrapper.findAll('select')
+    expect(selects[2]!.findAll('option').map(option => option.text())).toEqual(['480P', '768P'])
+    expect(selects[3]!.findAll('option').map(option => option.text())).toEqual(Array.from({ length: 11 }, (_, index) => String(index + 5)))
+    expect(selects[1]!.findAll('option').map(option => option.attributes('value'))).toEqual(['text', 'first_frame', 'first_last_frame'])
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(JSON.parse(fetchMock.mock.calls[1]![1].body)).toMatchObject({ model: 'MiniMax-H3-Max', resolution: '480P', duration: 5 })
+  })
+
+  it('blocks a Max test when key permissions only allow incompatible resolutions or durations', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { restrict_models: false, video_resolutions: ['2K'], video_max_duration: 4 } })
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const wrapper = create({ model: { ...model, name: 'MiniMax-H3-Max' } })
+    await prepare(wrapper)
+    await wrapper.find('form').trigger('submit')
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(startButton(wrapper).attributes('disabled')).toBeDefined()
+    expect(wrapper.findAll('select')[2]!.findAll('option')).toHaveLength(0)
+  })
+
   it('queries the accepted task with the original key and stops automatic polling at completion', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(reply(quote))

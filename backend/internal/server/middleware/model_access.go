@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/minimax"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
@@ -84,7 +85,7 @@ func ModelAccessCheck(tasks *service.MediaTaskService) func(*gin.Context, *servi
 		}
 		resolution := gjson.GetBytes(body, "resolution").String()
 		duration := int(gjson.GetBytes(body, "duration").Int())
-		if model == "MiniMax-H3" {
+		if minimax.IsVideoModel(model) {
 			if duration == 0 {
 				duration = 5
 			}

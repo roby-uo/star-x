@@ -75,18 +75,19 @@ func ValidateModelServicePolicies(config map[string]any) error {
 		if p.Kind != "video" {
 			continue
 		}
-		if p.Model != "MiniMax-H3" || p.Platform != PlatformOpenAI {
-			return invalid("规格定价目前仅支持已适配的 MiniMax-H3；其他视频模型沿用原有配置")
+		spec, supported := minimax.VideoModelSpecFor(p.Model)
+		if !supported || (p.Model != "MiniMax-H3" && p.Model != "MiniMax-H3-Max") || p.Platform != PlatformOpenAI {
+			return invalid("规格定价目前仅支持 MiniMax-H3 和 MiniMax-H3-Max；其他视频模型沿用原有配置")
 		}
-		if p.MinDuration < 4 || p.MaxDuration > 15 || p.MaxDuration < p.MinDuration {
-			return invalid("H3 时长须在 4–15 秒内")
+		if p.MinDuration < spec.MinDuration || p.MaxDuration > spec.MaxDuration || p.MaxDuration < p.MinDuration {
+			return invalid(fmt.Sprintf("%s 时长须在 %d–%d 秒内", p.Model, spec.MinDuration, spec.MaxDuration))
 		}
 		if len(p.Resolutions) == 0 || len(p.Modes) == 0 {
 			return invalid("请选择分辨率及生成方式")
 		}
 		for _, resolution := range p.Resolutions {
 			price, ok := p.Prices[resolution]
-			if !slices.Contains([]string{"768P", "2K"}, resolution) || !ok || price < 0 || math.IsNaN(price) || math.IsInf(price, 0) {
+			if !slices.Contains(spec.Resolutions, resolution) || !ok || price < 0 || math.IsNaN(price) || math.IsInf(price, 0) {
 				return invalid("每个开放分辨率都必须配置有效的每秒价格")
 			}
 		}
@@ -168,16 +169,19 @@ func (s *ChannelService) ResolveModelServicePolicy(ctx context.Context, groupID 
 	return nil, nil
 }
 
-func (s *OpenAIGatewayService) MiniMaxServicePolicy(ctx context.Context, key *APIKey) (*ModelServicePolicy, error) {
+func (s *OpenAIGatewayService) MiniMaxServicePolicy(ctx context.Context, key *APIKey, model string) (*ModelServicePolicy, error) {
 	if key == nil || key.GroupID == nil || key.Group == nil {
 		return nil, fmt.Errorf("需要绑定分组")
 	}
-	return s.channelService.ResolveModelServicePolicy(ctx, *key.GroupID, "MiniMax-H3")
+	return s.channelService.ResolveModelServicePolicy(ctx, *key.GroupID, model)
 }
 
 func (p *ModelServicePolicy) ValidateVideo(input minimax.CreateVideoRequest) error {
 	if p == nil {
 		return nil
+	}
+	if p.Kind != "video" || !strings.EqualFold(p.Model, input.Model) {
+		return fmt.Errorf("视频模型与服务配置不匹配")
 	}
 	if p.State != "published" {
 		return fmt.Errorf("该分组尚未开放此视频服务")
@@ -220,7 +224,10 @@ type VideoQuote struct {
 }
 
 func (s *OpenAIGatewayService) QuoteMiniMaxVideo(ctx context.Context, key *APIKey, input minimax.CreateVideoRequest) (*VideoQuote, error) {
-	policy, err := s.MiniMaxServicePolicy(ctx, key)
+	if err := input.Validate(); err != nil {
+		return nil, err
+	}
+	policy, err := s.MiniMaxServicePolicy(ctx, key, input.Model)
 	if err != nil {
 		return nil, err
 	}
@@ -230,10 +237,8 @@ func (s *OpenAIGatewayService) QuoteMiniMaxVideo(ctx context.Context, key *APIKe
 	if policy == nil && !GroupAllowsImageGeneration(key.Group) {
 		return nil, fmt.Errorf("该分组尚未开放视频生成")
 	}
-	price := 0.08
-	if input.Resolution == "2K" {
-		price = 0.13
-	}
+	spec, _ := minimax.VideoModelSpecFor(input.Model)
+	price := spec.PricesUSD[input.Resolution]
 	if policy != nil {
 		var ok bool
 		price, ok = policy.Prices[input.Resolution]

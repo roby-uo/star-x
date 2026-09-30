@@ -1,4 +1,5 @@
 import { isSeedreamModel } from './modelTest'
+import { miniMaxVideoSpec } from './minimaxVideo'
 
 export type CatalogModelType = 'Chat' | 'Images' | 'Videos'
 
@@ -16,7 +17,7 @@ export function catalogModelEndpoint(type: CatalogModelType, platform?: string, 
   if (type === 'Images') return '/v1/images/generations'
   if (type === 'Videos') {
     if (platform === 'grok') return '/v1/videos/generations'
-    return model === 'MiniMax-H3' ? '/v2/video_generation' : '暂未适配'
+    return platform === 'openai' && miniMaxVideoSpec(model) ? '/v2/video_generation' : '暂未适配'
   }
   if (platform === 'anthropic' || (platform === 'antigravity' && /claude/i.test(model || ''))) return '/v1/messages'
   if (platform === 'gemini' || platform === 'antigravity') return `/v1beta/models/${encodeURIComponent(model || '{model}')}:generateContent`

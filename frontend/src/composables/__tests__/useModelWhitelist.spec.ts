@@ -27,6 +27,10 @@ describe('useModelWhitelist', () => {
     for (const baseUrl of ['https://api.minimax.cn/v1', 'https://api.minimax.io']) {
       const models = getModelsByPlatform('openai', { type: 'apikey', baseUrl })
       expect(models).toContain('MiniMax-H3')
+      expect(models).toContain('MiniMax-H3-Max')
+      expect(models).toContain('MiniMax-M3')
+      expect(models).toContain('MiniMax-M2.7')
+      expect(models).not.toContain('MiniMax-M3.1-Flash-Preview')
       expect(models).not.toContain('gpt-5.4')
     }
     expect(getModelsByPlatform('openai', { type: 'oauth', baseUrl: 'https://api.minimax.cn/v1' })).not.toContain('MiniMax-H3')

@@ -15,6 +15,9 @@ describe('model catalog classification', () => {
     expect(catalogModelEndpoint('Images')).toBe('/v1/images/generations')
     expect(catalogModelEndpoint('Videos', 'grok')).toBe('/v1/videos/generations')
     expect(catalogModelEndpoint('Videos', 'openai', 'MiniMax-H3')).toBe('/v2/video_generation')
+    expect(catalogModelEndpoint('Videos', 'openai', 'MiniMax-H3-Max')).toBe('/v2/video_generation')
+    expect(catalogModelEndpoint('Videos', 'openai', 'MiniMax-H3-Max-preview')).toBe('暂未适配')
+    expect(catalogModelEndpoint('Videos', 'anthropic', 'MiniMax-H3-Max')).toBe('暂未适配')
     expect(catalogModelEndpoint('Videos', 'openai', 'other-video')).toBe('暂未适配')
   })
 

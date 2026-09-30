@@ -22,9 +22,9 @@
           <form id="service-form" @submit.prevent="prepare('apply')">
             <section v-if="activeTab === 'specs'" class="space-y-5">
               <div><h3 class="font-semibold text-gray-900 dark:text-white">规格与基础售价</h3><p class="mt-1 text-xs text-gray-500">统一使用美元。这里只维护基础售价，倍率在“分组与倍率”中管理。</p></div>
-              <template v-if="kind === 'video' && model === 'MiniMax-H3'">
-                <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-dark-600"><table class="w-full text-sm"><thead class="bg-gray-50 text-left text-gray-500 dark:bg-dark-900/30"><tr><th class="px-4 py-3">开放规格</th><th class="px-4 py-3">基础售价（USD / 秒）</th></tr></thead><tbody><tr v-for="resolution in ['768P', '2K']" :key="resolution" class="border-t border-gray-100 dark:border-dark-700"><td class="px-4 py-3"><label class="inline-flex items-center gap-2"><input v-model="policy.resolutions" type="checkbox" :value="resolution" />{{ resolution }}</label></td><td class="px-4 py-3"><input v-model.number="prices[resolution]" class="input max-w-48" type="number" min="0" step="any" :disabled="!policy.resolutions?.includes(resolution)" :aria-label="`${resolution} 每秒基础售价`" /></td></tr></tbody></table></div>
-                <div class="grid grid-cols-2 gap-4"><label class="text-sm">最短时长（秒）<input v-model.number="policy.min_duration" type="number" min="4" max="15" class="input mt-1" /></label><label class="text-sm">最长时长（秒）<input v-model.number="policy.max_duration" type="number" min="4" max="15" class="input mt-1" /></label></div>
+              <template v-if="kind === 'video' && videoSpec">
+                <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-dark-600"><table class="w-full text-sm"><thead class="bg-gray-50 text-left text-gray-500 dark:bg-dark-900/30"><tr><th class="px-4 py-3">开放规格</th><th class="px-4 py-3">基础售价（USD / 秒）</th></tr></thead><tbody><tr v-for="resolution in videoSpec.resolutions" :key="resolution" class="border-t border-gray-100 dark:border-dark-700"><td class="px-4 py-3"><label class="inline-flex items-center gap-2"><input v-model="policy.resolutions" type="checkbox" :value="resolution" />{{ resolution }}</label></td><td class="px-4 py-3"><input v-model.number="prices[resolution]" class="input max-w-48" type="number" min="0" step="any" :disabled="!policy.resolutions?.includes(resolution)" :aria-label="`${resolution} 每秒基础售价`" /></td></tr></tbody></table></div>
+                <div class="grid grid-cols-2 gap-4"><label class="text-sm">最短时长（秒）<input v-model.number="policy.min_duration" type="number" :min="videoSpec.minDuration" :max="videoSpec.maxDuration" class="input mt-1" /></label><label class="text-sm">最长时长（秒）<input v-model.number="policy.max_duration" type="number" :min="videoSpec.minDuration" :max="videoSpec.maxDuration" class="input mt-1" /></label></div>
                 <div><p class="input-label">生成方式</p><div class="flex flex-wrap gap-4"><label v-for="mode in videoModes" :key="mode.value" class="inline-flex items-center gap-2 text-sm"><input v-model="policy.modes" type="checkbox" :value="mode.value" />{{ mode.label }}</label></div></div>
                 <p class="text-xs text-gray-500">以上为对外售价，不是采购成本。未配置服务规则时沿用系统默认规格与定价。</p>
               </template>
@@ -95,6 +95,7 @@ import type { Account, AdminGroup } from '@/types'
 import { defaultModelPolicy, videoModes, type ModelServicePolicy, type ModelServiceRule } from '@/types/modelService'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { catalogModelProvider } from '@/utils/modelCatalog'
+import { miniMaxVideoSpec } from '@/utils/minimaxVideo'
 import { formatScaled } from '@/utils/pricing'
 import IntervalRow from '@/components/admin/channel/IntervalRow.vue'
 import { apiIntervalsToForm, formIntervalsToAPI, mTokToPerToken, perTokenToMTok, toNullableNumber, validateIntervals, type PricingFormEntry } from '@/components/admin/channel/types'
@@ -113,7 +114,8 @@ const policy = ref(defaultModelPolicy(props.model, props.platform, props.kind))
 const initialPolicy = ref(defaultModelPolicy(props.model, props.platform, props.kind))
 const scopeSnapshot = ref('')
 const rules = ref<Record<string, ModelServiceRule>>({})
-const prices = ref<Record<string, number>>({ '768P': 0.08, '2K': 0.13 })
+const videoSpec = computed(() => props.platform === 'openai' ? miniMaxVideoSpec(props.model) : undefined)
+const prices = ref<Record<string, number>>({ ...videoSpec.value?.prices })
 const imageSizes = ref('')
 const customPricing = ref(false)
 const newName = ref(`${props.model} 服务`)
@@ -127,7 +129,7 @@ const unassignedGroups = computed(() => groups.value.filter(group => group.platf
 const eligibleGroups = computed(() => groups.value.filter(group => group.platform === props.platform && currentChannel.value?.group_ids.includes(group.id)))
 const hasWildcardPrice = computed(() => !!currentChannel.value && !modelPricing(currentChannel.value, props.model, props.platform) && !!wildcardPricing(currentChannel.value, props.model, props.platform))
 const kindLabel = computed(() => ({ chat: '文本', image: '图片', video: '视频' })[props.kind])
-const unsupportedVideo = computed(() => props.kind === 'video' && (props.model !== 'MiniMax-H3' || props.platform !== 'openai'))
+const unsupportedVideo = computed(() => props.kind === 'video' && !videoSpec.value)
 const currentStateLabel = computed(() => ({ draft: '草稿', published: '已开放', paused: '已暂停' })[initialPolicy.value.state])
 const canSaveDraft = computed(() => initialPolicy.value.state === 'draft')
 const applyLabel = computed(() => initialPolicy.value.state === 'published' ? '预览并应用' : initialPolicy.value.state === 'paused' ? '预览并恢复' : '预览并发布')
@@ -167,10 +169,10 @@ function selectChannel() {
     base.state = currentlyAvailable ? 'published' : 'draft'
   }
   policy.value = base
-  prices.value = { '768P': 0.08, '2K': 0.13, ...base.prices }
+  prices.value = { ...videoSpec.value?.prices, ...base.prices }
   rules.value = Object.fromEntries(eligibleGroups.value.map(group => [group.id, clone(base.groups?.[group.id] || {
     enabled: existing ? base.groups == null : legacyGroupOpen(group),
-    resolutions: [...(base.resolutions || ['768P', '2K'])], max_duration: base.max_duration || 15, modes: [...(base.modes || ['text', 'first_frame', 'first_last_frame'])]
+    resolutions: [...(base.resolutions || videoSpec.value?.resolutions || [])], max_duration: base.max_duration || videoSpec.value?.maxDuration || 15, modes: [...(base.modes || videoSpec.value?.modes || [])]
   })]))
   initialPolicy.value = clone({ ...base, groups: { ...base.groups, ...rules.value } })
   imageSizes.value = base.image_sizes?.join(',') || ''
@@ -203,7 +205,8 @@ function prepare(action: 'apply' | 'draft' | 'pause') {
   }
   if (action !== 'pause' && props.kind === 'image' && (!Number.isInteger(next.max_images || 0) || (next.max_images || 0) < 0 || (next.max_images || 0) > 15)) { error.value = '图片数量上限应为 0–15 的整数。'; activeTab.value = 'specs'; return }
   if (action !== 'pause' && props.kind === 'video') {
-    if (!Number.isInteger(next.min_duration) || !Number.isInteger(next.max_duration) || next.min_duration! < 4 || next.max_duration! > 15 || next.min_duration! > next.max_duration! || !next.resolutions?.length || !next.modes?.length || next.resolutions.some(value => !Number.isFinite(next.prices?.[value]) || next.prices![value]! < 0)) { error.value = '请选择有效分辨率、每秒价格、生成方式和 4–15 秒内的时长。'; activeTab.value = 'specs'; return }
+    const spec = videoSpec.value
+    if (!spec || !Number.isInteger(next.min_duration) || !Number.isInteger(next.max_duration) || next.min_duration! < spec.minDuration || next.max_duration! > spec.maxDuration || next.min_duration! > next.max_duration! || !next.resolutions?.length || !next.modes?.length || next.resolutions.some(value => !spec.resolutions.includes(value) || !Number.isFinite(next.prices?.[value]) || next.prices![value]! < 0) || next.modes.some(value => !spec.modes.includes(value))) { error.value = `请选择有效分辨率、每秒价格、生成方式和 ${spec?.minDuration || 4}–${spec?.maxDuration || 15} 秒内的时长。`; activeTab.value = 'specs'; return }
     if (Object.values(next.groups || {}).some(rule => rule.enabled && (!rule.resolutions.length || !rule.modes.length || !Number.isInteger(rule.max_duration) || rule.max_duration < next.min_duration! || rule.max_duration > next.max_duration! || rule.resolutions.some(value => !next.resolutions?.includes(value)) || rule.modes.some(value => !next.modes?.includes(value))))) { error.value = '开放分组的规格必须处于模型服务范围内。'; activeTab.value = 'groups'; return }
   }
   let nextPrice: ChannelModelPricing | null | undefined

@@ -97,7 +97,7 @@
         v-if="isMiniMaxVideoAccount"
         type="button"
         @click="addMiniMaxH3"
-        :disabled="modelValue.includes(MINIMAX_H3_MODEL)"
+        :disabled="MINIMAX_H3_MODELS.every(model => modelValue.includes(model))"
         class="rounded-lg border border-violet-200 px-3 py-1.5 text-sm text-violet-700 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-violet-800 dark:text-violet-300"
       >
         {{ t('admin.accounts.addMiniMaxH3') }}
@@ -158,6 +158,7 @@ import ModelIcon from '@/components/common/ModelIcon.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { allModels, getModelsByPlatform, MINIMAX_H3_MODEL } from '@/composables/useModelWhitelist'
 import { isSeedreamModel } from '@/utils/modelTest'
+import { MINIMAX_H3_MODELS } from '@/utils/minimaxVideo'
 
 const { t } = useI18n()
 
@@ -224,9 +225,8 @@ const isMiniMaxVideoAccount = computed(() =>
   normalizedPlatforms.value.includes('openai') && presetModels('openai').includes(MINIMAX_H3_MODEL)
 )
 const addMiniMaxH3 = () => {
-  if (!props.modelValue.includes(MINIMAX_H3_MODEL)) {
-    emit('update:modelValue', [...props.modelValue, MINIMAX_H3_MODEL])
-  }
+  const missing = MINIMAX_H3_MODELS.filter(model => !props.modelValue.includes(model))
+  if (missing.length) emit('update:modelValue', [...props.modelValue, ...missing])
 }
 const misplacedSeedreamCount = computed(() =>
   props.accountType === 'oauth' && normalizedPlatforms.value.includes('openai')

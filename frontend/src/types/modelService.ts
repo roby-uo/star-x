@@ -1,3 +1,5 @@
+import { miniMaxVideoSpec } from '@/utils/minimaxVideo'
+
 export interface ModelServiceRule {
   enabled: boolean
   resolutions: string[]
@@ -27,5 +29,6 @@ export interface VideoQuote {
 }
 export const videoModes = [{ value: 'text', label: '文生视频' }, { value: 'first_frame', label: '首帧图生视频' }, { value: 'first_last_frame', label: '首尾帧视频' }]
 export function defaultModelPolicy(model: string, platform: string, kind: ModelServicePolicy['kind']): ModelServicePolicy {
-  return { model, platform, kind, state: 'draft', ...(kind === 'video' ? { resolutions: ['768P', '2K'], min_duration: 4, max_duration: 15, modes: ['text', 'first_frame', 'first_last_frame'], prices: { '768P': 0.08, '2K': 0.13 } } : {}), groups: {} }
+  const spec = kind === 'video' && platform === 'openai' ? miniMaxVideoSpec(model) : undefined
+  return { model, platform, kind, state: 'draft', ...(spec ? { resolutions: spec.resolutions, min_duration: spec.minDuration, max_duration: spec.maxDuration, modes: spec.modes, prices: spec.prices } : {}), groups: {} }
 }

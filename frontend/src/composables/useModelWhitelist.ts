@@ -3,6 +3,7 @@
 // =====================
 
 import { SEEDREAM_MODELS } from '@/utils/modelTest'
+import { MINIMAX_H3_MODELS } from '@/utils/minimaxVideo'
 
 // OpenAI
 const openaiModels = [
@@ -197,8 +198,13 @@ const doubaoModels = [
 
 // MiniMax
 export const MINIMAX_H3_MODEL = 'MiniMax-H3'
+const minimaxCurrentModels = [
+  'MiniMax-M3', 'MiniMax-M2.7', 'MiniMax-M2.7-highspeed', 'MiniMax-M2.5',
+  'MiniMax-M2.5-highspeed', 'MiniMax-M2.1', 'MiniMax-M2.1-highspeed', 'MiniMax-M2'
+]
 const minimaxModels = [
-  MINIMAX_H3_MODEL,
+  ...MINIMAX_H3_MODELS,
+  ...minimaxCurrentModels,
   'abab6.5-chat', 'abab6.5s-chat', 'abab6.5s-chat-pro',
   'abab6-chat',
   'abab5.5-chat', 'abab5.5s-chat'
@@ -432,7 +438,7 @@ export function getModelsByPlatform(platform: string, account?: { type?: string;
       if (ark) return [...SEEDREAM_MODELS]
       // MiniMax H3 uses its native video-task endpoint and may be absent from
       // the language-model list returned by upstream model sync.
-      if (minimax) return [MINIMAX_H3_MODEL]
+      if (minimax) return [...minimaxCurrentModels, ...MINIMAX_H3_MODELS]
       return openaiModels
     }
     case 'anthropic':

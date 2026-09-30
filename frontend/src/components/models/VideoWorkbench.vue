@@ -54,6 +54,7 @@ import { apiClient } from '@/api/client'
 import { buildGatewayUrl } from '@/api/url'
 import type { ApiKey } from '@/types'
 import { videoModes, type VideoQuote } from '@/types/modelService'
+import { miniMaxVideoSpec } from '@/utils/minimaxVideo'
 
 const props = defineProps<{ model: UserAvailableModel; embedded?: boolean; selectedKeyId?: number; contextKeys?: ApiKey[] }>()
 const emit = defineEmits<{ close: []; submitted: []; busy: [value: boolean] }>()
@@ -62,11 +63,17 @@ const keyID = ref<number | ''>('')
 const keyRules = ref<{ restrict_models?: boolean; models?: string[]; video_resolutions?: string[]; video_max_duration?: number }>({})
 const rulesLoading = ref(false)
 const rulesValid = ref(false)
-const resolutions = computed(() => (props.model.policy?.resolutions || ['768P', '2K']).filter(value => !keyRules.value.video_resolutions?.length || keyRules.value.video_resolutions.includes(value)))
-const allowedModes = computed(() => videoModes.filter(item => !props.model.policy?.modes || props.model.policy.modes.includes(item.value)))
-const durations = computed(() => Array.from({ length: Math.max(0, Math.min(props.model.policy?.max_duration || 15, keyRules.value.video_max_duration || 15) - (props.model.policy?.min_duration || 4) + 1) }, (_, index) => index + (props.model.policy?.min_duration || 4)))
-const resolution = ref(resolutions.value[0] || '768P')
-const duration = ref(durations.value.includes(5) ? 5 : durations.value[0] || 4)
+const videoSpec = computed(() => props.model.platform === 'openai' ? miniMaxVideoSpec(props.model.name) : undefined)
+const resolutions = computed(() => (videoSpec.value?.resolutions || []).filter(value => (!props.model.policy?.resolutions || props.model.policy.resolutions.includes(value)) && (!keyRules.value.video_resolutions?.length || keyRules.value.video_resolutions.includes(value))))
+const allowedModes = computed(() => videoModes.filter(item => videoSpec.value?.modes.includes(item.value) && (!props.model.policy?.modes || props.model.policy.modes.includes(item.value))))
+const durations = computed(() => {
+  if (!videoSpec.value) return []
+  const min = Math.max(videoSpec.value.minDuration, props.model.policy?.min_duration || videoSpec.value.minDuration)
+  const max = Math.min(videoSpec.value.maxDuration, props.model.policy?.max_duration || videoSpec.value.maxDuration, keyRules.value.video_max_duration || videoSpec.value.maxDuration)
+  return Array.from({ length: Math.max(0, max - min + 1) }, (_, index) => min + index)
+})
+const resolution = ref(resolutions.value[0] || '')
+const duration = ref(durations.value.includes(5) ? 5 : durations.value[0] || 0)
 const mode = ref(allowedModes.value[0]?.value || 'text')
 const prompt = ref('')
 const firstFrame = ref('')
