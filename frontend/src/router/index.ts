@@ -480,7 +480,7 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Group Management',
-      titleKey: 'nav.upstreamPools',
+      titleKey: 'nav.groupRates',
       descriptionKey: 'admin.groups.description'
     }
   },
@@ -496,7 +496,7 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Channel Management',
-      titleKey: 'nav.modelPublishing',
+      titleKey: 'nav.advancedChannels',
       descriptionKey: 'admin.channels.description'
     }
   },
@@ -555,8 +555,18 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Model Management',
-      titleKey: 'nav.modelServices',
-      descriptionKey: 'nav.modelServices'
+      titleKey: 'nav.modelServices'
+    }
+  },
+  {
+    path: '/admin/media-tasks',
+    name: 'AdminMediaTasks',
+    component: () => import('@/views/admin/MediaTasksView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Task Center',
+      titleKey: 'nav.mediaTasks'
     }
   },
   {

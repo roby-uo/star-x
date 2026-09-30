@@ -728,6 +728,8 @@ const adminNavItems = computed((): NavItem[] => {
     { path: '/admin/users', label: t('nav.users'), icon: UsersIcon, hideInSimpleMode: true },
     { path: '/admin/accounts', label: t('nav.upstreamManagement'), icon: GlobeIcon },
     { path: '/admin/models', label: t('nav.modelServices'), icon: PriceTagIcon },
+    { path: '/admin/groups', label: t('nav.groupRates'), icon: UsersIcon, hideInSimpleMode: true },
+    { path: '/admin/media-tasks', label: t('nav.mediaTasks'), icon: OrderIcon },
     { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
     { path: '/admin/announcements', label: t('nav.announcements'), icon: BellIcon },
     { path: '/admin/proxies', label: t('nav.proxies'), icon: ServerIcon },
@@ -831,7 +833,7 @@ function handleMenuItemClick(itemPath: string) {
 }
 
 function isActive(path: string): boolean {
-  if (path === '/admin/accounts' && ['/admin/groups', '/admin/channels/monitor'].includes(route.path)) return true
+  if (path === '/admin/accounts' && route.path === '/admin/channels/monitor') return true
   if (path === '/admin/models' && route.path.startsWith('/admin/channels/pricing')) return true
   if (path === '/model-catalog' && route.path === '/model-test') return true
   return route.path === path || route.path.startsWith(path + '/')

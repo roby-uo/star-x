@@ -4,7 +4,7 @@
       <template #filters>
         <AdminWorkspaceTabs area="models" />
         <div class="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200">
-          对外服务把资源池中的上游账号、模型映射和收费规则组合起来。只有需要向用户发布模型并计费时才需创建；上游账号已接入但这里为空是正常的。
+          此页用于维护渠道、模型映射与复杂计费规则。日常规格、基础售价和分组开放请从“模型服务”选择模型配置。
         </div>
         <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
           <!-- Left: Search + Filters -->

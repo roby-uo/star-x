@@ -2,7 +2,12 @@
   <section class="space-y-4">
     <div class="flex items-center justify-between"><div><h2 class="font-semibold">{{ admin ? '视频任务与账务' : '我的视频任务' }}</h2><p class="text-xs text-gray-500">后台定期更新状态。结果链接可能过期，完成后请及时下载保存。</p></div><button class="btn btn-secondary" :disabled="loading" @click="load">刷新列表</button></div>
     <p v-if="error" role="alert" class="text-sm text-red-600">{{ error }}</p>
-    <div v-for="task in tasks" :key="task.id" class="rounded-lg border p-4 dark:border-dark-600">
+    <div v-if="admin" class="flex flex-wrap gap-3">
+      <input v-model="search" class="input w-full sm:w-72" aria-label="筛选本页任务" placeholder="筛选本页模型、用户或任务编号" />
+      <select v-model="stateFilter" class="input w-44" aria-label="本页任务状态"><option value="">全部状态</option><option v-for="(label, state) in states" :key="state" :value="state">{{ label }}</option></select>
+      <span class="self-center text-xs text-gray-500">本页 {{ tasks.length }} 条，符合条件 {{ filteredTasks.length }} 条</span>
+    </div>
+    <div v-for="task in filteredTasks" :key="task.id" class="rounded-lg border p-4 dark:border-dark-600">
       <div class="flex flex-wrap items-center justify-between gap-2"><strong>{{ task.model }} · {{ task.specification.resolution }} · {{ task.specification.duration }} 秒</strong><span>{{ states[task.state] || task.state }}</span></div>
       <p class="mt-2 text-xs text-gray-500">{{ new Date(task.created_at).toLocaleString() }} · {{ task.id }}<span v-if="admin"> · 用户 {{ task.user_id }} · 密钥 {{ task.api_key_id }}</span></p>
       <p class="mt-2 text-sm">${{ task.quote.total.toFixed(4) }} · {{ billing[task.billing_state] || task.billing_state }}</p>
@@ -10,14 +15,14 @@
       <video v-if="safeURL(task.result?.task.content.url)" :src="safeURL(task.result?.task.content.url)" controls preload="none" class="mt-3 max-h-72 rounded-lg" />
       <div class="mt-3 flex flex-wrap gap-2"><button class="btn btn-secondary text-xs" :disabled="refreshing === task.id" @click="refresh(task.id)">更新状态</button><a v-if="safeURL(task.result?.task.content.url)" :href="safeURL(task.result?.task.content.url)" target="_blank" rel="noopener noreferrer" class="btn btn-secondary text-xs">打开／下载视频</a><button v-if="admin && task.state === 'uncertain' && task.billing_state === 'reserved'" class="btn btn-secondary text-xs" @click="releaseTask = task">核对并释放预占额度</button><button v-if="admin && ['failed','cancelled'].includes(task.state) && task.billing_state === 'charged'" class="btn btn-secondary text-xs" @click="refundTask = task">退还用户余额</button></div>
     </div>
-    <p v-if="!tasks.length && !loading" class="py-8 text-center text-gray-500">暂无视频任务</p>
+    <p v-if="!filteredTasks.length && !loading" class="py-8 text-center text-gray-500">{{ tasks.length ? '本页没有符合条件的任务' : '暂无视频任务' }}</p>
     <div class="flex justify-end gap-2"><button class="btn btn-secondary" :disabled="offset === 0 || loading" @click="offset -= 50; load()">上一页</button><button class="btn btn-secondary" :disabled="tasks.length < 50 || loading" @click="offset += 50; load()">下一页</button></div>
     <div v-if="refundTask" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><section role="dialog" aria-modal="true" aria-label="退款确认" class="max-w-lg space-y-4 rounded-xl bg-white p-6 dark:bg-dark-800"><h3 class="font-semibold">退还用户余额</h3><p>将向用户余额退回 ${{ refundTask.quote.total.toFixed(4) }}。此操作不代表供应商已退费，也不重置调用用量限额。订阅任务请在订阅管理中处理补偿。</p><div class="flex gap-3"><button class="btn btn-secondary" @click="refundTask = null">取消</button><button class="btn btn-primary" :disabled="loading" @click="refund">确认退款</button></div></section></div>
     <div v-if="releaseTask" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><section role="dialog" aria-modal="true" aria-label="核对任务" class="max-w-lg space-y-4 rounded-xl bg-white p-6 dark:bg-dark-800"><h3 class="font-semibold">核对上游是否已受理</h3><p>请先在供应商后台核实该任务未受理且未收费。确认后将释放 ${{ releaseTask.quote.total.toFixed(4) }} 预占额度。上游已受理的任务不能使用此操作。</p><div class="flex gap-3"><button class="btn btn-secondary" @click="releaseTask = null">返回</button><button class="btn btn-primary" :disabled="loading" @click="release">已核实未受理，释放额度</button></div></section></div>
   </section>
 </template>
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { apiClient } from '@/api/client'
 import type { VideoQuote } from '@/types/modelService'
 import { extractApiErrorMessage } from '@/utils/apiError'
@@ -28,6 +33,13 @@ const loading = ref(false)
 const refreshing = ref('')
 const error = ref('')
 const offset = ref(0)
+const search = ref('')
+const stateFilter = ref('')
+const filteredTasks = computed(() => tasks.value.filter(task => {
+  if (stateFilter.value && task.state !== stateFilter.value) return false
+  const query = search.value.trim().toLowerCase()
+  return !query || `${task.model} ${task.id} ${task.user_id} ${task.api_key_id}`.toLowerCase().includes(query)
+}))
 const refundTask = ref<Task | null>(null)
 const releaseTask = ref<Task | null>(null)
 const states: Record<string, string> = { submitting: '提交中', uncertain: '受理情况待核对', queued: '排队中', running: '生成中', succeeded: '已完成', failed: '失败', cancelled: '已取消' }

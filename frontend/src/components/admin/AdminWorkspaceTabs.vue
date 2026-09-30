@@ -37,10 +37,9 @@ function handleTabClick(path: string) {
 const tabs = computed(() => props.area === 'upstream'
   ? [
       { path: '/admin/accounts', label: 'nav.upstreamConnections' },
-      { path: '/admin/groups', label: 'nav.upstreamPools' }
+      { path: '/admin/groups', label: 'nav.groupRates' }
     ]
   : [
-      { path: '/admin/models', label: 'nav.modelCatalogAdmin' },
-      { path: '/admin/channels/pricing', label: 'nav.modelPublishing' }
+      { path: '/admin/models', label: 'nav.modelServices' }
     ])
 </script>

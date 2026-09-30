@@ -1,32 +1,198 @@
-import { flushPromises, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import VideoWorkbench from '../VideoWorkbench.vue'
+import { apiClient } from '@/api/client'
+import { list } from '@/api/keys'
+import type { ApiKey } from '@/types'
 
 vi.mock('@/api/keys', () => ({ list: vi.fn(async () => ({ items: [{ id: 1, name: '测试密钥', key: 'test-only', group_id: 2 }] })) }))
 vi.mock('@/api/client', () => ({ apiClient: { get: vi.fn(async () => ({ data: { restrict_models: false, video_resolutions: ['768P'], video_max_duration: 5 } })) } }))
 vi.mock('@/api/url', () => ({ buildGatewayUrl: (path: string) => path }))
 
+const model = { name: 'MiniMax-H3', platform: 'openai', group_id: 2, group_name: '普通用户', rate_multiplier: 1.4 }
+const quote = { currency: 'USD', unit_price: 0.08, multiplier: 1.4, total: 0.56, version: 'quote-version' }
+const reply = (data: unknown, status = 200) => ({ ok: status < 400, status, json: async () => data })
+const startButton = (wrapper: VueWrapper) => wrapper.findAll('button').find(button => ['开始测试', '已提交'].includes(button.text()))!
+async function prepare(wrapper: VueWrapper) {
+  await flushPromises()
+  await wrapper.find('textarea').setValue('sunrise')
+  await wrapper.find('input[type="checkbox"]').setValue(true)
+}
+
 describe('VideoWorkbench', () => {
-  afterEach(() => vi.unstubAllGlobals())
-  it('narrows choices using key permissions and invalidates the quote when specifications change', async () => {
-    const fetchMock = vi.fn(async (_path: string, _options?: unknown) => ({ ok: true, json: async () => ({ currency: 'USD', unit_price: 0.08, multiplier: 1.4, total: 0.56, version: 'quote-version' }) }))
+  const wrappers: VueWrapper[] = []
+  function create(props: Record<string, unknown> = {}) {
+    const wrapper = mount(VideoWorkbench, { props: { model, ...props } })
+    wrappers.push(wrapper)
+    return wrapper
+  }
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.clearAllMocks()
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { restrict_models: false, video_resolutions: ['768P'], video_max_duration: 5 } })
+  })
+  afterEach(() => {
+    wrappers.splice(0).forEach(wrapper => wrapper.unmount())
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it('narrows choices by key permissions and checks paid test consent before making requests', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(reply(quote)).mockResolvedValueOnce(reply({ id: 'local-1', task_id: 'task-1', state: 'queued', quote }))
     vi.stubGlobal('fetch', fetchMock)
-    const wrapper = mount(VideoWorkbench, { props: { model: { name: 'MiniMax-H3', platform: 'openai', group_id: 2, group_name: '普通用户', rate_multiplier: 1.4 } } })
+    const wrapper = create()
     await flushPromises()
     const selects = wrapper.findAll('select')
-    expect(selects[2]!.findAll('option').map(o => o.text())).toEqual(['768P'])
-    expect(selects[3]!.findAll('option').map(o => o.text())).toEqual(['4', '5'])
-    const generate = () => wrapper.findAll('button').find(b => b.text().startsWith('生成视频'))!
-    expect(generate().attributes('disabled')).toBeDefined()
+    expect(selects[2]!.findAll('option').map(option => option.text())).toEqual(['768P'])
+    expect(selects[3]!.findAll('option').map(option => option.text())).toEqual(['4', '5'])
     await wrapper.find('textarea').setValue('sunrise')
     await wrapper.find('form').trigger('submit')
+    expect(fetchMock).not.toHaveBeenCalled()
+    await wrapper.find('input[type="checkbox"]').setValue(true)
+    await wrapper.find('form').trigger('submit')
     await flushPromises()
-    expect(wrapper.text()).toContain('$0.5600')
-    expect(generate().attributes('disabled')).toBeUndefined()
-    await selects[3]!.setValue('4')
-    expect(generate().attributes('disabled')).toBeDefined()
+    expect(fetchMock.mock.calls.map(call => call[0])).toEqual(['/v2/video_generation/quote', '/v2/video_generation'])
+    const quoteOptions = fetchMock.mock.calls[0]![1] as RequestInit
+    const createOptions = fetchMock.mock.calls[1]![1] as RequestInit
+    expect(createOptions.body).toBe(quoteOptions.body)
+    expect(createOptions.headers).toMatchObject({ Authorization: 'Bearer test-only', 'X-Video-Quote': 'quote-version', 'Idempotency-Key': expect.any(String) })
+    expect(wrapper.text()).toContain('任务编号task-1')
+    expect(wrapper.text()).not.toContain('$0.5600')
+    expect(wrapper.text()).not.toContain('我的视频任务')
+    expect(startButton(wrapper).attributes('disabled')).toBeDefined()
+    await wrapper.find('form').trigger('submit')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not submit a stale quote after the selected model changes', async () => {
+    let completeQuote!: (value: ReturnType<typeof reply>) => void
+    const fetchMock = vi.fn(() => new Promise<ReturnType<typeof reply>>(resolve => { completeQuote = resolve }))
+    vi.stubGlobal('fetch', fetchMock)
+    const wrapper = create()
+    await prepare(wrapper)
+    await wrapper.find('form').trigger('submit')
+    await wrapper.setProps({ model: { ...model, name: 'MiniMax-H3-new' } })
+    completeQuote(reply(quote))
+    await flushPromises()
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(fetchMock.mock.calls[0]![0]).toBe('/v2/video_generation/quote')
+    expect(wrapper.find('input[type="checkbox"]').element).toHaveProperty('checked', false)
+    expect(wrapper.find('[aria-label="本次测试结果"]').exists()).toBe(false)
+  })
+
+  it('queries the accepted task with the original key and stops automatic polling at completion', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(reply(quote))
+      .mockResolvedValueOnce(reply({ id: 'local-1', task_id: 'task /1', state: 'queued' }))
+      .mockResolvedValueOnce(reply({ task: { status: 'succeeded', content: { url: 'https://example.com/video.mp4' } } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const wrapper = create()
+    await prepare(wrapper)
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(10000)
+    await flushPromises()
+    expect(fetchMock.mock.calls[2]).toEqual(['/v2/query/video_generation/task%20%2F1', { headers: { Authorization: 'Bearer test-only' } }])
+    expect(wrapper.find('video').attributes('src')).toBe('https://example.com/video.mp4')
+    expect(wrapper.text()).toContain('已完成')
+    await vi.advanceTimersByTimeAsync(30000)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    await wrapper.findAll('button').find(button => button.text() === '开始新的测试')!.trigger('click')
+    expect(wrapper.find('[aria-label="本次测试结果"]').exists()).toBe(false)
+    expect(wrapper.find('input[type="checkbox"]').element).toHaveProperty('checked', false)
+  })
+
+  it('preserves accepted identifiers from an error and allows only status queries', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(reply(quote))
+      .mockResolvedValueOnce(reply({ id: 'local-uncertain', task_id: 'upstream-accepted', error: { message: 'storage pending' } }, 503))
+      .mockResolvedValueOnce(reply({ task: { status: 'running', content: {} } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const wrapper = create()
+    await prepare(wrapper)
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.text()).toContain('local-uncertain')
+    expect(wrapper.text()).toContain('upstream-accepted')
+    expect(wrapper.text()).toContain('提交结果待核对')
+    await wrapper.find('form').trigger('submit')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    await wrapper.findAll('button').find(button => button.text() === '查询状态')!.trigger('click')
+    await flushPromises()
+    expect(fetchMock.mock.calls[2]![0]).toBe('/v2/query/video_generation/upstream-accepted')
+    expect(wrapper.text()).toContain('生成中')
+  })
+
+  it('locks an ambiguous network submission and never automatically creates it again', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(reply(quote)).mockRejectedValueOnce(new Error('connection lost'))
+    vi.stubGlobal('fetch', fetchMock)
+    const wrapper = create()
+    await prepare(wrapper)
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.text()).toContain('请求编号')
+    expect(wrapper.text()).toContain('联系管理员')
+    expect(startButton(wrapper).attributes('disabled')).toBeDefined()
+    await wrapper.find('form').trigger('submit')
+    await vi.advanceTimersByTimeAsync(120000)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).not.toContain('开始新的测试')
+  })
+
+  it('requires consent again after a definite rejection and never creates from an invalid quote', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(reply(quote))
+      .mockResolvedValueOnce(reply({ error: { message: 'configuration changed' } }, 409))
+      .mockResolvedValueOnce(reply({ total: 0.56 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const wrapper = create()
+    await prepare(wrapper)
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.find('[aria-label="本次测试结果"]').exists()).toBe(false)
+    expect(wrapper.find('input[type="checkbox"]').element).toHaveProperty('checked', false)
+    await wrapper.find('input[type="checkbox"]').setValue(true)
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(wrapper.text()).toContain('未返回有效凭证')
+  })
+
+  it('shares the outer detail key in embedded mode and rejects unsafe result URLs', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(reply(quote))
+      .mockResolvedValueOnce(reply({ task_id: 'task-1', state: 'queued' }))
+      .mockResolvedValueOnce(reply({ task: { status: 'succeeded', content: { url: 'javascript:alert(1)' } } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const wrapper = create({ embedded: true, selectedKeyId: 7, contextKeys: [{ id: 7, name: '选中密钥', key: 'outer-key', group_id: 2 } as ApiKey] })
+    await prepare(wrapper)
+    expect(list).not.toHaveBeenCalled()
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('调用密钥')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect((fetchMock.mock.calls[1]![1] as RequestInit).headers).toMatchObject({ Authorization: 'Bearer outer-key' })
+    await wrapper.findAll('button').find(button => button.text() === '查询状态')!.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('video').exists()).toBe(false)
+    expect(wrapper.find('a').exists()).toBe(false)
+    expect(wrapper.emitted('busy')?.some(event => event[0] === true)).toBe(true)
+  })
+
+  it('cancels the polling timer on unmount and blocks unauthorized keys', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(reply(quote)).mockResolvedValueOnce(reply({ task_id: 'task-1', state: 'queued' }))
+    vi.stubGlobal('fetch', fetchMock)
+    const wrapper = create()
+    await prepare(wrapper)
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
     wrapper.unmount()
+    await vi.advanceTimersByTimeAsync(20000)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    vi.mocked(apiClient.get).mockResolvedValueOnce({ data: { restrict_models: true, models: ['other-model'] } })
+    const denied = create()
+    await prepare(denied)
+    await denied.find('form').trigger('submit')
+    expect(denied.text()).toContain('未授权调用该模型')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 })
