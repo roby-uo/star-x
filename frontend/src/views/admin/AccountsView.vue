@@ -3,11 +3,9 @@
     <TablePageLayout>
       <template #filters>
         <AdminWorkspaceTabs area="upstream" />
-        <div class="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:border-dark-700 dark:bg-dark-800 dark:text-gray-300">
-          上游连接管理厂商账号、凭证和账号可用模型；资源池决定账号如何参与调度。
-          <router-link class="ml-1 text-primary-600 underline dark:text-primary-400" to="/admin/channels/monitor">定时探测</router-link>
-          是可选的主动请求检查，用于观察指定端点的可用率和延迟，需要单独创建监控项。
-          OpenAI 账号的 5h/7d 百分比来自上游额度，req/Token 是本站日志统计，两者口径不同。
+        <div class="mb-4 flex flex-wrap items-start justify-between gap-2 text-sm text-gray-500 dark:text-gray-400">
+          <p>管理厂商账号、API 凭证和可用模型。接入完成后，在「模型」中配置开放。</p>
+          <details class="text-xs"><summary class="cursor-pointer">额度与探测说明</summary><div class="mt-2 max-w-lg space-y-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-dark-700 dark:bg-dark-800"><p>账号参与调度由启用状态、所属分组和可用额度决定。</p><p><router-link class="text-primary-600 underline dark:text-primary-400" to="/admin/channels/monitor">定时探测</router-link> 可观察指定端点的可用率和延迟，需单独创建监控项。</p><p>OpenAI 账号的 5h/7d 百分比来自上游额度，req/Token 是本站日志统计。</p></div></details>
         </div>
         <div class="flex flex-wrap-reverse items-start justify-between gap-3">
           <AccountTableFilters

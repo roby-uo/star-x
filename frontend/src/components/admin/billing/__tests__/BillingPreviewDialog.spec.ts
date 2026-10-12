@@ -25,6 +25,33 @@ function field(wrapper: VueWrapper, label: string, selector = 'input') {
 }
 
 describe('BillingPreviewDialog estimate boundaries', () => {
+  it('accepts a valid supplied account and group without silently choosing other groups', async () => {
+    const wrapper = mount(BillingPreviewDialog, { props: { model: 'MiniMax-M3', initialAccountId: 1, initialGroupId: 7, accounts: [account()], groups: [group()], profiles: [profile()], models: ['MiniMax-M3'] } })
+    mounted.push(wrapper)
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/admin/billing-management/preview', expect.objectContaining({ model: 'MiniMax-M3', account_id: 1, group_id: 7 }))
+  })
+
+  it('rejects an initial group outside the supplied account rather than guessing a replacement', async () => {
+    const wrapper = mount(BillingPreviewDialog, { props: { model: 'MiniMax-M3', initialAccountId: 1, initialGroupId: 9, accounts: [account()], groups: [group(), { ...group(), id: 9 }], profiles: [], models: ['MiniMax-M3'] } })
+    mounted.push(wrapper)
+    await wrapper.get('form').trigger('submit')
+    expect(post).not.toHaveBeenCalled()
+    expect(wrapper.get('[role="alert"]').text()).toContain('请选择调用分组')
+    expect(field(wrapper, '调用分组', 'select').get('option:checked').text()).toBe('请选择')
+  })
+
+  it('shows only language-model fields when previewing independent search', async () => {
+    const wrapper = await dialog()
+    await field(wrapper, '调用用途', 'select').setValue('alpha_search')
+    expect(wrapper.findAll('label').some(label => label.text().startsWith('分辨率'))).toBe(false)
+    expect(wrapper.findAll('label').some(label => label.text().startsWith('输出时长'))).toBe(false)
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/admin/billing-management/preview', expect.objectContaining({ model: 'MiniMax-M3', modality: 'chat', operation: 'alpha_search' }))
+  })
+
   it('sends one administrative preview request and never invokes a model or gateway', async () => {
     const wrapper = await dialog()
     await wrapper.get('form').trigger('submit')

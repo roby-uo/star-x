@@ -480,7 +480,7 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Group Management',
-      titleKey: 'nav.groupRates',
+      titleKey: 'nav.modelManagement',
       descriptionKey: 'admin.groups.description'
     }
   },
@@ -496,7 +496,7 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Channel Management',
-      titleKey: 'nav.advancedChannels',
+      titleKey: 'nav.modelManagement',
       descriptionKey: 'admin.channels.description'
     }
   },
@@ -508,7 +508,7 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Channel Monitor',
-      titleKey: 'nav.upstreamMonitor',
+      titleKey: 'nav.modelManagement',
       descriptionKey: 'admin.channelMonitor.description'
     }
   },
@@ -543,7 +543,7 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       requiresAdmin: true,
       title: 'API Management',
-      titleKey: 'nav.upstreamConnections',
+      titleKey: 'nav.modelManagement',
       descriptionKey: 'admin.accounts.description'
     }
   },
@@ -555,7 +555,7 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Model Management',
-      titleKey: 'nav.modelServices'
+      titleKey: 'nav.modelManagement'
     }
   },
   {
@@ -566,7 +566,7 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Billing Management',
-      titleKey: 'nav.billingManagement'
+      titleKey: 'nav.modelManagement'
     }
   },
   {

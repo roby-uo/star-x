@@ -119,6 +119,24 @@ describe('feature route guard', () => {
     appStore.fetchPublicSettings.mockReset()
   })
 
+  it('redirects simple-mode administrators away from the restricted groups route', async () => {
+    authStore.isAdmin = true
+    authStore.isSimpleMode = true
+    const { navigation, next } = runGuard({ requiresAdmin: true }, '/admin/groups')
+    await navigation
+    expect(next).toHaveBeenCalledOnce()
+    expect(next).toHaveBeenCalledWith('/admin/dashboard')
+  })
+
+  it.each(['/admin/models', '/admin/accounts', '/admin/billing-management'])('allows accessible simple-mode workspace route %s', async path => {
+    authStore.isAdmin = true
+    authStore.isSimpleMode = true
+    const { navigation, next } = runGuard({ requiresAdmin: true }, path)
+    await navigation
+    expect(next).toHaveBeenCalledOnce()
+    expect(next).toHaveBeenCalledWith()
+  })
+
   it('waits for the first public-settings request before deciding payment access', async () => {
     const deferred = createDeferred<{ payment_enabled: boolean }>()
     appStore.fetchPublicSettings.mockImplementation(async () => {

@@ -1,8 +1,9 @@
 <template>
   <AppLayout>
     <div class="mx-auto max-w-7xl space-y-5">
+      <AdminWorkspaceTabs area="billing" />
       <header class="flex flex-wrap items-start justify-between gap-3">
-        <div><h2 class="text-xl font-semibold text-gray-900 dark:text-white">计费管理</h2><p class="mt-1 text-sm text-gray-500">统一人民币基准价，按采购方式设置一个售价倍率。</p></div>
+        <div><h2 class="text-xl font-semibold text-gray-900 dark:text-white">售价规则</h2><p class="mt-1 text-sm text-gray-500">统一调整销售倍率，模型使用匹配的采购基准价。</p></div>
         <button type="button" class="btn btn-secondary" :disabled="loading || saving" aria-label="刷新计费配置" @click="load"><Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" /></button>
       </header>
       <p v-if="error" role="alert" class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950/20">{{ error }}</p>
@@ -21,12 +22,14 @@
           </form>
           <form class="rounded-xl border border-gray-200 bg-white p-5 dark:border-dark-700 dark:bg-dark-800" @submit.prevent="saveGroupRate">
             <h3 class="font-semibold text-gray-900 dark:text-white">账号授权 / 订阅</h3>
-            <div class="mt-4 flex flex-wrap items-center justify-between gap-3"><label for="billing-group" class="text-sm text-gray-600 dark:text-gray-300">分组倍率</label><div class="flex flex-wrap items-center gap-2"><select id="billing-group" v-model.number="selectedGroupID" class="input max-w-44" aria-label="选择账号计费分组"><option v-for="group in groups" :key="group.id" :value="group.id">{{ group.name }}</option></select><input v-model.number="groupMultiplier" type="number" min="0" step="any" required class="input w-24" aria-label="账号分组倍率" /><span class="text-sm text-gray-500">×</span><button type="submit" class="btn btn-secondary" :disabled="saving || !groupRateChanged">保存</button></div></div>
+            <div class="mt-4 space-y-3"><div class="flex items-center justify-between gap-3"><label for="billing-group" class="shrink-0 text-sm text-gray-600 dark:text-gray-300">分组</label><select id="billing-group" v-model.number="selectedGroupID" class="input w-full max-w-60" aria-label="选择账号计费分组"><option v-for="group in groups" :key="group.id" :value="group.id">{{ group.name }}</option></select></div><div class="flex items-center justify-between gap-3"><label for="account-group-multiplier" class="text-sm text-gray-600 dark:text-gray-300">售价倍率</label><div class="flex shrink-0 items-center gap-2"><input id="account-group-multiplier" v-model.number="groupMultiplier" type="number" min="0" step="any" required class="input w-24" aria-label="账号分组倍率" /><span class="text-sm text-gray-500">×</span><button type="submit" class="btn btn-secondary" :disabled="saving || !groupRateChanged">保存</button></div></div></div>
             <p class="mt-3 text-xs text-gray-500">参考基准价 × 所选分组倍率；包月实付独立记录。</p>
           </form>
         </div>
-        <section class="space-y-3" aria-label="模型基准价">
-          <div class="flex flex-wrap items-center justify-between gap-3"><h3 class="font-semibold">模型价格</h3><div class="flex flex-wrap gap-2"><input v-model="query" class="input w-full sm:w-64" placeholder="搜索模型或供应商" aria-label="搜索费率模型" /><select v-model="modality" class="input w-32" aria-label="费率模型类型"><option value="">全部类型</option><option value="Chat">文本</option><option value="Images">图像</option><option value="Videos">视频</option></select></div></div>
+        <details :open="!!route.query.model || route.query.tab === 'prices'" class="rounded-xl border border-gray-200 bg-white p-5 dark:border-dark-700 dark:bg-dark-800">
+          <summary class="cursor-pointer font-medium">按模型核对价格 <span class="ml-2 text-xs font-normal text-gray-500">{{ models.length }} 个模型</span></summary>
+          <section class="mt-4 space-y-3" aria-label="模型基准价">
+          <div class="flex flex-wrap items-center justify-between gap-3"><p class="text-xs text-gray-500">核对具体上游、规格与最终扣费</p><div class="flex flex-wrap gap-2"><input v-model="query" class="input w-full sm:w-64" placeholder="搜索模型或供应商" aria-label="搜索费率模型" /><select v-model="modality" class="input w-32" aria-label="费率模型类型"><option value="">全部类型</option><option value="Chat">文本</option><option value="Images">图像</option><option value="Videos">视频</option></select></div></div>
           <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-800">
             <table class="w-full min-w-[880px] text-left text-sm"><thead class="bg-gray-50 text-xs text-gray-500 dark:bg-dark-900"><tr><th class="px-5 py-3">模型与类型</th><th class="px-5 py-3">价格来源</th><th class="px-5 py-3">人民币基准价</th><th class="px-5 py-3">售价</th><th class="px-5 py-3 text-right">规格与试算</th></tr></thead><tbody>
               <tr v-for="row in filteredModels" :key="row.key" class="border-t border-gray-100 dark:border-dark-700"><td class="px-5 py-4"><p class="font-medium">{{ row.model }}</p><p class="mt-1 text-xs text-gray-500">{{ typeLabel(row.kind) }} · {{ row.provider }}</p></td><td class="px-5 py-4"><p class="text-xs" :class="catalogEntries(row).some(entry => entry.status !== 'ready') ? 'text-amber-600' : 'text-gray-600 dark:text-gray-300'">{{ sourceLabel(row) }}</p><p class="mt-1 text-xs text-gray-400">{{ row.accounts.length }} 个上游来源</p><details v-if="catalogEntries(row).some(entry => entry.status !== 'ready')" class="mt-2 max-w-52 text-xs text-gray-500"><summary class="cursor-pointer">查看待确认原因</summary><p v-for="reason in [...new Set(catalogEntries(row).filter(entry => entry.status !== 'ready').map(entry => entry.reason))]" :key="reason" class="mt-2">{{ reason }}</p></details></td><td class="max-w-xs px-5 py-4 text-xs">{{ priceLabel(row) }}</td><td class="max-w-xs px-5 py-4"><p class="text-xs text-primary-700 dark:text-primary-300">{{ priceLabel(row, true) }}</p><p class="mt-1 text-xs text-gray-400">{{ rateLabel(row) }}</p></td><td class="px-5 py-4 text-right"><button type="button" class="btn btn-secondary whitespace-nowrap text-xs" :aria-label="`查看 ${row.model} 规格与最终扣费`" @click="openPreview(row.model)">查看与试算</button></td></tr>
@@ -34,7 +37,8 @@
             </tbody></table>
           </div>
           <p class="text-xs text-gray-500">按供应商、地区、模型与规格匹配。模型名不能代表第三方采购价；最终价格以选定上游的预览为准。</p>
-        </section>
+          </section>
+        </details>
         <details :open="route.query.tab === 'costs'" class="rounded-xl border border-gray-200 bg-white p-5 dark:border-dark-700 dark:bg-dark-800">
           <summary class="cursor-pointer font-medium">价格来源与特殊供应商 <span class="ml-2 text-xs font-normal text-gray-500">{{ config.cost_profiles.length }} 份配置</span></summary>
           <div class="mt-4 space-y-3"><div class="flex flex-wrap items-center justify-between gap-3"><p class="text-xs text-gray-500">官方参考价自动匹配，第三方单价或合同折扣在这里补充。</p><button type="button" class="btn btn-secondary" :disabled="saving" @click="openCost()">添加基准价</button></div>
@@ -55,6 +59,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import AdminWorkspaceTabs from '@/components/admin/AdminWorkspaceTabs.vue'
 import Icon from '@/components/icons/Icon.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import CostProfileEditor from '@/components/admin/billing/CostProfileEditor.vue'
@@ -123,6 +128,7 @@ function sourceLabel(row: SaleRow) {
     const labels = { manual: '人工采购基准', official: '维护的参考价表', official_reference: '官方参考价', reference: '账号参考价' }
     return [...new Set(entries.map(entry => labels[entry.source] || '参考价'))].join(' · ')
   }
+  if (config.value?.simple_billing_enabled !== false) return '价格待核对 · 选择上游后试算'
   const profiles = matchingProfiles(row)
   if (profiles.length > 1) return '多个采购配置 · 预览核对'
   if (profiles.length) return profiles[0]?.name || '人工基准价'
@@ -131,6 +137,7 @@ function sourceLabel(row: SaleRow) {
 function rateLabel(row: SaleRow) {
   const entries = catalogEntries(row).filter(entry => entry.status === 'ready')
   if (entries.length) return [...new Set(entries.map(entry => `${entry.route === 'api' ? 'API' : '分组'} ${entry.multiplier}×`))].join(' · ')
+  if (config.value?.simple_billing_enabled !== false) return '按实际选定上游确认'
   const api = row.accounts.some(account => account.type === 'apikey')
   const authorized = row.accounts.some(account => account.type !== 'apikey')
   return api && authorized ? '混合来源 · 选择上游后试算' : api ? `按量 API 售价倍率 ${config.value?.api_sale_multiplier ?? 1.4}×` : `账号参考价 × 分组倍率 ${selectedGroup.value?.rate_multiplier ?? 1}×`
@@ -148,6 +155,7 @@ function priceLabel(row: SaleRow, sale = false): string {
     const lines = [...values]
     return lines.slice(0, 2).join(' · ') + (lines.length > 2 ? ` · 共 ${lines.length} 项，试算查看` : '')
   }
+  if (config.value?.simple_billing_enabled !== false) return '待核对 · 选择上游后试算'
   if (sale) return '选择上游后试算'
   const profiles = matchingProfiles(row)
   if (profiles.length > 1) return '多个来源 · 选择上游后查看'

@@ -158,14 +158,17 @@ export default {
         nextBtn: '开始配置 🚀',
         prevBtn: '跳过'
       },
+      openModelWorkspace: {
+        title: '进入模型管理',
+        description: '点击左侧“模型管理”，在同一个工作区管理模型、上游和相关设置。'
+      },
       groupManage: {
-        title: '📦 第一步：分组管理',
-        description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;"><b>什么是分组？</b></p><p style="margin-bottom: 12px;">分组是 star-X 的核心概念，它就像一个"服务套餐"：</p><ul style="margin-left: 20px; margin-bottom: 12px; font-size: 13px;"><li>🎯 每个分组可以包含多个上游账号</li><li>💰 每个分组有独立的计费倍率</li><li>👥 可以设置为公开或专属分组</li></ul><p style="margin-top: 12px; padding: 8px 12px; background: #f3f7ff; border-left: 3px solid #4f7dff; border-radius: 4px; font-size: 13px;"><b>💡 示例：</b>您可以创建"VIP专线"（高倍率）和"免费试用"（低倍率）两个分组</p><p style="margin-top: 16px; color: #4f7dff; font-weight: 600;">👉 点击左侧的"上游管理"开始</p></div>'
+        title: '打开管理设置',
+        description: '分组用于安排账号、控制用户可用模型与权限。账号授权接入按分组倍率计费；API 按量接入使用统一倍率。点击“管理设置”展开菜单，再进入“用户分组”。'
       },
       openPools: {
-        title: '选择资源池',
-        description: '在上游管理页面点击“资源池”，继续创建服务分组。'
+        title: '选择用户分组',
+        description: '点击“用户分组”，创建分组并管理用户权限与账号授权接入的倍率。'
       },
       createGroup: {
         title: '➕ 创建新分组',
@@ -185,9 +188,8 @@ export default {
         nextBtn: '下一步'
       },
       groupMultiplier: {
-        title: '💰 3. 费率倍数',
-        description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">设置该分组的计费倍率，控制用户的实际扣费。</p><div style="padding: 8px 12px; background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>⚙️ 计费规则：</b><ul style="margin: 8px 0 0 16px;"><li><b>1.0</b> - 按计费参考价</li><li><b>1.5</b> - 用户消耗 ¥1，扣除 ¥1.5</li><li><b>2.0</b> - 用户消耗 ¥1，扣除 ¥2</li><li><b>0.8</b> - 补贴模式（亏本运营）</li></ul></div><p style="font-size: 13px; color: #6b7280;">建议测试分组设置为 1.0</p></div>',
+        title: '3. 账号授权接入倍率',
+        description: '此倍率用于账号授权接入：参考价 × 分组倍率。API 按量接入使用计费设置中的统一倍率，不叠加此倍率。测试分组可先设为 1.0。',
         nextBtn: '下一步'
       },
       groupExclusive: {
@@ -202,9 +204,8 @@ export default {
           '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">确认信息无误后，点击创建按钮保存分组。</p><p style="padding: 8px 12px; background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>⚠️ 注意：</b>分组创建后，平台类型不可修改，其他信息可以随时编辑</p><p style="padding: 8px 12px; background: #f3f7ff; border-left: 3px solid #4f7dff; border-radius: 4px; font-size: 13px;"><b>📌 下一步：</b>创建成功后，我们将添加上游账号到这个分组</p><p style="margin-top: 12px; color: #4f7dff; font-weight: 600;">👉 点击"创建"按钮</p></div>'
       },
       accountManage: {
-        title: '🔗 第二步：添加账号',
-        description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;"><b>太棒了！分组已创建成功 🎉</b></p><p style="margin-bottom: 12px;">现在需要添加上游 AI 服务商的账号，让分组能够实际提供服务。</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>🔑 账号的作用：</b><ul style="margin: 8px 0 0 16px;"><li>连接到上游 AI 服务（Claude、GPT 等）</li><li>一个分组可以包含多个账号（负载均衡）</li><li>支持 OAuth 和 Session Key 两种方式</li></ul></div><p style="margin-top: 16px; color: #4f7dff; font-weight: 600;">👉 点击左侧的"上游管理"</p></div>'
+        title: '第二步：添加上游',
+        description: '点击工作区上方“上游”，接入厂商账号或 API Key，并把账号加入刚创建的分组。'
       },
       createAccount: {
         title: '➕ 添加新账号',

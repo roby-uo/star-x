@@ -2,13 +2,15 @@
   <AppLayout>
     <TablePageLayout>
       <template #filters>
+        <AdminWorkspaceTabs area="models" />
         <div class="mb-5 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">管理对外提供的模型</h2>
-            <p class="mt-1 text-sm text-gray-500">在一个地方设置规格、基础售价和开放分组，分组倍率继续沿用原有配置。</p>
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">模型目录</h2>
+            <p class="mt-1 text-sm text-gray-500">选择模型，配置规格与开放分组，或直接试算费用。</p>
           </div>
-          <div class="flex gap-2"><router-link to="/admin/billing-management" class="btn btn-secondary">费率与成本</router-link><router-link to="/admin/accounts" class="btn btn-secondary">添加上游模型</router-link></div>
+          <router-link to="/admin/accounts" class="btn btn-primary">接入上游</router-link>
         </div>
+        <p v-if="billingError" role="alert" class="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">{{ billingError }} <button type="button" class="ml-2 underline" :disabled="loading" @click="load">重试</button></p>
         <div class="mb-4 flex flex-wrap gap-2" role="tablist" aria-label="模型类型">
           <button v-for="tab in typeTabs" :key="tab.value" type="button" role="tab" :aria-selected="type === tab.value"
             class="rounded-lg px-4 py-2 text-sm font-medium transition-colors" :class="type === tab.value ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50 dark:bg-dark-800 dark:text-gray-300'" @click="type = tab.value">
@@ -32,26 +34,28 @@
         </div>
       </template>
       <template #table>
-        <div class="table-wrapper">
-          <table class="min-w-full">
-            <thead><tr><th>模型</th><th>供应商</th><th>规格与基础售价</th><th>开放分组</th><th>状态</th><th class="text-right">管理</th></tr></thead>
+        <div class="table-wrapper overflow-x-auto">
+          <table class="w-full" style="min-width: 1040px">
+            <thead><tr><th>模型</th><th>上游来源</th><th>规格</th><th>开放分组</th><th>开放状态</th><th>计费状态</th><th class="text-right">操作</th></tr></thead>
             <tbody>
               <tr v-for="row in filteredRows" :key="row.key" class="hover:bg-gray-50 dark:hover:bg-dark-700/40">
-                <td><div class="font-semibold text-gray-900 dark:text-white">{{ row.model }}</div><div class="mt-1 text-xs text-gray-500">{{ typeLabel(row.type) }} · {{ row.sources.length }} 个上游来源</div></td>
-                <td><div>{{ catalogModelProvider(row.model, row.platform) }}</div><div class="mt-1 text-xs text-gray-400">{{ row.accounts || '尚未关联账号' }}</div></td>
-                <td><div class="text-sm">{{ row.specs }}</div><div class="mt-1 text-xs text-gray-500">{{ row.price }}</div></td>
+                <td><div class="font-semibold text-gray-900 dark:text-white">{{ row.model }}</div><div class="mt-1 text-xs text-gray-500">{{ typeLabel(row.type) }}</div></td>
+                <td><div>{{ catalogModelProvider(row.model, row.platform) }}</div><div class="mt-1 max-w-56 truncate text-xs text-gray-400" :title="row.accounts">{{ row.accounts || '尚未关联账号' }}</div><div v-if="row.sources.length" class="mt-1 text-xs" :class="row.activeSources ? 'text-gray-400' : 'text-amber-600'">{{ row.activeSources }} / {{ row.sources.length }} 个来源可调度</div></td>
+                <td><div class="max-w-56 text-sm">{{ row.specs }}</div></td>
                 <td><div v-if="row.groupNames.length" class="flex max-w-64 flex-wrap gap-1"><span v-for="name in row.groupNames" :key="name" class="rounded bg-gray-100 px-2 py-1 text-xs dark:bg-dark-700">{{ name }}</span></div><span v-else class="text-xs text-gray-400">尚未开放</span></td>
-                <td><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium" :class="statusClass(row.status)">{{ statusLabel(row.status) }}</span><div v-if="row.legacy" class="mt-1 text-xs text-gray-400">沿用现有配置</div></td>
-                <td><button class="btn btn-secondary whitespace-nowrap text-xs" :aria-label="`配置 ${row.model}`" @click="editing = row">配置模型</button></td>
+                <td><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium" :class="statusClass(row.status)">{{ row.sources.length && !row.activeSources ? '上游暂停' : statusLabel(row.status) }}</span></td>
+                <td><span class="whitespace-nowrap text-xs" :class="billingClass(row.billing)">{{ billingLabel(row.billing) }}</span><div class="mt-1 max-w-40 text-xs text-gray-400">{{ row.billingHint }}</div></td>
+                <td><div class="flex justify-end gap-2"><button class="btn btn-secondary whitespace-nowrap text-xs" :aria-label="`配置 ${row.model}`" @click="editing = row">配置</button><button class="btn btn-secondary whitespace-nowrap text-xs" :disabled="!billingConfig || !row.sources.length" :aria-label="`试算 ${row.model}`" @click="preview = row">试算</button></div></td>
               </tr>
-              <tr v-if="loading"><td colspan="6" class="py-16 text-center text-sm text-gray-500">正在加载模型…</td></tr>
-              <tr v-else-if="!filteredRows.length"><td colspan="6" class="py-16 text-center text-sm text-gray-500"><span v-if="rows.length">没有符合条件的模型。</span><span v-else>先在 <router-link to="/admin/accounts" class="text-primary-600 underline">上游管理</router-link> 登记模型，随后在这里配置开放。</span></td></tr>
+              <tr v-if="loading"><td colspan="7" class="py-16 text-center text-sm text-gray-500">正在加载模型…</td></tr>
+              <tr v-else-if="!filteredRows.length"><td colspan="7" class="py-16 text-center text-sm text-gray-500"><span v-if="rows.length">没有符合条件的模型。</span><span v-else>先 <router-link to="/admin/accounts" class="text-primary-600 underline">接入上游</router-link> 并登记可用模型。</span></td></tr>
             </tbody>
           </table>
         </div>
       </template>
     </TablePageLayout>
     <ModelServiceEditor v-if="editing" :model="editing.model" :platform="editing.platform" :kind="editing.type === 'Videos' ? 'video' : editing.type === 'Images' ? 'image' : 'chat'" :channels="channels" :accounts="editing.sources" @close="editing = null" @saved="onSaved" />
+    <BillingPreviewDialog v-if="preview" :model="preview.model" :accounts="preview.sources" :groups="groups" :profiles="billingConfig?.cost_profiles || []" :models="[preview.model]" :initial-account-id="previewAccountID(preview)" :initial-group-id="previewGroupID(preview)" @close="preview = null" />
   </AppLayout>
 </template>
 
@@ -59,7 +63,9 @@
 import { computed, onMounted, ref } from 'vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
+import AdminWorkspaceTabs from '@/components/admin/AdminWorkspaceTabs.vue'
 import ModelServiceEditor from '@/components/admin/ModelServiceEditor.vue'
+import BillingPreviewDialog from '@/components/admin/billing/BillingPreviewDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import channelsAPI, { type Channel } from '@/api/admin/channels'
 import { accountsAPI } from '@/api/admin/accounts'
@@ -68,19 +74,24 @@ import type { Account, AdminGroup } from '@/types'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { catalogModelProvider, catalogModelType, isAudioModel, type CatalogModelType } from '@/utils/modelCatalog'
-import { configuredModelOpen, modelPolicy, modelPricing } from '@/components/admin/modelServiceAdmin'
+import { configuredModelOpen, modelPolicy } from '@/components/admin/modelServiceAdmin'
 import type { ModelServicePolicy } from '@/types/modelService'
-import { formatScaled } from '@/utils/pricing'
 import { miniMaxVideoSpec } from '@/utils/minimaxVideo'
+import { billingManagementAPI, type BillingCatalogEntry, type BillingManagementConfig } from '@/api/admin/billingManagement'
 
 type ModelStatus = 'open' | 'partial' | 'paused' | 'draft' | 'unassigned'
-type ModelRow = { key: string; model: string; type: CatalogModelType; platform: string; accounts: string; sources: Account[]; groupNames: string[]; status: ModelStatus; legacy: boolean; specs: string; price: string }
+type BillingStatus = 'ready' | 'partial' | 'unknown' | 'unavailable' | 'legacy'
+type ModelRow = { key: string; model: string; type: CatalogModelType; platform: string; accounts: string; sources: Account[]; activeSources: number; groupNames: string[]; status: ModelStatus; specs: string; billing: BillingStatus; billingHint: string }
 const typeTabs = [{ value: '', label: '全部模型' }, { value: 'Chat', label: '文本' }, { value: 'Images', label: '图片' }, { value: 'Videos', label: '视频' }]
 const appStore = useAppStore()
 const channels = ref<Channel[]>([])
 const accounts = ref<Account[]>([])
 const groups = ref<AdminGroup[]>([])
 const editing = ref<ModelRow | null>(null)
+const preview = ref<ModelRow | null>(null)
+const billingConfig = ref<BillingManagementConfig | null>(null)
+const billingCatalog = ref<BillingCatalogEntry[]>([])
+const billingError = ref('')
 const loading = ref(false)
 const query = ref('')
 const type = ref('')
@@ -88,6 +99,31 @@ const statusFilter = ref('')
 const typeLabel = (value: CatalogModelType) => ({ Chat: '文本', Images: '图片', Videos: '视频' })[value]
 const statusLabel = (value: ModelStatus) => ({ open: '已开放', partial: '部分开放', paused: '已暂停', draft: '草稿', unassigned: '待配置' })[value]
 const statusClass = (value: ModelStatus) => value === 'open' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' : value === 'partial' ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' : 'bg-gray-100 text-gray-600 dark:bg-dark-700 dark:text-gray-300'
+const billingLabel = (value: BillingStatus) => ({ ready: '基准价已匹配', partial: '部分规格待确认', unknown: '价格待核对', unavailable: '来源暂停', legacy: '自定义定价' })[value]
+const billingClass = (value: BillingStatus) => value === 'ready' ? 'text-emerald-600 dark:text-emerald-400' : value === 'partial' || value === 'unknown' ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500'
+
+function billingSummary(platform: string, model: string, sources: Account[], activeSources: number): { billing: BillingStatus; billingHint: string } {
+  if (!billingConfig.value) return { billing: 'unknown', billingHint: '价格信息暂不可用' }
+  if (billingConfig.value.simple_billing_enabled === false) return { billing: 'legacy', billingHint: '在模型配置中维护' }
+  if (sources.length && !activeSources) return { billing: 'unavailable', billingHint: '可通过试算核对参考价' }
+  const entries = billingCatalog.value.filter(entry => !entry.operation && entry.platform === platform && entry.model === model)
+  if (!entries.length || entries.every(entry => entry.status !== 'ready')) return { billing: 'unknown', billingHint: '在计费设置补充采购价' }
+  const ready = entries.filter(entry => entry.status === 'ready')
+  const hints = [...new Set(ready.map(entry => entry.route === 'api' ? `API ${entry.multiplier}×` : '账号按分组倍率'))]
+  return { billing: ready.length === entries.length ? 'ready' : 'partial', billingHint: hints.join(' · ') }
+}
+
+function previewAccountID(row: ModelRow): number | undefined {
+  const available = row.sources.filter(account => account.status === 'active' && account.schedulable !== false)
+  return available.length === 1 ? available[0]!.id : undefined
+}
+function previewGroupID(row: ModelRow): number | undefined {
+  const account = row.sources.find(source => source.id === previewAccountID(row))
+  if (!account) return undefined
+  const ids = account.group_ids || account.groups?.map(group => group.id) || []
+  const available = groups.value.filter(group => group.status === 'active' && group.platform === row.platform && ids.includes(group.id))
+  return available.length === 1 ? available[0]!.id : undefined
+}
 
 const rows = computed<ModelRow[]>(() => {
   const inventory = new Map<string, { model: string; platform: string; kind?: string; sources: Account[] }>()
@@ -122,16 +158,14 @@ const rows = computed<ModelRow[]>(() => {
     })
     const status: ModelStatus = openGroups.length
       ? (openGroups.length < matchingGroups.length || policies.some(({ channel, policy }) => channel.status !== 'active' || policy.state !== 'published') ? 'partial' : 'open')
-      : policies.some(({ channel, policy }) => channel.status !== 'active' || policy.state === 'paused') ? 'paused'
+      : (entry.sources.length > 0 && !activeSources.length) || policies.some(({ channel, policy }) => channel.status !== 'active' || policy.state === 'paused') ? 'paused'
       : policies.some(({ policy }) => policy.state === 'draft') ? 'draft' : 'unassigned'
     const selectedPolicies = policies.map(item => item.policy)
     const videoSpec = entry.platform === 'openai' ? miniMaxVideoSpec(entry.model) : undefined
     const specs = modelType === 'Videos'
       ? selectedPolicies.length ? [...new Set(selectedPolicies.flatMap(policy => policy.resolutions || []))].join(' / ') + ' · ' + `${Math.min(...selectedPolicies.map(policy => policy.min_duration || videoSpec?.minDuration || 4))}–${Math.max(...selectedPolicies.map(policy => policy.max_duration || videoSpec?.maxDuration || 15))} 秒` : videoSpec ? `${videoSpec.resolutions.join(' / ')} · ${videoSpec.minDuration}–${videoSpec.maxDuration} 秒` : '沿用上游规格'
       : modelType === 'Images' ? [...new Set(selectedPolicies.flatMap(policy => policy.image_sizes || []))].join(' / ') || '沿用上游图片规格' : '文本输入与输出'
-    const pricingEntries = channels.value.flatMap(channel => { const pricing = modelPricing(channel, entry.model, entry.platform); return pricing ? [pricing] : [] })
-    const summaries = modelType === 'Videos' ? [...new Set(selectedPolicies.map(policy => (policy.resolutions || []).map(resolution => `${resolution} ${formatScaled(policy.prices?.[resolution] ?? null, 1)}/秒`).join(' · ')).filter(Boolean))] : [...new Set(pricingEntries.map(pricing => pricing.intervals.length ? '已配置分档价格' : pricing.billing_mode === 'token' ? `输入 ${formatScaled(pricing.input_price, 1_000_000)} · 输出 ${formatScaled(pricing.output_price, 1_000_000)}/百万词元` : `${formatScaled(pricing.per_request_price, 1)}/${pricing.billing_mode === 'image' ? '张' : '次'}`))]
-    return { key, model: entry.model, platform: entry.platform, type: modelType, sources: entry.sources, accounts: entry.sources.map(account => account.name).join('、'), groupNames: openGroups.map(group => group.name), status, legacy: !policies.length, specs, price: summaries.length > 1 ? '多个价格范围 · 在配置中查看' : summaries[0] || '沿用系统／分组定价' }
+    return { key, model: entry.model, platform: entry.platform, type: modelType, sources: entry.sources, activeSources: activeSources.length, accounts: entry.sources.map(account => account.name).join('、'), groupNames: openGroups.map(group => group.name), status, specs, ...billingSummary(entry.platform, entry.model, entry.sources, activeSources.length) }
   }).sort((a, b) => a.type.localeCompare(b.type) || a.model.localeCompare(b.model))
 })
 
@@ -142,6 +176,7 @@ const filteredRows = computed(() => {
 
 async function load() {
   loading.value = true
+  billingError.value = ''
   try {
     const fetchChannels = async () => {
       const all: Channel[] = []
@@ -151,8 +186,21 @@ async function load() {
       const all: Account[] = []
       for (let page = 1; ; page++) { const result = await accountsAPI.list(page, 100); all.push(...result.items); if (!result.items.length || all.length >= result.total) return all }
     }
-    const [nextChannels, nextAccounts, nextGroups] = await Promise.all([fetchChannels(), fetchAccounts(), getAllIncludingInactive()])
-    channels.value = nextChannels; accounts.value = nextAccounts; groups.value = nextGroups
+    const [inventory, pricing] = await Promise.allSettled([
+      Promise.all([fetchChannels(), fetchAccounts(), getAllIncludingInactive()]),
+      Promise.all([billingManagementAPI.getConfig(), billingManagementAPI.catalog()])
+    ])
+    if (inventory.status === 'fulfilled') {
+      const [nextChannels, nextAccounts, nextGroups] = inventory.value
+      channels.value = nextChannels; accounts.value = nextAccounts; groups.value = nextGroups
+    } else appStore.showError(extractApiErrorMessage(inventory.reason, '模型目录加载失败'))
+    if (pricing.status === 'fulfilled') {
+      const [nextConfig, nextCatalog] = pricing.value
+      billingConfig.value = nextConfig; billingCatalog.value = nextCatalog
+    } else {
+      billingConfig.value = null; billingCatalog.value = []
+      billingError.value = extractApiErrorMessage(pricing.reason, '价格信息加载失败，模型目录仍可管理。')
+    }
   } catch (error) { appStore.showError(extractApiErrorMessage(error, '模型服务加载失败')) }
   finally { loading.value = false }
 }

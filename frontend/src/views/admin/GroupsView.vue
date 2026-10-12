@@ -3,6 +3,12 @@
     <TablePageLayout>
       <template #filters>
         <AdminWorkspaceTabs area="upstream" />
+        <div class="flex flex-wrap items-center justify-between gap-2 text-sm text-gray-500 dark:text-gray-400">
+          <p>管理分组的访问权限、容量与请求路由。</p>
+          <RouterLink v-if="simpleBillingEnabled === true" to="/admin/billing-management" class="font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400" data-testid="group-billing-settings">计费设置</RouterLink>
+          <button v-else-if="billingConfigError" type="button" class="font-medium text-primary-600 dark:text-primary-400" @click="loadBillingMode" data-testid="group-billing-retry">计费配置加载失败，点击重试</button>
+          <span v-else-if="billingConfigLoading">正在读取计费设置…</span>
+        </div>
         <div
           class="flex flex-col justify-between gap-4 lg:flex-row lg:items-start"
         >
@@ -252,7 +258,7 @@
 
           <template #cell-rate_multiplier="{ value }">
             <span class="text-sm text-gray-700 dark:text-gray-300"
-              >{{ value }}x</span
+              >{{ simpleBillingEnabled === null ? '—' : `${value}x` }}</span
             >
           </template>
 
@@ -384,6 +390,7 @@
                 </span>
               </button>
               <button
+                v-if="showLegacyPricing"
                 @click="handleRateMultipliers(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-purple-600 dark:hover:bg-dark-700 dark:hover:text-purple-400"
               >
@@ -446,6 +453,8 @@
         @submit.prevent="handleCreateGroup"
         class="space-y-5"
       >
+        <p v-if="simpleBillingEnabled === true" class="rounded-lg bg-gray-50 p-3 text-sm text-gray-500 dark:bg-dark-800 dark:text-gray-400">授权账号倍率、模型价格统一在<RouterLink to="/admin/billing-management" class="ml-1 text-primary-600 dark:text-primary-400">计费设置</RouterLink>调整。</p>
+        <p v-else-if="simpleBillingEnabled === null" class="text-sm text-amber-600 dark:text-amber-400">读取计费配置后可保存分组。<button type="button" class="ml-1 underline" :disabled="billingConfigLoading" @click="loadBillingMode">{{ billingConfigLoading ? '加载中…' : '重新加载' }}</button></p>
         <div>
           <label class="input-label">{{ t("admin.groups.form.name") }}</label>
           <input
@@ -569,7 +578,7 @@
           </select>
           <p class="input-hint">{{ t("admin.groups.copyAccounts.hint") }}</p>
         </div>
-        <div>
+        <div v-if="showLegacyPricing">
           <label class="input-label">{{
             t("admin.groups.form.rateMultiplier")
           }}</label>
@@ -848,9 +857,9 @@
           <label
             class="block mb-2 font-medium text-gray-700 dark:text-gray-300"
           >
-            {{ t(imagePricingI18nKey(createForm.platform, "title")) }}
+            {{ showLegacyPricing ? t(imagePricingI18nKey(createForm.platform, "title")) : "图片生成权限" }}
           </label>
-          <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          <p v-if="showLegacyPricing" class="text-xs text-gray-500 dark:text-gray-400 mb-3">
             {{ t(imagePricingI18nKey(createForm.platform, "description")) }}
           </p>
           <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -862,7 +871,7 @@
               />
               {{ t(imagePricingI18nKey(createForm.platform, "allowImageGeneration")) }}
             </label>
-            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <label v-if="showLegacyPricing" class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <input
                 v-model="createForm.image_rate_independent"
                 type="checkbox"
@@ -871,73 +880,75 @@
               {{ t(imagePricingI18nKey(createForm.platform, "independentMultiplier")) }}
             </label>
           </div>
-          <div
-            v-if="createForm.image_rate_independent"
-            class="mb-4"
-          >
-            <label class="input-label">{{
-              t(imagePricingI18nKey(createForm.platform, "imageMultiplier"))
-            }}</label>
-            <input
-              v-model.number="createForm.image_rate_multiplier"
-              type="number"
-              step="0.0001"
-              min="0"
-              class="input"
-              placeholder="1"
-            />
-          </div>
-          <div class="grid grid-cols-3 gap-3">
-            <div>
-              <label class="input-label">1K (¥)</label>
-              <LedgerAmountInput
-                v-model="createForm.image_price_1k"
+          <template v-if="showLegacyPricing">
+            <div
+              v-if="createForm.image_rate_independent"
+              class="mb-4"
+            >
+              <label class="input-label">{{
+                t(imagePricingI18nKey(createForm.platform, "imageMultiplier"))
+              }}</label>
+              <input
+                v-model.number="createForm.image_rate_multiplier"
                 type="number"
-                step="0.001"
+                step="0.0001"
                 min="0"
                 class="input"
-                :placeholder="getImagePricePlaceholder(createForm.platform, 'image_price_1k')"
+                placeholder="1"
               />
             </div>
-            <div>
-              <label class="input-label">2K (¥)</label>
-              <LedgerAmountInput
-                v-model="createForm.image_price_2k"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getImagePricePlaceholder(createForm.platform, 'image_price_2k')"
-              />
-            </div>
-            <div>
-              <label class="input-label">4K (¥)</label>
-              <LedgerAmountInput
-                v-model="createForm.image_price_4k"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getImagePricePlaceholder(createForm.platform, 'image_price_4k')"
-              />
-            </div>
-          </div>
-          <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
-            {{ t(imagePricingI18nKey(createForm.platform, "modeHint")) }}
-          </p>
-          <div class="mt-2 rounded-lg bg-gray-50 p-3 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-            <div class="mb-1 font-medium">
-              {{ t(imagePricingI18nKey(createForm.platform, "finalPricePreview")) }}
-            </div>
-            <div class="grid grid-cols-3 gap-2">
-              <div
-                v-for="item in createImageFinalPricePreview"
-                :key="item.label"
-              >
-                {{ item.label }}: {{ item.value }}
+            <div class="grid grid-cols-3 gap-3">
+              <div>
+                <label class="input-label">1K (¥)</label>
+                <LedgerAmountInput
+                  v-model="createForm.image_price_1k"
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  class="input"
+                  :placeholder="getImagePricePlaceholder(createForm.platform, 'image_price_1k')"
+                />
+              </div>
+              <div>
+                <label class="input-label">2K (¥)</label>
+                <LedgerAmountInput
+                  v-model="createForm.image_price_2k"
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  class="input"
+                  :placeholder="getImagePricePlaceholder(createForm.platform, 'image_price_2k')"
+                />
+              </div>
+              <div>
+                <label class="input-label">4K (¥)</label>
+                <LedgerAmountInput
+                  v-model="createForm.image_price_4k"
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  class="input"
+                  :placeholder="getImagePricePlaceholder(createForm.platform, 'image_price_4k')"
+                />
               </div>
             </div>
-          </div>
+            <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
+              {{ t(imagePricingI18nKey(createForm.platform, "modeHint")) }}
+            </p>
+            <div class="mt-2 rounded-lg bg-gray-50 p-3 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+              <div class="mb-1 font-medium">
+                {{ t(imagePricingI18nKey(createForm.platform, "finalPricePreview")) }}
+              </div>
+              <div class="grid grid-cols-3 gap-2">
+                <div
+                  v-for="item in createImageFinalPricePreview"
+                  :key="item.label"
+                >
+                  {{ item.label }}: {{ item.value }}
+                </div>
+              </div>
+            </div>
+          </template>
           <div v-if="createForm.platform === 'gemini' && createForm.allow_image_generation" class="mt-4 border-t border-dashed border-gray-200 pt-4 dark:border-dark-700">
             <label
               class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -949,11 +960,11 @@
               />
               {{ t("admin.groups.imagePricing.allowBatchImageGeneration") }}
             </label>
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            <p v-if="showLegacyPricing" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
               {{ t("admin.groups.imagePricing.batchSectionHint") }}
             </p>
             <div
-              v-if="createForm.allow_batch_image_generation"
+              v-if="showLegacyPricing && createForm.allow_batch_image_generation"
               class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2"
             >
               <div>
@@ -994,7 +1005,7 @@
 
         <!-- 视频生成计费配置（仅 Grok 平台） -->
         <div
-          v-if="supportsVideoPricingPlatform(createForm.platform)"
+          v-if="showLegacyPricing && supportsVideoPricingPlatform(createForm.platform)"
           class="border-t pt-4"
         >
           <label
@@ -1085,7 +1096,7 @@
         </div>
 
         <!-- 高峰时段倍率配置（仅订阅类型分组） -->
-        <div v-if="createForm.subscription_type === 'subscription'" class="border-t pt-4">
+        <div v-if="showLegacyPricing && createForm.subscription_type === 'subscription'" class="border-t pt-4">
           <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
             <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <input
@@ -1340,7 +1351,7 @@
 
         <!-- Codex 网页搜索按次计费（仅 openai 平台） -->
         <div
-          v-if="createForm.platform === 'openai'"
+          v-if="showLegacyPricing && createForm.platform === 'openai'"
           class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
         >
           <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
@@ -1916,7 +1927,7 @@
           <button
             type="submit"
             form="create-group-form"
-            :disabled="submitting"
+            :disabled="submitting || simpleBillingEnabled === null"
             class="btn btn-primary"
             data-tour="group-form-submit"
           >
@@ -1959,6 +1970,8 @@
         @submit.prevent="handleUpdateGroup"
         class="space-y-5"
       >
+        <p v-if="simpleBillingEnabled === true" class="rounded-lg bg-gray-50 p-3 text-sm text-gray-500 dark:bg-dark-800 dark:text-gray-400">授权账号倍率、模型价格统一在<RouterLink to="/admin/billing-management" class="ml-1 text-primary-600 dark:text-primary-400">计费设置</RouterLink>调整。</p>
+        <p v-else-if="simpleBillingEnabled === null" class="text-sm text-amber-600 dark:text-amber-400">读取计费配置后可保存分组。<button type="button" class="ml-1 underline" :disabled="billingConfigLoading" @click="loadBillingMode">{{ billingConfigLoading ? '加载中…' : '重新加载' }}</button></p>
         <div>
           <label class="input-label">{{ t("admin.groups.form.name") }}</label>
           <input
@@ -2082,7 +2095,7 @@
             {{ t("admin.groups.copyAccounts.hintEdit") }}
           </p>
         </div>
-        <div>
+        <div v-if="showLegacyPricing">
           <label class="input-label">{{
             t("admin.groups.form.rateMultiplier")
           }}</label>
@@ -2362,9 +2375,9 @@
           <label
             class="block mb-2 font-medium text-gray-700 dark:text-gray-300"
           >
-            {{ t(imagePricingI18nKey(editForm.platform, "title")) }}
+            {{ showLegacyPricing ? t(imagePricingI18nKey(editForm.platform, "title")) : "图片生成权限" }}
           </label>
-          <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          <p v-if="showLegacyPricing" class="text-xs text-gray-500 dark:text-gray-400 mb-3">
             {{ t(imagePricingI18nKey(editForm.platform, "description")) }}
           </p>
           <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -2376,7 +2389,7 @@
               />
               {{ t(imagePricingI18nKey(editForm.platform, "allowImageGeneration")) }}
             </label>
-            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <label v-if="showLegacyPricing" class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <input
                 v-model="editForm.image_rate_independent"
                 type="checkbox"
@@ -2385,73 +2398,75 @@
               {{ t(imagePricingI18nKey(editForm.platform, "independentMultiplier")) }}
             </label>
           </div>
-          <div
-            v-if="editForm.image_rate_independent"
-            class="mb-4"
-          >
-            <label class="input-label">{{
-              t(imagePricingI18nKey(editForm.platform, "imageMultiplier"))
-            }}</label>
-            <input
-              v-model.number="editForm.image_rate_multiplier"
-              type="number"
-              step="0.0001"
-              min="0"
-              class="input"
-              placeholder="1"
-            />
-          </div>
-          <div class="grid grid-cols-3 gap-3">
-            <div>
-              <label class="input-label">1K (¥)</label>
-              <LedgerAmountInput
-                v-model="editForm.image_price_1k"
+          <template v-if="showLegacyPricing">
+            <div
+              v-if="editForm.image_rate_independent"
+              class="mb-4"
+            >
+              <label class="input-label">{{
+                t(imagePricingI18nKey(editForm.platform, "imageMultiplier"))
+              }}</label>
+              <input
+                v-model.number="editForm.image_rate_multiplier"
                 type="number"
-                step="0.001"
+                step="0.0001"
                 min="0"
                 class="input"
-                :placeholder="getImagePricePlaceholder(editForm.platform, 'image_price_1k')"
+                placeholder="1"
               />
             </div>
-            <div>
-              <label class="input-label">2K (¥)</label>
-              <LedgerAmountInput
-                v-model="editForm.image_price_2k"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getImagePricePlaceholder(editForm.platform, 'image_price_2k')"
-              />
-            </div>
-            <div>
-              <label class="input-label">4K (¥)</label>
-              <LedgerAmountInput
-                v-model="editForm.image_price_4k"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getImagePricePlaceholder(editForm.platform, 'image_price_4k')"
-              />
-            </div>
-          </div>
-          <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
-            {{ t(imagePricingI18nKey(editForm.platform, "modeHint")) }}
-          </p>
-          <div class="mt-2 rounded-lg bg-gray-50 p-3 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-            <div class="mb-1 font-medium">
-              {{ t(imagePricingI18nKey(editForm.platform, "finalPricePreview")) }}
-            </div>
-            <div class="grid grid-cols-3 gap-2">
-              <div
-                v-for="item in editImageFinalPricePreview"
-                :key="item.label"
-              >
-                {{ item.label }}: {{ item.value }}
+            <div class="grid grid-cols-3 gap-3">
+              <div>
+                <label class="input-label">1K (¥)</label>
+                <LedgerAmountInput
+                  v-model="editForm.image_price_1k"
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  class="input"
+                  :placeholder="getImagePricePlaceholder(editForm.platform, 'image_price_1k')"
+                />
+              </div>
+              <div>
+                <label class="input-label">2K (¥)</label>
+                <LedgerAmountInput
+                  v-model="editForm.image_price_2k"
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  class="input"
+                  :placeholder="getImagePricePlaceholder(editForm.platform, 'image_price_2k')"
+                />
+              </div>
+              <div>
+                <label class="input-label">4K (¥)</label>
+                <LedgerAmountInput
+                  v-model="editForm.image_price_4k"
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  class="input"
+                  :placeholder="getImagePricePlaceholder(editForm.platform, 'image_price_4k')"
+                />
               </div>
             </div>
-          </div>
+            <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
+              {{ t(imagePricingI18nKey(editForm.platform, "modeHint")) }}
+            </p>
+            <div class="mt-2 rounded-lg bg-gray-50 p-3 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+              <div class="mb-1 font-medium">
+                {{ t(imagePricingI18nKey(editForm.platform, "finalPricePreview")) }}
+              </div>
+              <div class="grid grid-cols-3 gap-2">
+                <div
+                  v-for="item in editImageFinalPricePreview"
+                  :key="item.label"
+                >
+                  {{ item.label }}: {{ item.value }}
+                </div>
+              </div>
+            </div>
+          </template>
           <div v-if="editForm.platform === 'gemini' && editForm.allow_image_generation" class="mt-4 border-t border-dashed border-gray-200 pt-4 dark:border-dark-700">
             <label
               class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -2463,11 +2478,11 @@
               />
               {{ t("admin.groups.imagePricing.allowBatchImageGeneration") }}
             </label>
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            <p v-if="showLegacyPricing" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
               {{ t("admin.groups.imagePricing.batchSectionHint") }}
             </p>
             <div
-              v-if="editForm.allow_batch_image_generation"
+              v-if="showLegacyPricing && editForm.allow_batch_image_generation"
               class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2"
             >
               <div>
@@ -2508,7 +2523,7 @@
 
         <!-- 视频生成计费配置（仅 Grok 平台） -->
         <div
-          v-if="supportsVideoPricingPlatform(editForm.platform)"
+          v-if="showLegacyPricing && supportsVideoPricingPlatform(editForm.platform)"
           class="border-t pt-4"
         >
           <label
@@ -2599,7 +2614,7 @@
         </div>
 
         <!-- 高峰时段倍率配置（仅订阅类型分组） -->
-        <div v-if="editForm.subscription_type === 'subscription'" class="border-t pt-4">
+        <div v-if="showLegacyPricing && editForm.subscription_type === 'subscription'" class="border-t pt-4">
           <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
             <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <input
@@ -2850,7 +2865,7 @@
 
         <!-- Codex 网页搜索按次计费（仅 openai 平台） -->
         <div
-          v-if="editForm.platform === 'openai'"
+          v-if="showLegacyPricing && editForm.platform === 'openai'"
           class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
         >
           <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
@@ -3425,7 +3440,7 @@
           <button
             type="submit"
             form="edit-group-form"
-            :disabled="submitting"
+            :disabled="submitting || simpleBillingEnabled === null"
             class="btn btn-primary"
             data-tour="group-form-submit"
           >
@@ -3561,6 +3576,7 @@
 
     <!-- Group Rate Multipliers Modal -->
     <GroupRateMultipliersModal
+      v-if="showLegacyPricing"
       :show="showRateMultipliersModal"
       :group="rateMultipliersGroup"
       @close="showRateMultipliersModal = false"
@@ -3585,7 +3601,9 @@ import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
 import { useOnboardingStore } from "@/stores/onboarding";
 import { adminAPI } from "@/api/admin";
-import type { AdminGroup, GroupPlatform, SubscriptionType } from "@/types";
+import { billingManagementAPI } from "@/api/admin/billingManagement";
+import { RouterLink } from "vue-router";
+import type { AdminGroup, CreateGroupRequest, UpdateGroupRequest, GroupPlatform, SubscriptionType } from "@/types";
 import type { Column } from "@/components/common/types";
 import AppLayout from "@/components/layout/AppLayout.vue";
 import TablePageLayout from "@/components/layout/TablePageLayout.vue";
@@ -3637,6 +3655,28 @@ import {
 const { t } = useI18n();
 const appStore = useAppStore();
 const onboardingStore = useOnboardingStore();
+const simpleBillingEnabled = ref<boolean | null>(null);
+const billingConfigLoading = ref(false);
+const billingConfigError = ref(false);
+const showLegacyPricing = computed(() => simpleBillingEnabled.value === false);
+
+const loadBillingMode = async () => {
+  if (billingConfigLoading.value) return;
+  billingConfigLoading.value = true;
+  billingConfigError.value = false;
+  simpleBillingEnabled.value = null;
+  try {
+    const config = await billingManagementAPI.getConfig();
+    if (typeof config.simple_billing_enabled !== "boolean") {
+      throw new Error("Missing billing mode");
+    }
+    simpleBillingEnabled.value = config.simple_billing_enabled;
+  } catch {
+    billingConfigError.value = true;
+  } finally {
+    billingConfigLoading.value = false;
+  }
+};
 
 const ALWAYS_VISIBLE_COLUMNS = new Set(["name", "actions"]);
 // Default hidden columns (hidden on first load / after schema bumps).
@@ -3664,7 +3704,7 @@ const allColumns = computed<Column[]>(() => [
   },
   {
     key: "rate_multiplier",
-    label: t("admin.groups.columns.rateMultiplier"),
+    label: showLegacyPricing.value ? t("admin.groups.columns.rateMultiplier") : "授权倍率",
     sortable: true,
   },
   {
@@ -4830,7 +4870,25 @@ const normalizeRateMultiplier = (
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 1;
 };
 
+// Hidden pricing fields must not overwrite centrally managed or historical values.
+const omitCentralizedPricingFields = (payload: UpdateGroupRequest) => {
+  const fields = [
+    "rate_multiplier", "image_rate_independent", "image_rate_multiplier",
+    "batch_image_discount_multiplier", "batch_image_hold_multiplier",
+    "image_price_1k", "image_price_2k", "image_price_4k",
+    "video_rate_independent", "video_rate_multiplier",
+    "video_price_480p", "video_price_720p", "video_price_1080p",
+    "web_search_price_per_call", "peak_rate_enabled", "peak_start", "peak_end",
+    "peak_rate_multiplier",
+  ] as const;
+  for (const field of fields) delete payload[field];
+};
+
 const handleCreateGroup = async () => {
+  if (simpleBillingEnabled.value === null) {
+    appStore.showError("请先重新加载计费配置，再保存分组。");
+    return;
+  }
   if (!createForm.name.trim()) {
     appStore.showError(t("admin.groups.nameRequired"));
     return;
@@ -4903,7 +4961,12 @@ const handleCreateGroup = async () => {
     requestData.peak_rate_multiplier = normalizeRateMultiplier(
       createForm.peak_rate_multiplier,
     );
-    await adminAPI.groups.create(requestData);
+    const createPayload: CreateGroupRequest = requestData;
+    if (simpleBillingEnabled.value) {
+      omitCentralizedPricingFields(createPayload);
+      createPayload.rate_multiplier = 1;
+    }
+    await adminAPI.groups.create(createPayload);
     appStore.showSuccess(t("admin.groups.groupCreated"));
     closeCreateModal();
     loadGroups();
@@ -5015,6 +5078,10 @@ const closeEditModal = () => {
 
 const handleUpdateGroup = async () => {
   if (!editingGroup.value) return;
+  if (simpleBillingEnabled.value === null) {
+    appStore.showError("请先重新加载计费配置，再保存分组。");
+    return;
+  }
   if (!editForm.name.trim()) {
     appStore.showError(t("admin.groups.nameRequired"));
     return;
@@ -5096,7 +5163,9 @@ const handleUpdateGroup = async () => {
     payload.peak_rate_multiplier = normalizeRateMultiplier(
       editForm.peak_rate_multiplier,
     );
-    await adminAPI.groups.update(editingGroup.value.id, payload);
+    const updatePayload: UpdateGroupRequest = payload;
+    if (simpleBillingEnabled.value) omitCentralizedPricingFields(updatePayload);
+    await adminAPI.groups.update(editingGroup.value.id, updatePayload);
     appStore.showSuccess(t("admin.groups.groupUpdated"));
     closeEditModal();
     loadGroups();
@@ -5135,6 +5204,7 @@ const removeEditMessagesDispatchMapping = (row: MessagesDispatchMappingRow) => {
 };
 
 const handleRateMultipliers = (group: AdminGroup) => {
+  if (!showLegacyPricing.value) return;
   rateMultipliersGroup.value = group;
   showRateMultipliersModal.value = true;
 };
@@ -5354,6 +5424,7 @@ const saveSortOrder = async () => {
 };
 
 onMounted(() => {
+  loadBillingMode();
   loadGroups();
   loadModelsListCandidates("create", 0, createForm.platform);
   document.addEventListener("click", handleClickOutside);

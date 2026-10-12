@@ -5,6 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AdminGroup } from '@/types'
 import GroupsView from '@/views/admin/GroupsView.vue'
 
+vi.mock('@/api/admin/billingManagement', () => ({
+  billingManagementAPI: { getConfig: async () => ({ simple_billing_enabled: false }) }
+}))
+
 const {
   listGroups,
   duplicateGroup,
@@ -139,6 +143,8 @@ function mountView() {
       stubs: {
         AppLayout: AppLayoutStub,
         TablePageLayout: TablePageLayoutStub,
+        AdminWorkspaceTabs: true,
+        RouterLink: true,
         DataTable: DataTableStub,
         Pagination: true,
         BaseDialog: true,

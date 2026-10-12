@@ -4,6 +4,10 @@ import { flushPromises, mount } from '@vue/test-utils'
 import type { AdminGroup } from '@/types'
 import GroupsView from '../GroupsView.vue'
 
+vi.mock('@/api/admin/billingManagement', () => ({
+  billingManagementAPI: { getConfig: async () => ({ simple_billing_enabled: false }) }
+}))
+
 const {
   listGroups,
   getAllGroups,
@@ -183,6 +187,8 @@ const mountView = async () => {
       stubs: {
         AppLayout: AppLayoutStub,
         TablePageLayout: TablePageLayoutStub,
+        AdminWorkspaceTabs: true,
+        RouterLink: true,
         DataTable: DataTableStub,
         Pagination: true,
         BaseDialog: BaseDialogStub,

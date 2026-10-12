@@ -3,9 +3,13 @@
     <TablePageLayout>
       <template #filters>
         <AdminWorkspaceTabs area="models" />
-        <div class="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200">
-          此页用于维护渠道、模型映射与复杂计费规则。日常规格、基础售价和分组开放请从“模型服务”选择模型配置。
-        </div>
+        <p class="mb-4 text-sm leading-6 text-gray-500 dark:text-gray-400">
+          高级渠道用于维护上游来源、模型映射与渠道路由。规格与开放在
+          <router-link class="text-primary-600 hover:underline dark:text-primary-400" to="/admin/models">模型</router-link>
+          中管理，统一倍率与费用规则在
+          <router-link class="text-primary-600 hover:underline dark:text-primary-400" to="/admin/billing-management">计费设置</router-link>
+          中管理。
+        </p>
         <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
           <!-- Left: Search + Filters -->
           <div class="flex flex-1 flex-wrap items-center gap-3">

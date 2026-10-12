@@ -1,11 +1,15 @@
 <template>
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-6" @click.self="!saving && emit('close')">
-    <section role="dialog" aria-modal="true" aria-labelledby="service-title" class="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-dark-800">
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-6" @click.self="!saving && !previewOpen && emit('close')">
+    <section role="dialog" :aria-modal="previewOpen ? undefined : 'true'" :aria-hidden="previewOpen ? 'true' : undefined" :inert="previewOpen ? true : undefined" aria-labelledby="service-title" class="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-dark-800">
       <header class="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-5 dark:border-dark-700 sm:px-7">
-        <div><p class="mb-1 text-xs text-gray-500">{{ kindLabel }}模型 · {{ catalogModelProvider(model, platform) }}</p><h2 id="service-title" class="break-all text-xl font-semibold text-gray-900 dark:text-white">{{ model }}</h2><p class="mt-1 text-xs text-gray-500">调用名称与当前模型一致。配置按选定分组范围生效。</p><p class="mt-2 text-xs leading-5 text-gray-500">{{ accessPurpose }}</p></div>
+        <div><p class="mb-1 text-xs text-gray-500">{{ kindLabel }}模型 · {{ catalogModelProvider(model, platform) }}</p><h2 id="service-title" class="break-all text-xl font-semibold text-gray-900 dark:text-white">{{ model }}</h2><p class="mt-2 text-xs leading-5 text-gray-500">{{ accessPurpose }}</p></div>
         <button type="button" class="btn btn-secondary shrink-0" :disabled="saving" @click="emit('close')">关闭</button>
       </header>
       <div class="overflow-y-auto px-5 py-5 sm:px-7">
+        <div v-if="simpleBillingEnabled" class="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 px-4 py-3 dark:border-dark-600">
+          <p class="text-xs text-gray-500">这里配置规格与开放权限。费用按实际上游和统一费率计算。</p>
+          <div class="flex items-center gap-4"><button type="button" class="btn btn-secondary text-xs" :disabled="saving || !!confirmation || !billingLoaded" @click="previewOpen = true">费用试算</button><router-link :to="billingSettingsPath" class="text-xs text-primary-600">计费设置 →</router-link></div>
+        </div>
         <section class="mb-5 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-dark-600 dark:bg-dark-900/30">
           <label class="input-label" for="service-scope">本次修改的分组范围</label>
           <select v-if="candidateChannels.length > 1 || !selectedChannel" id="service-scope" v-model="selectedChannel" class="input" @change="selectChannel">
@@ -21,7 +25,7 @@
           </nav>
           <form id="service-form" @submit.prevent="prepare('apply')">
             <section v-if="activeTab === 'specs'" class="space-y-5">
-              <div><h3 class="font-semibold text-gray-900 dark:text-white">{{ simpleBillingEnabled ? '服务规格' : '规格与基础售价' }}</h3><p v-if="simpleBillingEnabled" class="mt-1 text-xs text-gray-500">这里只管理可用规格与开放权限，售价统一在 <router-link to="/admin/billing-management" class="text-primary-600 underline">计费管理</router-link> 中调整。</p><p v-else class="mt-1 text-xs text-gray-500">统一使用人民币。这里只维护基础售价，倍率在“分组与倍率”中管理。</p></div>
+              <div><h3 class="font-semibold text-gray-900 dark:text-white">{{ simpleBillingEnabled ? '服务规格' : '规格与基础售价' }}</h3><p v-if="!simpleBillingEnabled" class="mt-1 text-xs text-gray-500">统一使用人民币。这里只维护基础售价，倍率在“分组与倍率”中管理。</p></div>
               <template v-if="kind === 'video' && videoSpec">
                 <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-dark-600"><table class="w-full text-sm"><thead class="bg-gray-50 text-left text-gray-500 dark:bg-dark-900/30"><tr><th class="px-4 py-3">开放规格</th><th v-if="!simpleBillingEnabled" class="px-4 py-3">基础售价（人民币 / 秒）</th></tr></thead><tbody><tr v-for="resolution in videoSpec.resolutions" :key="resolution" class="border-t border-gray-100 dark:border-dark-700"><td class="px-4 py-3"><label class="inline-flex items-center gap-2"><input v-model="policy.resolutions" type="checkbox" :value="resolution" />{{ resolution }}</label></td><td v-if="!simpleBillingEnabled" class="px-4 py-3"><LedgerAmountInput v-model="prices[resolution]" class="input max-w-48" type="number" min="0" step="any" :disabled="!policy.resolutions?.includes(resolution)" :aria-label="`${resolution} 每秒基础售价`" /></td></tr></tbody></table></div>
                 <div class="grid grid-cols-2 gap-4"><label class="text-sm">最短时长（秒）<input v-model.number="policy.min_duration" type="number" :min="videoSpec.minDuration" :max="videoSpec.maxDuration" class="input mt-1" /></label><label class="text-sm">最长时长（秒）<input v-model.number="policy.max_duration" type="number" :min="videoSpec.minDuration" :max="videoSpec.maxDuration" class="input mt-1" /></label></div>
@@ -45,22 +49,22 @@
               </template>
             </section>
             <section v-if="activeTab === 'groups'" class="space-y-4">
-              <div><h3 class="font-semibold text-gray-900 dark:text-white">开放分组</h3><p class="mt-1 text-xs text-gray-500">勾选分组并限定其可用规格。实际售价由选定上游和计费管理中的规则确定。</p></div>
+              <div><h3 class="font-semibold text-gray-900 dark:text-white">开放分组</h3><p class="mt-1 text-xs text-gray-500">选择可以使用此模型的分组。</p></div>
               <div v-for="group in eligibleGroups" :key="group.id" class="rounded-xl border border-gray-200 p-4 dark:border-dark-600">
-                <label class="flex flex-wrap items-center gap-2 text-sm"><input v-model="rules[group.id]!.enabled" type="checkbox" :disabled="group.status !== 'active'" /><span class="font-medium">{{ group.name }}</span><span class="text-xs text-gray-500">账号授权倍率 {{ group.rate_multiplier }}×{{ group.status !== 'active' ? ' · 分组已停用' : '' }}</span></label>
+                <label class="flex flex-wrap items-center gap-2 text-sm"><input v-model="rules[group.id]!.enabled" type="checkbox" :disabled="group.status !== 'active'" /><span class="font-medium">{{ group.name }}</span><span v-if="!simpleBillingEnabled" class="text-xs text-gray-500">账号授权倍率 {{ group.rate_multiplier }}×</span><span v-if="group.status !== 'active'" class="text-xs text-gray-500">分组已停用</span></label>
                 <div v-if="kind === 'video' && rules[group.id]!.enabled" class="mt-4 grid gap-4 sm:grid-cols-2">
                   <div><p class="mb-2 text-xs text-gray-500">允许分辨率</p><label v-for="resolution in policy.resolutions" :key="resolution" class="mr-4 inline-flex items-center gap-2 text-sm"><input v-model="rules[group.id]!.resolutions" type="checkbox" :value="resolution" />{{ resolution }}</label></div>
                   <label class="text-sm">最长时长（秒）<input v-model.number="rules[group.id]!.max_duration" class="input mt-1 max-w-32" type="number" :min="policy.min_duration" :max="policy.max_duration" /></label>
                   <div class="sm:col-span-2"><p class="mb-2 text-xs text-gray-500">允许生成方式</p><label v-for="mode in videoModes.filter(item => policy.modes?.includes(item.value))" :key="mode.value" class="mr-4 inline-flex items-center gap-2 text-sm"><input v-model="rules[group.id]!.modes" type="checkbox" :value="mode.value" />{{ mode.label }}</label></div>
                 </div>
-                <p v-if="rules[group.id]!.enabled" class="mt-3 text-xs text-primary-700 dark:text-primary-300">{{ groupPreview(group) }}</p>
+                <p v-if="!simpleBillingEnabled && rules[group.id]!.enabled" class="mt-3 text-xs text-primary-700 dark:text-primary-300">{{ groupPreview(group) }}</p>
                 <p v-if="rules[group.id]!.enabled && !hasSourceForGroup(group.id)" class="mt-2 text-xs text-amber-600">没有已登记该模型的启用账号关联此分组，请先配置上游。</p>
               </div>
               <p v-if="!eligibleGroups.length" class="text-sm text-gray-500">该范围尚未关联匹配平台的分组，请在高级配置中关联。</p>
             </section>
             <section v-if="activeTab === 'sources'" class="space-y-4">
               <div><h3 class="font-semibold text-gray-900 dark:text-white">上游来源</h3><p class="mt-1 text-xs text-gray-500">模型登记表示已加入账号配置，不代表已验证真实生成权限。</p></div>
-              <div v-for="account in accounts || []" :key="account.id" class="rounded-xl border border-gray-200 p-4 text-sm dark:border-dark-600"><div class="flex flex-wrap justify-between gap-2"><strong>{{ account.name }}</strong><span class="text-xs text-gray-500">{{ account.status === 'active' ? '账号启用' : '账号未启用' }} · 生成权限需实际验证</span></div><div class="mt-2 text-xs text-gray-500">上游调用名称：{{ account.configured_models?.[model] || model }}</div><div class="mt-1 text-xs text-gray-500">所属分组：{{ groups.filter(group => (account.group_ids || account.groups?.map(item => item.id) || []).includes(group.id)).map(group => group.name).join('、') || '尚未分配' }}</div></div>
+              <div v-for="account in accounts || []" :key="account.id" class="rounded-xl border border-gray-200 p-4 text-sm dark:border-dark-600"><div class="flex flex-wrap justify-between gap-2"><strong>{{ account.name }}</strong><span class="text-xs text-gray-500">{{ sourceState(account) }}</span></div><div class="mt-2 text-xs text-gray-500">上游调用名称：{{ account.configured_models?.[model] || model }}</div><div class="mt-1 text-xs text-gray-500">所属分组：{{ groups.filter(group => (account.group_ids || account.groups?.map(item => item.id) || []).includes(group.id)).map(group => group.name).join('、') || '尚未分配' }}</div></div>
               <p v-if="!accounts?.length" class="text-sm text-amber-600">尚无明确登记此模型的上游账号。</p>
               <details class="rounded-xl border border-gray-200 p-4 dark:border-dark-600"><summary class="cursor-pointer text-sm">高级配置</summary><dl class="mt-3 grid grid-cols-2 gap-2 text-xs"><dt class="text-gray-500">底层渠道</dt><dd>{{ currentChannel?.name }}</dd><dt class="text-gray-500">协议平台</dt><dd>{{ platform }}</dd><dt class="text-gray-500">渠道状态</dt><dd>{{ currentChannel?.status === 'active' ? '启用' : '停用' }}</dd></dl><router-link to="/admin/channels/pricing" class="mt-4 inline-block text-sm text-primary-600 underline">管理渠道、模型映射与路由</router-link></details>
             </section>
@@ -83,6 +87,7 @@
         <div class="mt-5 flex justify-end gap-3"><button class="btn btn-secondary" type="button" :disabled="saving" @click="confirmation = null">返回修改</button><button class="btn btn-primary" type="button" :disabled="saving" @click="save">{{ saving ? '应用中…' : '确认' }}</button></div>
       </section>
     </div>
+    <BillingPreviewDialog v-if="previewOpen" :model="model" :accounts="accounts || []" :groups="previewGroups" :profiles="costProfiles" :models="[model]" :initial-account-id="previewAccountID" :initial-group-id="previewGroupID" @close="previewOpen = false" />
   </div>
 </template>
 
@@ -93,7 +98,8 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import channelsAPI, { type Channel, type ChannelModelPricing } from '@/api/admin/channels'
 import { getAllIncludingInactive } from '@/api/admin/groups'
-import { billingManagementAPI } from '@/api/admin/billingManagement'
+import { billingManagementAPI, type ProcurementProfile } from '@/api/admin/billingManagement'
+import BillingPreviewDialog from '@/components/admin/billing/BillingPreviewDialog.vue'
 import type { Account, AdminGroup } from '@/types'
 import { defaultModelPolicy, videoModes, type ModelServicePolicy, type ModelServiceRule } from '@/types/modelService'
 import { extractApiErrorMessage } from '@/utils/apiError'
@@ -113,6 +119,22 @@ const groups = ref<AdminGroup[]>([])
 const selectedChannel = ref<number | ''>('')
 const activeTab = ref('specs')
 const simpleBillingEnabled = ref(true)
+const billingLoaded = ref(false)
+const costProfiles = ref<ProcurementProfile[]>([])
+const previewOpen = ref(false)
+const billingSettingsPath = computed(() => `/admin/billing-management?model=${encodeURIComponent(props.model)}`)
+const previewGroups = computed(() => groups.value.filter(group => group.platform === props.platform && group.status === 'active'))
+const previewAccountID = computed(() => {
+  const sources = props.accounts || []
+  return sources.length === 1 && sources[0]!.status === 'active' && sources[0]!.schedulable !== false ? sources[0]!.id : undefined
+})
+const previewGroupID = computed(() => {
+  if (!previewAccountID.value) return undefined
+  const account = props.accounts?.find(source => source.id === previewAccountID.value)
+  const ids = account?.group_ids || account?.groups?.map(group => group.id) || []
+  const candidates = previewGroups.value.filter(group => ids.includes(group.id))
+  return candidates.length === 1 ? candidates[0]!.id : undefined
+})
 const tabs = [{ value: 'specs', label: '服务规格' }, { value: 'groups', label: '开放分组' }, { value: 'sources', label: '上游来源' }]
 const policy = ref(defaultModelPolicy(props.model, props.platform, props.kind))
 const initialPolicy = ref(defaultModelPolicy(props.model, props.platform, props.kind))
@@ -150,6 +172,7 @@ const pricing = ref<PricingFormEntry>(emptyPricing())
 function emptyPricing(): PricingFormEntry { return { models: [props.model], billing_mode: props.kind === 'image' ? 'image' : 'token', input_price: null, output_price: null, cache_write_price: null, cache_read_price: null, image_input_price: null, image_output_price: null, per_request_price: null, intervals: [] } }
 function scopeLabel(channel: Channel): string { return groups.value.filter(group => channel.group_ids.includes(group.id) && group.platform === props.platform).map(group => group.name).join('、') || `${channel.name}（未关联匹配分组）` }
 function hasSourceForGroup(id: number): boolean { return (props.accounts || []).some(account => account.status === 'active' && account.schedulable !== false && (account.group_ids || account.groups?.map(group => group.id) || []).includes(id)) }
+function sourceState(account: Account): string { return account.status !== 'active' ? '未启用' : account.schedulable === false ? '暂停调度' : '可调度' }
 function legacyGroupOpen(group: AdminGroup): boolean { return group.status === 'active' && (props.kind === 'chat' || group.allow_image_generation) && (props.accounts || []).some(account => account.status === 'active' && account.schedulable !== false && (account.group_ids || account.groups?.map(item => item.id) || []).includes(group.id) && configuredModelOpen(currentChannel.value, props.model, props.platform, group.id, account.configured_models?.[props.model] || props.model)) }
 function groupMultiplier(group: AdminGroup): number { return props.kind === 'video' && group.video_rate_independent ? group.video_rate_multiplier : props.kind === 'image' && group.image_rate_independent ? group.image_rate_multiplier : group.rate_multiplier }
 function groupPreview(group: AdminGroup): string {
@@ -247,5 +270,5 @@ async function save() {
   } catch (failure) { error.value = extractApiErrorMessage(failure, '应用模型配置失败') }
   finally { saving.value = false }
 }
-onMounted(async () => { try { const [groupList, billingConfig] = await Promise.all([getAllIncludingInactive(), billingManagementAPI.getConfig()]); groups.value = groupList; simpleBillingEnabled.value = billingConfig.simple_billing_enabled !== false; if (candidateChannels.value.length === 1) { selectedChannel.value = candidateChannels.value[0]!.id; selectChannel() } } catch (failure) { error.value = extractApiErrorMessage(failure, '分组加载失败') } })
+onMounted(async () => { try { const [groupList, billingConfig] = await Promise.all([getAllIncludingInactive(), billingManagementAPI.getConfig()]); groups.value = groupList; simpleBillingEnabled.value = billingConfig.simple_billing_enabled !== false; costProfiles.value = billingConfig.cost_profiles; billingLoaded.value = true; if (candidateChannels.value.length === 1) { selectedChannel.value = candidateChannels.value[0]!.id; selectChannel() } } catch (failure) { error.value = extractApiErrorMessage(failure, '分组加载失败') } })
 </script>

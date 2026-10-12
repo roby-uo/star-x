@@ -19,9 +19,19 @@ export const getAdminSteps = (t: (key: string) => string, isSimpleMode = false):
     }
   },
 
+  {
+    element: '#sidebar-model-manage',
+    popover: {
+      title: t('onboarding.admin.openModelWorkspace.title'),
+      description: t('onboarding.admin.openModelWorkspace.description'),
+      side: 'right',
+      align: 'center',
+      showButtons: ['close'],
+    }
+  },
   // ========== 第一部分：创建分组 ==========
   {
-    element: '#sidebar-upstream-group-manage',
+    element: '#model-management-settings-trigger',
     popover: {
       title: t('onboarding.admin.groupManage.title'),
       description: t('onboarding.admin.groupManage.description'),
@@ -242,7 +252,7 @@ export const getAdminSteps = (t: (key: string) => string, isSimpleMode = false):
       const element = step.element as string | undefined
       // 过滤掉分组管理和账号分组选择相关步骤
       return !element || (
-        !element.includes('sidebar-upstream-group-manage') &&
+        !element.includes('model-management-settings-trigger') &&
         !element.includes('upstream-pools-tab') &&
         !element.includes('groups-create-btn') &&
         !element.includes('group-form-') &&

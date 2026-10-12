@@ -12,6 +12,7 @@ vi.mock('@/api/admin/accounts', () => ({ accountsAPI: { list: listAccounts } }))
 vi.mock('@/api/admin/groups', () => ({ getAllIncludingInactive: getGroups, update: updateGroup }))
 vi.mock('vue-router', () => ({ useRoute: () => ({ query: {} }) }))
 vi.mock('@/components/layout/AppLayout.vue', () => ({ default: { template: '<main><slot /></main>' } }))
+vi.mock('@/components/admin/AdminWorkspaceTabs.vue', () => ({ default: { template: '<div />' } }))
 const mounted: VueWrapper[] = []
 afterEach(() => { mounted.forEach(wrapper => wrapper.unmount()); mounted.length = 0 })
 beforeEach(() => {
@@ -25,7 +26,7 @@ beforeEach(() => {
   updateGroup.mockImplementation(async (id, data) => ({ ...group(), id, ...data }))
 })
 async function page() {
-  const wrapper = mount(BillingManagementView, { global: { stubs: { Icon: true, BillingPreviewDialog: true, RouterLink: { template: '<a><slot /></a>' }, ConfirmDialog: true } } })
+  const wrapper = mount(BillingManagementView, { global: { stubs: { AdminWorkspaceTabs: true, Icon: true, BillingPreviewDialog: true, RouterLink: { template: '<a><slot /></a>' }, ConfirmDialog: true } } })
   mounted.push(wrapper); await flushPromises(); return wrapper
 }
 function field(wrapper: VueWrapper, label: string) { const row = wrapper.findAll('label').find(item => item.text().startsWith(label)); if (!row) throw new Error(label); return row.get('input') }
@@ -80,7 +81,7 @@ describe('BillingManagementView simplified pricing', () => {
   it('does not present an unconfigured source as confirmed or free', async () => {
     getConfig.mockResolvedValue(config({ cost_profiles: [] }))
     const wrapper = await page()
-    expect(wrapper.text()).toContain('预览核对')
+    expect(wrapper.text()).toContain('价格待核对')
     expect(wrapper.text()).not.toContain('¥0.00')
     expect(wrapper.find('nav').exists()).toBe(false)
   })
@@ -92,5 +93,13 @@ describe('BillingManagementView simplified pricing', () => {
     expect(table).toContain('¥2.94')
     expect(table).toContain('API 1.4×')
     expect(table).not.toContain('¥4.116')
+  })
+  it('does not fall back to obsolete channel prices when the live catalogue is missing', async () => {
+    listAccounts.mockResolvedValue({ items: [account(1, 'oauth')], total: 1 })
+    listChannels.mockResolvedValue({ items: [{ id: 2, name: '旧规则', status: 'active', group_ids: [7], features_config: {}, model_pricing: [{ platform: 'openai', models: ['MiniMax-M3'], billing_mode: 'token', input_price: 999, intervals: [] }] }], total: 1 })
+    const wrapper = await page()
+    expect(wrapper.get('table').text()).toContain('待核对 · 选择上游后试算')
+    expect(wrapper.get('table').text()).not.toContain('999')
+    expect(wrapper.get('table').text()).not.toContain('分组倍率 1.4')
   })
 })

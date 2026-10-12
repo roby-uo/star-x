@@ -160,13 +160,17 @@ export default {
         nextBtn: 'Start Setup 🚀',
         prevBtn: 'Skip'
       },
+      openModelWorkspace: {
+        title: 'Open Model Management',
+        description: 'Select Model Management in the sidebar to manage models, upstreams, and their settings in one workspace.'
+      },
       groupManage: {
-        title: '📦 Step 1: Group Management',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;"><b>What is a Group?</b></p><p style="margin-bottom: 12px;">Groups are the core concept of star-X, like a "service package":</p><ul style="margin-left: 20px; margin-bottom: 12px; font-size: 13px;"><li>🎯 Each group can contain multiple upstream accounts</li><li>💰 Each group has independent billing multiplier</li><li>👥 Can be set as public or exclusive</li></ul><p style="margin-top: 12px; padding: 8px 12px; background: #f3f7ff; border-left: 3px solid #4f7dff; border-radius: 4px; font-size: 13px;"><b>💡 Example:</b> You can create "VIP Premium" (high rate) and "Free Trial" (low rate) groups</p><p style="margin-top: 16px; color: #4f7dff; font-weight: 600;">👉 Click "Upstream Management" on the left sidebar</p></div>'
+        title: 'Open Management Settings',
+        description: 'Groups organize accounts and control model access. Account authorization uses group rates; metered API access uses the global rate. Open Management Settings, then select User Groups.'
       },
       openPools: {
-        title: 'Open Pools',
-        description: 'Select Pools in Upstream Management to create a service group.'
+        title: 'Open User Groups',
+        description: 'Select User Groups to create a group and manage access and account authorization rate multipliers.'
       },
       createGroup: {
         title: '➕ Create New Group',
@@ -183,8 +187,8 @@ export default {
         nextBtn: 'Next'
       },
       groupMultiplier: {
-        title: '💰 3. Rate Multiplier',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Set the billing multiplier to control user charges.</p><div style="padding: 8px 12px; background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>⚙️ Billing Rules:</b><ul style="margin: 8px 0 0 16px;"><li><b>1.0</b> - Billing reference price</li><li><b>1.5</b> - User consumes ¥1, charged ¥1.5</li><li><b>2.0</b> - User consumes ¥1, charged ¥2</li><li><b>0.8</b> - Subsidy mode (loss-making)</li></ul></div><p style="font-size: 13px; color: #6b7280;">Recommend setting test group to 1.0</p></div>',
+        title: '3. Account Authorization Rate',
+        description: 'This multiplier applies to account authorization: reference price × group rate. Metered API access uses the global rate in Billing Settings and does not add the group rate. Start with 1.0 for a test group.',
         nextBtn: 'Next'
       },
       groupExclusive: {
@@ -197,8 +201,8 @@ export default {
         description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Confirm the information and click create to save the group.</p><p style="padding: 8px 12px; background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>⚠️ Note:</b> Platform type cannot be changed after creation, but other settings can be edited anytime</p><p style="padding: 8px 12px; background: #f3f7ff; border-left: 3px solid #4f7dff; border-radius: 4px; font-size: 13px;"><b>📌 Next Step:</b> After creation, we\'ll add upstream accounts to this group</p><p style="margin-top: 12px; color: #4f7dff; font-weight: 600;">👉 Click "Create" button</p></div>'
       },
       accountManage: {
-        title: '🔗 Step 2: Add Account',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;"><b>Great! Group created successfully 🎉</b></p><p style="margin-bottom: 12px;">Now add upstream AI service accounts to enable actual service delivery.</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>🔑 Account Purpose:</b><ul style="margin: 8px 0 0 16px;"><li>Connect to upstream AI services (Claude, GPT, etc.)</li><li>One group can contain multiple accounts (load balancing)</li><li>Supports OAuth and Session Key methods</li></ul></div><p style="margin-top: 16px; color: #4f7dff; font-weight: 600;">👉 Click "Upstream Management" on the left sidebar</p></div>'
+        title: 'Step 2: Add an Upstream',
+        description: 'Select Upstreams at the top of the workspace, connect a provider account or API Key, and add the account to the group you created.'
       },
       createAccount: {
         title: '➕ Add New Account',
