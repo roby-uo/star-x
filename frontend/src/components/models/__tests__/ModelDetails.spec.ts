@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ModelDetails from '../ModelDetails.vue'
 import { aggregateUserModels } from '../userModelCatalog'
 import type { ApiKey } from '@/types'
+import type { UserCatalogItem } from '../userModelCatalog'
 
 const { listKeys } = vi.hoisted(() => ({ listKeys: vi.fn() }))
 vi.mock('@/api/keys', () => ({ list: listKeys }))
@@ -11,7 +12,8 @@ vi.mock('@/stores/app', () => ({ useAppStore: () => ({ apiBaseUrl: '' }) }))
 const key = (group_id: number) => ({ id: group_id * 10, group_id, name: `Key ${group_id}`, key: `secret-${group_id}`, status: 'active' }) as ApiKey
 const item = aggregateUserModels([1, 2].map(group_id => ({ name: 'MiniMax-H3', platform: 'openai', group_id, group_name: group_id === 1 ? '普通用户' : 'VIP用户', rate_multiplier: group_id, policy: { model: 'MiniMax-H3', platform: 'openai', kind: 'video' as const, state: 'published' as const, resolutions: group_id === 1 ? ['768P'] : ['2K'], min_duration: 4, max_duration: 15, prices: { '768P': 0.08, '2K': 0.13 } } })))[0]
 const workbench = { name: 'VideoWorkbench', props: ['model', 'selectedKeyId', 'contextKeys', 'embedded'], emits: ['busy'], template: '<div data-test="workbench">Current test</div>' }
-const mountDetails = () => mount(ModelDetails, { props: { item, initialTab: 'test' }, global: { stubs: { RouterLink: { template: '<a><slot /></a>' }, VideoWorkbench: workbench } } })
+const linkStub = { name: 'RouterLink', props: ['to'], template: '<a><slot /></a>' }
+const mountDetails = (extraProps: { item?: UserCatalogItem; initialTab?: 'api' | 'test'; initialGroupId?: number; initialKeyId?: number } = {}) => mount(ModelDetails, { props: { item, initialTab: 'test', ...extraProps }, global: { stubs: { RouterLink: linkStub, VideoWorkbench: workbench } } })
 
 beforeEach(() => {
   listKeys.mockReset()
@@ -49,6 +51,146 @@ describe('model connection details', () => {
     await wrapper.vm.$nextTick()
     expect(wrapper.findAll('select').every(select => select.attributes('disabled') !== undefined)).toBe(true)
     expect(wrapper.find('button[aria-label="关闭模型详情"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.findComponent({ name: 'RouterLink' }).exists()).toBe(false)
+    expect(wrapper.text()).toContain('管理密钥')
+    wrapper.unmount()
+  })
+
+  it('restores only an available group and active key from the same group', async () => {
+    listKeys.mockResolvedValue({ items: [key(1), key(2), { ...key(2), id: 21 }, { ...key(2), id: 22, status: 'inactive' }], pages: 1 })
+    const wrapper = mountDetails({ initialGroupId: 2, initialKeyId: 21 })
+    await flushPromises()
+    expect((wrapper.findAll('select')[0].element as HTMLSelectElement).value).toBe('2')
+    expect(wrapper.findComponent({ name: 'VideoWorkbench' }).props('selectedKeyId')).toBe(21)
+    expect(wrapper.findComponent({ name: 'VideoWorkbench' }).props('contextKeys').map((entry: ApiKey) => entry.id)).toEqual([20, 21])
+    expect(wrapper.findComponent({ name: 'RouterLink' }).props('to')).toEqual({ path: '/keys', query: { model: 'MiniMax-H3', platform: 'openai', kind: 'Videos', tab: 'test', group: '2', key: '21' } })
+    wrapper.unmount()
+  })
+
+  it('falls back safely when the requested group or key is unavailable', async () => {
+    const wrapper = mountDetails({ initialGroupId: 99, initialKeyId: 20 })
+    await flushPromises()
+    expect(listKeys).toHaveBeenCalledWith(1, 100, { group_id: 1, status: 'active' })
+    expect(wrapper.findComponent({ name: 'VideoWorkbench' }).props('selectedKeyId')).toBe(10)
+    expect(wrapper.get('pre').text()).not.toContain('secret-1')
+    wrapper.unmount()
+  })
+
+  it('takes a user with no key to creation while preserving the model, group and selected tab', async () => {
+    listKeys.mockResolvedValue({ items: [], pages: 1 })
+    const wrapper = mountDetails({ initialGroupId: 2 })
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'RouterLink' }).text()).toBe('创建密钥')
+    expect(wrapper.findComponent({ name: 'RouterLink' }).props('to')).toEqual({ path: '/keys', query: { model: 'MiniMax-H3', platform: 'openai', kind: 'Videos', tab: 'test', group: '2', create: '1' } })
+    await wrapper.findAll('button').find(button => button.text() === 'API 接入')!.trigger('click')
+    expect(wrapper.findComponent({ name: 'RouterLink' }).props('to').query.tab).toBe('api')
+    expect(wrapper.findComponent({ name: 'VideoWorkbench' }).exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('retries key loading in place while preserving the chosen group and detail tab', async () => {
+    listKeys.mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce({ items: [key(2)], pages: 1 })
+    const wrapper = mountDetails({ initialGroupId: 2, initialKeyId: 20 })
+    await flushPromises()
+    expect(wrapper.get('[role="alert"]').text()).toContain('调用密钥加载失败')
+    expect(wrapper.findComponent({ name: 'RouterLink' }).exists()).toBe(false)
+    await wrapper.findAll('button').find(button => button.text() === '重新加载')!.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'VideoWorkbench' }).props('selectedKeyId')).toBe(20)
+    expect(wrapper.findComponent({ name: 'RouterLink' }).props('to').query).toMatchObject({ group: '2', tab: 'test' })
+    wrapper.unmount()
+  })
+
+  it('emits valid selections when the user changes group, key or tab without any secret', async () => {
+    listKeys.mockImplementation(async (_page, _size, filter) => ({ items: [key(filter.group_id), { ...key(filter.group_id), id: filter.group_id * 10 + 1 }], pages: 1 }))
+    const wrapper = mountDetails()
+    await flushPromises()
+    expect(wrapper.emitted('contextChange')?.at(-1)).toEqual([{ groupId: 1, keyId: 10, tab: 'test' }])
+    await wrapper.findAll('select')[0].setValue(2)
+    await flushPromises()
+    expect(wrapper.emitted('contextChange')?.at(-1)).toEqual([{ groupId: 2, keyId: 20, tab: 'test' }])
+    await wrapper.findAll('select')[1].setValue(21)
+    expect(wrapper.emitted('contextChange')?.at(-1)).toEqual([{ groupId: 2, keyId: 21, tab: 'test' }])
+    await wrapper.findAll('button').find(button => button.text() === 'API 接入')!.trigger('click')
+    expect(wrapper.emitted('contextChange')?.at(-1)).toEqual([{ groupId: 2, keyId: 21, tab: 'api' }])
+    expect(JSON.stringify(wrapper.emitted('contextChange'))).not.toContain('secret-')
+    wrapper.unmount()
+  })
+
+  it('restores changed external context on the same model and avoids redundant key requests or test resets', async () => {
+    listKeys.mockImplementation(async (_page, _size, filter) => ({ items: [key(filter.group_id), { ...key(filter.group_id), id: filter.group_id * 10 + 1 }], pages: 1 }))
+    const wrapper = mountDetails()
+    await flushPromises()
+    await wrapper.setProps({ initialGroupId: 2, initialKeyId: 21, initialTab: 'api' })
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'VideoWorkbench' }).props('selectedKeyId')).toBe(21)
+    expect(wrapper.findComponent({ name: 'VideoWorkbench' }).props('model').group_id).toBe(2)
+    const existingTest = wrapper.findComponent({ name: 'VideoWorkbench' }).vm
+    const calls = listKeys.mock.calls.length
+    await wrapper.setProps({ initialTab: 'test' })
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'VideoWorkbench' }).vm).toBe(existingTest)
+    expect(listKeys).toHaveBeenCalledTimes(calls)
+    await wrapper.setProps({ initialKeyId: 20 })
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'VideoWorkbench' }).props('selectedKeyId')).toBe(20)
+    expect(listKeys).toHaveBeenCalledTimes(calls)
+    const currentTest = wrapper.findComponent({ name: 'VideoWorkbench' }).vm
+    await wrapper.setProps({ initialGroupId: 2, initialKeyId: 20, initialTab: 'test' })
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'VideoWorkbench' }).vm).toBe(currentTest)
+    expect(listKeys).toHaveBeenCalledTimes(calls)
+    wrapper.unmount()
+  })
+
+  it('holds external context changes until the running request finishes', async () => {
+    const wrapper = mountDetails()
+    await flushPromises()
+    const runningTest = wrapper.findComponent({ name: 'VideoWorkbench' }).vm
+    runningTest.$emit('busy', true)
+    await wrapper.vm.$nextTick()
+    await wrapper.setProps({ initialGroupId: 2, initialKeyId: 20, initialTab: 'api' })
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'VideoWorkbench' }).vm).toBe(runningTest)
+    expect(wrapper.findComponent({ name: 'VideoWorkbench' }).props('selectedKeyId')).toBe(10)
+    expect(listKeys).toHaveBeenCalledTimes(1)
+    expect(wrapper.findAll('button').find(button => button.text() === '在线测试')?.attributes('aria-pressed')).toBe('true')
+    runningTest.$emit('busy', false)
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'VideoWorkbench' }).props('selectedKeyId')).toBe(20)
+    expect(wrapper.findAll('button').find(button => button.text() === 'API 接入')?.attributes('aria-pressed')).toBe('true')
+    expect(listKeys).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
+  })
+
+  it('uses the latest external key selection when the group lookup is still pending', async () => {
+    let resolveKeys: (value: { items: ApiKey[]; pages: number }) => void = () => {}
+    listKeys.mockImplementation(() => new Promise(resolve => { resolveKeys = resolve }))
+    const wrapper = mountDetails({ initialGroupId: 2, initialKeyId: 20 })
+    await wrapper.setProps({ initialKeyId: 21 })
+    resolveKeys({ items: [key(2), { ...key(2), id: 21 }], pages: 1 })
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'VideoWorkbench' }).props('selectedKeyId')).toBe(21)
+    expect(listKeys).toHaveBeenCalledTimes(1)
+    wrapper.unmount()
+  })
+
+  it('omits expired or exhausted active keys and accepts a future unlimited key', async () => {
+    listKeys.mockResolvedValue({ items: [
+      { ...key(1), id: 11, expires_at: new Date(Date.now() - 1000).toISOString() },
+      { ...key(1), id: 12, quota: 10, quota_used: 10 },
+      { ...key(1), id: 13, quota: 10, quota_used: 11 },
+      { ...key(1), id: 14, expires_at: new Date(Date.now() + 60_000).toISOString(), quota: 0, quota_used: 50 },
+      { ...key(2), id: 21 }
+    ], pages: 1 })
+    const wrapper = mountDetails({ initialGroupId: 1, initialKeyId: 11 })
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'VideoWorkbench' }).props('selectedKeyId')).toBe(14)
+    expect(wrapper.findComponent({ name: 'VideoWorkbench' }).props('contextKeys').map((entry: ApiKey) => entry.id)).toEqual([14])
+    await wrapper.setProps({ initialKeyId: 12 })
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'VideoWorkbench' }).props('selectedKeyId')).toBe(14)
     wrapper.unmount()
   })
 

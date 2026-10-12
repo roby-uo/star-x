@@ -29,7 +29,7 @@
         </p>
         <p class="text-xs leading-6 text-gray-500 dark:text-gray-400" data-testid="agent-model-purpose">
           {{ t('keys.useKeyModal.agentModelPurpose') }}
-          <router-link to="/models" class="ml-1 text-primary-600 hover:underline dark:text-primary-300">{{ t('keys.useKeyModal.modelCatalogLink') }}</router-link>
+          <router-link to="/model-catalog" class="ml-1 text-primary-600 hover:underline dark:text-primary-300" @click="emit('close')">{{ t('keys.useKeyModal.modelCatalogLink') }}</router-link>
         </p>
 
         <!-- Client Tabs -->

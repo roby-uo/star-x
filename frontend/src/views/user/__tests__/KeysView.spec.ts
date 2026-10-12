@@ -7,6 +7,9 @@ import KeysView from '../KeysView.vue'
 
 const {
   listKeys,
+  createKey,
+  routerPush,
+  routeState,
   getPublicSettings,
   getDashboardApiKeysUsage,
   getAvailableGroups,
@@ -18,6 +21,9 @@ const {
   nextStep,
 } = vi.hoisted(() => ({
   listKeys: vi.fn(),
+  createKey: vi.fn(),
+  routerPush: vi.fn(),
+  routeState: { query: {} as Record<string, unknown>, fullPath: '/keys' },
   getPublicSettings: vi.fn(),
   getDashboardApiKeysUsage: vi.fn(),
   getAvailableGroups: vi.fn(),
@@ -58,7 +64,7 @@ const messages: Record<string, string> = {
 vi.mock('@/api', () => ({
   keysAPI: {
     list: listKeys,
-    create: vi.fn(),
+    create: createKey,
     update: vi.fn(),
     delete: vi.fn(),
     toggleStatus: vi.fn(),
@@ -73,6 +79,11 @@ vi.mock('@/api', () => ({
     getAvailable: getAvailableGroups,
     getUserGroupRates,
   },
+}))
+
+vi.mock('vue-router', () => ({
+  useRoute: () => routeState,
+  useRouter: () => ({ push: routerPush }),
 }))
 
 vi.mock('@/stores/app', () => ({
@@ -188,9 +199,9 @@ const DataTableStub = {
 
 const SelectStub = {
   name: 'Select',
-  props: ['modelValue', 'options'],
+  props: ['modelValue', 'options', 'disabled'],
   emits: ['update:modelValue'],
-  template: '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"></select>',
+  template: '<select :value="modelValue" :disabled="disabled" @change="$emit(\'update:modelValue\', $event.target.value)"></select>',
 }
 
 const SearchInputStub = {
@@ -216,6 +227,19 @@ const IconStub = {
   template: '<span data-test="icon">{{ name }}</span>',
 }
 
+const BaseDialogStub = {
+  name: 'BaseDialog',
+  props: ['show', 'title', 'showCloseButton', 'closeOnEscape', 'closeOnClickOutside'],
+  emits: ['close'],
+  template: '<section v-if="show" data-test="key-dialog"><button v-if="showCloseButton !== false" data-test="close-key-dialog" @click="$emit(\'close\')">Close</button><slot /><slot name="footer" /></section>',
+}
+
+const RouterLinkStub = {
+  name: 'RouterLink',
+  props: ['to'],
+  template: '<a><slot /></a>',
+}
+
 const mountView = async () => {
   const wrapper = mount(KeysView, {
     global: {
@@ -224,7 +248,7 @@ const mountView = async () => {
         TablePageLayout: TablePageLayoutStub,
         DataTable: DataTableStub,
         Pagination: PaginationStub,
-        BaseDialog: true,
+        BaseDialog: BaseDialogStub,
         ConfirmDialog: true,
         EmptyState: true,
         Select: SelectStub,
@@ -234,6 +258,8 @@ const mountView = async () => {
         EndpointPopover: true,
         GroupBadge: true,
         GroupOptionItem: true,
+        UserAccessWorkspace: true,
+        RouterLink: RouterLinkStub,
         Teleport: true,
       },
     },
@@ -262,6 +288,10 @@ describe('user KeysView column settings', () => {
     localStorage.clear()
 
     listKeys.mockReset()
+    createKey.mockReset()
+    routerPush.mockReset()
+    routeState.query = {}
+    routeState.fullPath = '/keys'
     getPublicSettings.mockReset()
     getDashboardApiKeysUsage.mockReset()
     getAvailableGroups.mockReset()
@@ -282,6 +312,8 @@ describe('user KeysView column settings', () => {
     getPublicSettings.mockResolvedValue({})
     getDashboardApiKeysUsage.mockResolvedValue({ stats: {} })
     getAvailableGroups.mockResolvedValue([])
+    createKey.mockResolvedValue({ ...createApiKey(), id: 55, group_id: 42 })
+    routerPush.mockResolvedValue(undefined)
     getUserGroupRates.mockResolvedValue({})
     isCurrentStep.mockReturnValue(false)
   })
@@ -449,5 +481,157 @@ describe('user KeysView column settings', () => {
       },
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     )
+  })
+
+  it('does not open or create a key when visiting the keys page directly', async () => {
+    const wrapper = await mountView()
+    expect(wrapper.find('[data-test="key-dialog"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="model-return-context"]').exists()).toBe(false)
+    expect(createKey).not.toHaveBeenCalled()
+  })
+
+  it('waits for available groups before opening a contextual create form', async () => {
+    routeState.query = { model: 'MiniMax-H3', platform: 'openai', kind: 'Videos', group: '42', tab: 'api', create: '1' }
+    let resolveGroups!: (groups: unknown[]) => void
+    getAvailableGroups.mockImplementationOnce(() => new Promise(resolve => { resolveGroups = resolve }))
+    const wrapper = await mountView()
+    expect(wrapper.find('[data-test="key-dialog"]').exists()).toBe(false)
+    expect(createKey).not.toHaveBeenCalled()
+
+    resolveGroups([{ id: 42, name: 'Accessible', platform: 'openai' }])
+    await flushPromises()
+    expect(wrapper.find('[data-test="key-dialog"]').exists()).toBe(true)
+    const selector = wrapper.get('[data-tour="key-form-group"]')
+    expect(selector.element.getAttribute('value') ?? (selector.element as HTMLSelectElement).value).toBe('42')
+    expect(createKey).not.toHaveBeenCalled()
+  })
+
+  it('does not preselect an inaccessible query group and does not reopen after cancel', async () => {
+    routeState.query = { model: 'MiniMax-H3', platform: 'openai', kind: 'Videos', group: '999', tab: 'test', create: '1' }
+    getAvailableGroups.mockResolvedValue([{ id: 42, name: 'Accessible', platform: 'openai' }])
+    const wrapper = await mountView()
+    expect((wrapper.get('[data-tour="key-form-group"]').element as HTMLSelectElement).value).toBe('')
+    await wrapper.get('[data-test="close-key-dialog"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-test="key-dialog"]').exists()).toBe(false)
+    expect(createKey).not.toHaveBeenCalled()
+  })
+
+  it('returns to the selected model with the created key ID, never its secret', async () => {
+    routeState.query = { model: 'MiniMax-H3', platform: 'openai', kind: 'Videos', group: '42', tab: 'test', create: '1', returnTo: 'https://evil.example' }
+    getAvailableGroups.mockResolvedValue([{ id: 42, name: 'Accessible', platform: 'openai' }])
+    const wrapper = await mountView()
+    await wrapper.get('[data-tour="key-form-name"]').setValue('video-access')
+    await wrapper.get('#key-form').trigger('submit')
+    await flushPromises()
+
+    expect(createKey).toHaveBeenCalledWith('video-access', 42, undefined, [], [], 0, undefined, { rate_limit_5h: 0, rate_limit_1d: 0, rate_limit_7d: 0 })
+    expect(routerPush).toHaveBeenCalledWith({ path: '/model-catalog', query: { model: 'MiniMax-H3', platform: 'openai', kind: 'Videos', tab: 'test', group: '42', key: '55' } })
+    expect(JSON.stringify(routerPush.mock.calls)).not.toContain('sk-test-key')
+    expect(wrapper.find('[data-test="key-dialog"]').exists()).toBe(false)
+  })
+
+  it('preserves the form and model context on creation failure', async () => {
+    routeState.query = { model: 'MiniMax-H3', platform: 'openai', kind: 'Videos', group: '42', tab: 'api', create: '1' }
+    getAvailableGroups.mockResolvedValue([{ id: 42, name: 'Accessible', platform: 'openai' }])
+    createKey.mockRejectedValue({ response: { data: { detail: 'Unable to create' } } })
+    const wrapper = await mountView()
+    await wrapper.get('[data-tour="key-form-name"]').setValue('keep-my-form')
+    await wrapper.get('#key-form').trigger('submit')
+    await flushPromises()
+
+    expect(showError).toHaveBeenCalledWith('Unable to create')
+    expect(wrapper.find('[data-test="key-dialog"]').exists()).toBe(true)
+    expect((wrapper.get('[data-tour="key-form-name"]').element as HTMLInputElement).value).toBe('keep-my-form')
+    expect(wrapper.get('[data-test="model-return-context"]').exists()).toBe(true)
+    expect(routerPush).not.toHaveBeenCalled()
+  })
+
+  it('keeps contextual creation closed when groups fail, then opens after retry succeeds', async () => {
+    routeState.query = { model: 'MiniMax-H3', platform: 'openai', kind: 'Videos', group: '42', tab: 'api', create: '1' }
+    getAvailableGroups.mockRejectedValueOnce(new Error('Groups unavailable'))
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const wrapper = await mountView()
+    expect(wrapper.find('[data-test="key-dialog"]').exists()).toBe(false)
+    getAvailableGroups.mockResolvedValue([{ id: 42, name: 'Accessible', platform: 'openai' }])
+    await wrapper.get('[data-test="model-return-context"] button').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-test="key-dialog"]').exists()).toBe(true)
+    expect(createKey).not.toHaveBeenCalled()
+    consoleError.mockRestore()
+  })
+
+  it('ignores malformed model contexts even when create is requested', async () => {
+    routeState.query = { model: 'MiniMax-H3', platform: 'unknown', kind: 'Videos', group: '42', create: '1' }
+    getAvailableGroups.mockResolvedValue([{ id: 42, name: 'Accessible', platform: 'openai' }])
+    const wrapper = await mountView()
+    expect(wrapper.find('[data-test="key-dialog"]').exists()).toBe(false)
+    expect(createKey).not.toHaveBeenCalled()
+  })
+
+  it('locks pending creation against closing and duplicate submission and returns the submitted group with only the new key ID', async () => {
+    routeState.query = { model: 'MiniMax-H3', platform: 'openai', kind: 'Videos', group: '42', tab: 'test', create: '1', key: '1' }
+    getAvailableGroups.mockResolvedValue([{ id: 42, name: 'Accessible', platform: 'openai' }, { id: 99, name: 'Another', platform: 'openai' }])
+    let resolveCreate!: (key: ApiKey) => void
+    createKey.mockImplementationOnce(() => new Promise(resolve => { resolveCreate = resolve }))
+    const wrapper = await mountView()
+    await wrapper.get('[data-tour="key-form-name"]').setValue('pending-key')
+    await wrapper.get('#key-form').trigger('submit')
+
+    expect((wrapper.get('[data-test="key-form-fields"]').element as HTMLFieldSetElement).disabled).toBe(true)
+    expect((wrapper.get('[data-test="cancel-key-form"]').element as HTMLButtonElement).disabled).toBe(true)
+    const dialog = wrapper.findAllComponents({ name: 'BaseDialog' }).find(component => component.props('show'))!
+    expect(dialog.props('closeOnEscape')).toBe(false)
+    expect(dialog.props('showCloseButton')).toBe(false)
+    expect(dialog.props('closeOnClickOutside')).toBe(false)
+    await dialog.vm.$emit('close')
+    await wrapper.get('[data-test="cancel-key-form"]').trigger('click')
+    await wrapper.get('#key-form').trigger('submit')
+    expect(wrapper.find('[data-test="key-dialog"]').exists()).toBe(true)
+    expect(createKey).toHaveBeenCalledTimes(1)
+
+    // Even a stale child event cannot change the return metadata of this request.
+    const groupSelect = wrapper.findAllComponents({ name: 'Select' }).find(component => component.attributes('data-tour') === 'key-form-group')!
+    expect(groupSelect.props('disabled')).toBe(true)
+    groupSelect.vm.$emit('update:modelValue', 99)
+    await nextTick()
+    resolveCreate({ ...createApiKey(), id: 77, group_id: 42, key: 'sk-secret-new-key' })
+    await flushPromises()
+
+    expect(routerPush).toHaveBeenCalledTimes(1)
+    expect(routerPush).toHaveBeenCalledWith({ path: '/model-catalog', query: { model: 'MiniMax-H3', platform: 'openai', kind: 'Videos', tab: 'test', group: '42', key: '77' } })
+    expect(JSON.stringify(routerPush.mock.calls)).not.toContain('sk-secret-new-key')
+    expect(wrapper.find('[data-test="key-dialog"]').exists()).toBe(false)
+  })
+
+  it('does not redirect a late creation result after the user has navigated to a different context', async () => {
+    routeState.query = { model: 'MiniMax-H3', platform: 'openai', kind: 'Videos', group: '42', tab: 'api', create: '1' }
+    getAvailableGroups.mockResolvedValue([{ id: 42, name: 'Accessible', platform: 'openai' }])
+    let resolveCreate!: (key: ApiKey) => void
+    createKey.mockImplementationOnce(() => new Promise(resolve => { resolveCreate = resolve }))
+    const wrapper = await mountView()
+    await wrapper.get('[data-tour="key-form-name"]').setValue('pending-key')
+    await wrapper.get('#key-form').trigger('submit')
+    routeState.query = { model: 'another-model', platform: 'openai', kind: 'Chat', tab: 'api' }
+    routeState.fullPath = '/keys?model=another-model'
+    resolveCreate({ ...createApiKey(), id: 88, group_id: 42 })
+    await flushPromises()
+    expect(routerPush).not.toHaveBeenCalled()
+  })
+
+  it('does not redirect or reload the old page when creation finishes after unmount', async () => {
+    routeState.query = { model: 'MiniMax-H3', platform: 'openai', kind: 'Videos', group: '42', tab: 'api', create: '1' }
+    getAvailableGroups.mockResolvedValue([{ id: 42, name: 'Accessible', platform: 'openai' }])
+    let resolveCreate!: (key: ApiKey) => void
+    createKey.mockImplementationOnce(() => new Promise(resolve => { resolveCreate = resolve }))
+    const wrapper = await mountView()
+    await wrapper.get('[data-tour="key-form-name"]').setValue('pending-key')
+    await wrapper.get('#key-form').trigger('submit')
+    const listCallCount = listKeys.mock.calls.length
+    wrapper.unmount()
+    resolveCreate({ ...createApiKey(), id: 89, group_id: 42 })
+    await flushPromises()
+    expect(routerPush).not.toHaveBeenCalled()
+    expect(listKeys).toHaveBeenCalledTimes(listCallCount)
   })
 })

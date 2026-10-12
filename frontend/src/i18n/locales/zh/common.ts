@@ -157,6 +157,9 @@ export default {
     modelTest: '模型测试',
     modelCatalog: '模型目录',
     userModelManagement: '模型目录',
+    userApiAccess: 'API 接入',
+    userAccessModels: '模型',
+    userAccessKeys: '密钥',
     upstreamManagement: '上游管理',
     upstreamConnections: '上游连接',
     upstreamPools: '资源池',
@@ -221,6 +224,14 @@ export default {
     contentModeration: '内容审核',
     promptAudit: '提示词审计',
     auditLogs: '操作日志',
+  },
+
+  userAccess: {
+    returnToModel: '返回模型',
+    creatingForModel: '为 {model} 配置接入密钥',
+    loadingGroups: '正在加载可用分组…',
+    groupsLoadFailed: '可用分组加载失败，请重试',
+    chooseAvailableGroup: '请为密钥选择一个可用分组'
   },
 
   // Auth

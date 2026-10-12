@@ -148,9 +148,9 @@
                   {{ t('nav.profile') }}
                 </router-link>
 
-                <router-link to="/keys" @click="closeDropdown" class="dropdown-item">
+                <router-link v-if="!appStore.backendModeEnabled || authStore.isAdmin" to="/model-catalog" @click="closeDropdown" class="dropdown-item">
                   <Icon name="key" size="sm" />
-                  {{ t('nav.apiKeys') }}
+                  {{ t('nav.userApiAccess') }}
                 </router-link>
               </div>
 

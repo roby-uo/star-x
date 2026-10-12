@@ -98,6 +98,7 @@
               class="sidebar-link mb-1"
               :class="{ 'sidebar-link-active': isActive(item.path, item.activePaths), 'sidebar-link-collapsed': sidebarCollapsed }"
               :title="sidebarCollapsed ? item.label : undefined"
+              :data-tour="item.path === '/model-catalog' ? 'sidebar-my-keys' : undefined"
               :id="
                 item.path === '/admin/models'
                   ? 'sidebar-model-manage'
@@ -105,7 +106,7 @@
                       ? 'sidebar-wallet'
                       : undefined
               "
-              @click="handleMenuItemClick(item.path)"
+              @click.capture="handleMenuItemClick(item.path, $event)"
             >
               <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
               <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" />
@@ -129,10 +130,10 @@
             :target="item.path === '/recharge' ? '_blank' : undefined"
             :rel="item.path === '/recharge' ? 'noopener noreferrer' : undefined"
             class="sidebar-link mb-1"
-            :class="{ 'sidebar-link-active': isActive(item.path), 'sidebar-link-collapsed': sidebarCollapsed }"
+            :class="{ 'sidebar-link-active': isActive(item.path, item.activePaths), 'sidebar-link-collapsed': sidebarCollapsed }"
             :title="sidebarCollapsed ? item.label : undefined"
-            :data-tour="item.path === '/keys' ? 'sidebar-my-keys' : undefined"
-            @click="handleMenuItemClick(item.path)"
+            :data-tour="item.path === '/model-catalog' ? 'sidebar-my-keys' : undefined"
+            @click.capture="handleMenuItemClick(item.path, $event)"
           >
             <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
             <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" />
@@ -151,10 +152,10 @@
             :target="item.path === '/recharge' ? '_blank' : undefined"
             :rel="item.path === '/recharge' ? 'noopener noreferrer' : undefined"
             class="sidebar-link mb-1"
-            :class="{ 'sidebar-link-active': isActive(item.path), 'sidebar-link-collapsed': sidebarCollapsed }"
+            :class="{ 'sidebar-link-active': isActive(item.path, item.activePaths), 'sidebar-link-collapsed': sidebarCollapsed }"
             :title="sidebarCollapsed ? item.label : undefined"
-            :data-tour="item.path === '/keys' ? 'sidebar-my-keys' : undefined"
-            @click="handleMenuItemClick(item.path)"
+            :data-tour="item.path === '/model-catalog' ? 'sidebar-my-keys' : undefined"
+            @click.capture="handleMenuItemClick(item.path, $event)"
           >
             <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
             <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" />
@@ -659,8 +660,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
     items.push({ path: '/dashboard', label: t('nav.dashboard'), icon: DashboardIcon })
   }
   items.push(
-    { path: '/keys', label: t('nav.apiKeyManagement'), icon: KeyIcon },
-    { path: '/model-catalog', label: t('nav.userModelManagement'), icon: ChannelIcon },
+    { path: '/model-catalog', label: t('nav.userApiAccess'), icon: KeyIcon, activePaths: ['/keys', '/model-test'] },
     { path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon, hideInSimpleMode: true, featureFlag: flagBatchImageAccess },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
     { path: '/available-channels', label: t('nav.availableChannels'), icon: ChannelIcon, hideInSimpleMode: true, featureFlag: flagAvailableChannels },
@@ -768,10 +768,10 @@ const adminNavItems = computed((): NavItem[] => {
 
   const visible = applyFeatureFlags(baseItems)
 
-  // 简单模式下，在系统设置前插入 API密钥
+  // 简单模式下，个人接入入口放在系统设置前。
   if (authStore.isSimpleMode) {
     const filtered = visible.filter(item => !item.hideInSimpleMode)
-    filtered.push({ path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon })
+    filtered.push({ path: '/model-catalog', label: t('nav.userApiAccess'), icon: KeyIcon, activePaths: ['/keys', '/model-test'] })
     filtered.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon })
     for (const cm of customMenuItemsForAdmin.value) {
       filtered.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg })
@@ -800,7 +800,7 @@ function closeMobile() {
   appStore.setMobileOpen(false)
 }
 
-function handleMenuItemClick(itemPath: string) {
+function handleMenuItemClick(itemPath: string, event?: MouseEvent) {
   if (mobileOpen.value) {
     setTimeout(() => {
       appStore.setMobileOpen(false)
@@ -810,12 +810,19 @@ function handleMenuItemClick(itemPath: string) {
   // Map paths to tour selectors
   const pathToSelector: Record<string, string> = {
     '/admin/models': '#sidebar-model-manage',
-    '/keys': '[data-tour="sidebar-my-keys"]'
+    '/model-catalog': '[data-tour="sidebar-my-keys"]'
   }
 
   const selector = pathToSelector[itemPath]
   if (selector && onboardingStore.isCurrentStep(selector)) {
-    onboardingStore.nextStep(500)
+    if (itemPath === '/model-catalog') {
+      // The existing tour continues with the key creation button. Its click
+      // must reach the keys tab even though normal entry opens the models tab.
+      event?.preventDefault()
+      void router.push('/keys').then(() => onboardingStore.nextStep(500))
+    } else {
+      void onboardingStore.nextStep(500)
+    }
   }
 }
 

@@ -18,8 +18,9 @@
             <select v-model.number="keyId" class="input mt-2" :disabled="busy || keysLoading"><option :value="0">{{ keysLoading ? '加载密钥…' : '请选择密钥' }}</option><option v-for="key in keys" :key="key.id" :value="key.id">{{ key.name }}</option></select>
           </label>
         </div>
-        <p v-if="keysError" role="alert" class="mb-4 text-sm text-red-600">{{ keysError }}</p>
-        <p v-else-if="!keysLoading && !keys.length" class="mb-4 text-sm text-gray-500">此分组暂无可用密钥。<router-link to="/keys" class="text-primary-600 hover:underline">创建调用密钥</router-link></p>
+        <div v-if="keysError" role="alert" class="mb-4 flex flex-wrap items-center gap-2 text-sm text-red-600"><p>{{ keysError }}</p><button class="text-primary-600 hover:underline disabled:opacity-40" :disabled="busy || keysLoading" @click="loadKeys(groupId)">重新加载</button></div>
+        <p v-else-if="!keysLoading && !keys.length" class="mb-4 text-sm text-gray-500">此分组暂无可用密钥。<router-link v-if="!busy" :to="createKeyLocation" class="text-primary-600 hover:underline">创建密钥</router-link><span v-else class="text-gray-400">创建密钥</span></p>
+        <p v-else-if="!keysLoading && keys.length" class="mb-4 text-xs text-gray-500"><router-link v-if="!busy" :to="manageKeysLocation" class="text-primary-600 hover:underline">管理密钥</router-link><span v-else class="text-gray-400">管理密钥</span></p>
         <div class="mb-5 flex gap-6 border-b border-gray-200 dark:border-dark-700" aria-label="模型详情">
           <button v-for="entry in tabs" :key="entry.value" class="border-b-2 pb-3 text-sm font-medium disabled:opacity-50" :class="tab === entry.value ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500'" :aria-pressed="tab === entry.value" :disabled="busy" @click="tab = entry.value">{{ entry.label }}</button>
         </div>
@@ -36,7 +37,7 @@
               <pre class="overflow-x-auto bg-gray-900 p-4 text-xs leading-6 text-gray-100">{{ example }}</pre>
             </div>
             <p v-if="item.type === 'Videos'" class="text-xs leading-5 text-gray-500">视频通过异步接口调用：创建后保存任务编号，再由你的应用查询状态与下载结果。此页面提供接入示例和当前测试结果。</p>
-            <p class="text-xs leading-5 text-gray-500">示例使用 YOUR_API_KEY 占位符，请在客户端填入所选分组的密钥；真实密钥请在 API 密钥管理中查看。</p>
+            <p class="text-xs leading-5 text-gray-500">示例使用 YOUR_API_KEY 占位符，请在客户端填入所选分组的密钥；真实密钥请在「API 接入 → 密钥」中查看。</p>
             <p v-if="copyError" role="alert" class="text-xs text-red-600">{{ copyError }}</p>
           </template>
           <p v-else class="rounded-xl bg-gray-50 p-4 text-sm text-gray-500 dark:bg-dark-900">此模型已列入目录，当前暂无对应的调用适配。请联系管理员确认接入方式。</p>
@@ -69,15 +70,18 @@ import type { ApiKey } from '@/types'
 import { catalogModelEndpoint } from '@/utils/modelCatalog'
 import { isSeedreamModel } from '@/utils/modelTest'
 import { miniMaxVideoSpec } from '@/utils/minimaxVideo'
+import { buildUserAccessQuery, type UserAccessContext } from '@/utils/userAccessContext'
 import { buildTextRequest, catalogTypeLabels, modelAccessLabels, modelSupplier, protocolLabel, type UserCatalogItem } from './userModelCatalog'
-const props = withDefaults(defineProps<{ item: UserCatalogItem; initialTab?: 'api' | 'test' }>(), { initialTab: 'api' })
-const emit = defineEmits<{ close: [] }>()
+const props = withDefaults(defineProps<{ item: UserCatalogItem; initialTab?: 'api' | 'test'; initialGroupId?: number; initialKeyId?: number }>(), { initialTab: 'api' })
+interface ModelAccessSelection { groupId: number; keyId?: number; tab: 'api' | 'test' }
+const emit = defineEmits<{ close: []; contextChange: [selection: ModelAccessSelection] }>()
 const appStore = useAppStore()
 const tab = ref<'api' | 'test'>(props.initialTab)
 const testVisited = ref(props.initialTab === 'test')
 watch(tab, value => { if (value === 'test') testVisited.value = true })
 const tabs = [{ value: 'api' as const, label: 'API 接入' }, { value: 'test' as const, label: '在线测试' }]
-const groupId = ref(props.item.groups[0].group_id)
+function requestedGroupId() { return props.item.groups.find(group => group.group_id === props.initialGroupId)?.group_id || props.item.groups[0].group_id }
+const groupId = ref(requestedGroupId())
 const keyId = ref(0)
 const keys = ref<ApiKey[]>([])
 const keysLoading = ref(false)
@@ -87,6 +91,9 @@ const copied = ref(false)
 const copyError = ref('')
 const model = computed(() => props.item.groups.find(group => group.group_id === groupId.value) || props.item.groups[0])
 const selectedKey = computed(() => keys.value.find(key => key.id === keyId.value))
+const accessContext = computed<UserAccessContext>(() => ({ model: props.item.name, platform: props.item.platform, kind: props.item.type, tab: tab.value, groupId: groupId.value, ...(selectedKey.value ? { keyId: selectedKey.value.id } : {}) }))
+const createKeyLocation = computed(() => ({ path: '/keys', query: buildUserAccessQuery(accessContext.value, { create: true }) }))
+const manageKeysLocation = computed(() => ({ path: '/keys', query: buildUserAccessQuery(accessContext.value) }))
 const contextId = computed(() => `${groupId.value}:${keyId.value}`)
 const endpoint = computed(() => {
   const guessed = catalogModelEndpoint(props.item.type, model.value.platform, model.value.name)
@@ -133,7 +140,13 @@ function curl(path: string, body: Record<string, unknown>, headers: Record<strin
   return [`curl '${origin.value}${path}' \\`, "  -H 'Authorization: Bearer YOUR_API_KEY' \\", "  -H 'Content-Type: application/json' \\", ...Object.entries(headers).map(([name, value]) => `  -H '${name}: ${value}' \\`), `  -d '${JSON.stringify(body, null, 2).replace(/'/g, "'\\''")}'`].join('\n')
 }
 let keysRevision = 0
-watch(groupId, async id => {
+function usableKey(key: ApiKey, id: number) {
+  return key.group_id === id && key.status === 'active'
+    && (!key.expires_at || Date.parse(key.expires_at) > Date.now())
+    && !(key.quota > 0 && (key.quota_used || 0) >= key.quota)
+}
+async function loadKeys(id: number, preferredKeyId = keyId.value) {
+  if (busy.value) return
   const revision = ++keysRevision
   keys.value = []
   keyId.value = 0
@@ -142,13 +155,45 @@ watch(groupId, async id => {
   try {
     const first = await list(1, 100, { group_id: id, status: 'active' })
     const allKeys = [...first.items]
-    for (let page = 2; page <= first.pages; page++) allKeys.push(...(await list(page, 100, { group_id: id, status: 'active' })).items)
+    for (let page = 2; page <= first.pages; page++) {
+      if (revision !== keysRevision) return
+      allKeys.push(...(await list(page, 100, { group_id: id, status: 'active' })).items)
+    }
     if (revision !== keysRevision) return
-    keys.value = allKeys.filter(key => key.group_id === id && key.status === 'active')
-    keyId.value = keys.value[0]?.id || 0
-  } catch { if (revision === keysRevision) keysError.value = '调用密钥加载失败，请关闭详情后重新打开。' }
+    keys.value = allKeys.filter(key => usableKey(key, id))
+    const preferred = id === requestedGroupId() && props.initialKeyId !== undefined ? props.initialKeyId : preferredKeyId
+    keyId.value = keys.value.find(key => key.id === preferred)?.id || keys.value[0]?.id || 0
+  } catch { if (revision === keysRevision) keysError.value = '调用密钥加载失败，请重新加载。' }
   finally { if (revision === keysRevision) keysLoading.value = false }
-}, { immediate: true })
+}
+watch(groupId, id => { void loadKeys(id, 0) }, { immediate: true })
+let externalContextPending = false
+function restoreExternalContext() {
+  if (busy.value || !externalContextPending) return
+  externalContextPending = false
+  tab.value = props.initialTab === 'test' ? 'test' : 'api'
+  const requestedGroup = requestedGroupId()
+  if (groupId.value !== requestedGroup) {
+    groupId.value = requestedGroup
+    return
+  }
+  // A lookup already in progress reads the latest props once its valid key list arrives.
+  if (!keysLoading.value && !keysError.value) keyId.value = keys.value.find(key => key.id === props.initialKeyId)?.id || keys.value[0]?.id || 0
+}
+watch(() => [props.initialGroupId, props.initialKeyId, props.initialTab], () => {
+  externalContextPending = true
+  restoreExternalContext()
+})
+watch(busy, value => { if (!value) restoreExternalContext() })
+let lastEmittedContext = ''
+watch([groupId, keyId, tab, keysLoading, keysError], () => {
+  if (busy.value || keysLoading.value || keysError.value || externalContextPending) return
+  const selection: ModelAccessSelection = { groupId: groupId.value, tab: tab.value, ...(selectedKey.value ? { keyId: selectedKey.value.id } : {}) }
+  const signature = JSON.stringify(selection)
+  if (signature === lastEmittedContext) return
+  lastEmittedContext = signature
+  emit('contextChange', selection)
+})
 function close() { if (!busy.value) emit('close') }
 function onEscape(event: KeyboardEvent) { if (event.key === 'Escape') close() }
 async function copyExample() {

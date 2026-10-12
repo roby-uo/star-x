@@ -157,6 +157,9 @@ export default {
     modelTest: 'Model Test',
     modelCatalog: 'Model Catalog',
     userModelManagement: 'Model Catalog',
+    userApiAccess: 'API Access',
+    userAccessModels: 'Models',
+    userAccessKeys: 'Keys',
     upstreamManagement: 'Upstreams',
     upstreamConnections: 'Connections',
     upstreamPools: 'Pools',
@@ -221,6 +224,14 @@ export default {
     contentModeration: 'Content Moderation',
     promptAudit: 'Prompt Audit',
     auditLogs: 'Audit Logs',
+  },
+
+  userAccess: {
+    returnToModel: 'Back to model',
+    creatingForModel: 'Manage API keys for {model}',
+    loadingGroups: 'Loading available groups…',
+    groupsLoadFailed: 'Could not load available groups. Retry.',
+    chooseAvailableGroup: 'Choose an available group for this key'
   },
 
   // Auth

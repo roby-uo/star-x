@@ -1,6 +1,24 @@
 <template>
   <AppLayout>
-    <TablePageLayout>
+    <div class="user-access-keys-workspace">
+      <UserAccessWorkspace />
+      <div
+        v-if="modelContext"
+        class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3 text-sm dark:border-primary-900 dark:bg-primary-900/10"
+        data-test="model-return-context"
+      >
+        <div class="min-w-0">
+          <p class="break-words text-gray-700 dark:text-gray-200">{{ t('userAccess.creatingForModel', { model: modelContext.model }) }}</p>
+          <p v-if="groupsLoading" class="mt-1 text-xs text-gray-500">{{ t('userAccess.loadingGroups') }}</p>
+          <button v-else-if="groupsLoadFailed" class="mt-1 text-xs text-primary-600 hover:underline" @click="loadGroups">
+            {{ t('userAccess.groupsLoadFailed') }}
+          </button>
+        </div>
+        <router-link :to="modelReturnLocation" class="shrink-0 text-primary-600 hover:underline" data-test="return-to-model">
+          {{ t('userAccess.returnToModel') }}
+        </router-link>
+      </div>
+    <TablePageLayout class="user-access-keys-table">
       <template #filters>
         <div class="flex flex-col gap-3">
           <div class="flex flex-wrap items-center gap-3">
@@ -73,7 +91,7 @@
               </button>
             </div>
           </div>
-          <button @click="showCreateModal = true" class="btn btn-primary" data-tour="keys-create-btn">
+          <button @click="openCreateModal" class="btn btn-primary" data-tour="keys-create-btn">
             <Icon name="plus" size="md" class="mr-2" />
             {{ t('keys.createKey') }}
           </button>
@@ -422,7 +440,7 @@
               :title="t('keys.noKeysYet')"
               :description="t('keys.createFirstKey')"
               :action-text="t('keys.createKey')"
-              @action="showCreateModal = true"
+              @action="openCreateModal"
             />
           </template>
         </DataTable>
@@ -439,15 +457,20 @@
         />
       </template>
     </TablePageLayout>
+    </div>
 
     <!-- Create/Edit Modal -->
     <BaseDialog
       :show="showCreateModal || showEditModal"
       :title="showEditModal ? t('keys.editKey') : t('keys.createKey')"
+      :close-on-escape="!submitting"
+      :close-on-click-outside="false"
+      :show-close-button="!submitting"
       width="normal"
       @close="closeModals"
     >
       <form id="key-form" @submit.prevent="handleSubmit" class="space-y-5">
+        <fieldset :disabled="submitting" :inert="submitting" class="space-y-5" data-test="key-form-fields">
         <div>
           <label class="input-label">{{ t('keys.nameLabel') }}</label>
           <input
@@ -464,6 +487,7 @@
           <label class="input-label">{{ t('keys.groupLabel') }}</label>
           <Select
             v-model="formData.group_id"
+            :disabled="submitting"
             :options="groupOptions"
             :placeholder="t('keys.selectGroup')"
             :searchable="true"
@@ -491,6 +515,9 @@
               />
             </template>
           </Select>
+          <p v-if="creationContext && formData.group_id === null" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('userAccess.chooseAvailableGroup') }}
+          </p>
           <p v-if="selectedImageGroup" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
             {{ t('keys.imageGroupHint') }}
             <router-link to="/model-catalog" class="text-primary-600 hover:underline">{{ t('keys.viewImageModels') }}</router-link>
@@ -534,6 +561,7 @@
           <label class="input-label">{{ t('keys.statusLabel') }}</label>
           <Select
             v-model="formData.status"
+            :disabled="submitting"
             :options="statusOptions"
             :placeholder="t('keys.selectStatus')"
           />
@@ -897,10 +925,11 @@
             </div>
           </div>
         </div>
+        </fieldset>
       </form>
       <template #footer>
         <div class="flex justify-end gap-3">
-          <button @click="closeModals" type="button" class="btn btn-secondary">
+          <button @click="closeModals" :disabled="submitting" type="button" class="btn btn-secondary" data-test="cancel-key-form">
             {{ t('common.cancel') }}
           </button>
           <button
@@ -1107,7 +1136,8 @@
 import LedgerAmountInput from '@/components/common/LedgerAmountInput.vue'
 import { formatCnyFromLedger } from '@/utils/currency'
 import KeyModelAccessEditor from '@/components/models/KeyModelAccessEditor.vue'
-	import { ref, reactive, computed, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
+	import { ref, reactive, computed, watch, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
+	import { useRoute, useRouter } from 'vue-router'
 	import { useI18n } from 'vue-i18n'
 	import { useAppStore } from '@/stores/app'
 	import { useOnboardingStore } from '@/stores/onboarding'
@@ -1118,6 +1148,8 @@ const { t } = useI18n()
 import { keysAPI, authAPI, usageAPI, userGroupsAPI } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
+import UserAccessWorkspace from '@/components/models/UserAccessWorkspace.vue'
+import { parseUserAccessContext, buildUserAccessQuery, type UserAccessContext } from '@/utils/userAccessContext'
 	import DataTable from '@/components/common/DataTable.vue'
 	import Pagination from '@/components/common/Pagination.vue'
 	import BaseDialog from '@/components/common/BaseDialog.vue'
@@ -1156,6 +1188,15 @@ interface GroupOption {
 }
 
 const appStore = useAppStore()
+const route = useRoute()
+const router = useRouter()
+const modelContext = computed(() => parseUserAccessContext(route.query))
+const modelReturnLocation = computed(() => ({ path: '/model-catalog', query: buildUserAccessQuery(modelContext.value) }))
+const creationContext = ref<UserAccessContext | null>(null)
+const groupsLoaded = ref(false)
+const groupsLoading = ref(false)
+const groupsLoadFailed = ref(false)
+const openedCreationContexts = new Set<string>()
 const onboardingStore = useOnboardingStore()
 const { copyToClipboard: clipboardCopy } = useClipboard()
 
@@ -1297,6 +1338,7 @@ const columnDropdownRef = ref<HTMLElement | null>(null)
 const dropdownPosition = ref<{ top?: number; bottom?: number; left: number } | null>(null)
 const groupButtonRefs = ref<Map<number, HTMLElement>>(new Map())
 let abortController: AbortController | null = null
+let disposed = false
 
 // Get the currently selected key for group change
 const selectedKeyForGroup = computed(() => {
@@ -1333,6 +1375,26 @@ const formData = ref({
   expiration_preset: '30' as '7' | '30' | '90' | 'custom',
   expiration_date: ''
 })
+
+const openCreateModal = () => {
+  if (submitting.value) return
+  creationContext.value = modelContext.value
+  const requestedGroup = creationContext.value?.groupId
+  if (groupsLoaded.value && requestedGroup && groups.value.some(group => group.id === requestedGroup)) {
+    formData.value.group_id = requestedGroup
+  }
+  showCreateModal.value = true
+}
+
+// Context links open the form once after available groups have been checked.
+// The form still requires an explicit submit; cancelling does not reopen it.
+watch([modelContext, groupsLoaded, () => route.query.create], () => {
+  if (!modelContext.value || route.query.create !== '1' || !groupsLoaded.value) return
+  const contextId = JSON.stringify(buildUserAccessQuery(modelContext.value, { create: true }))
+  if (openedCreationContexts.has(contextId) || showCreateModal.value || showEditModal.value) return
+  openedCreationContexts.add(contextId)
+  openCreateModal()
+}, { immediate: true })
 
 // 自定义Key验证
 const customKeyError = computed(() => {
@@ -1489,10 +1551,17 @@ const loadApiKeys = async () => {
 }
 
 const loadGroups = async () => {
+  if (groupsLoading.value) return
+  groupsLoading.value = true
+  groupsLoadFailed.value = false
   try {
     groups.value = await userGroupsAPI.getAvailable()
+    groupsLoaded.value = true
   } catch (error) {
+    groupsLoadFailed.value = true
     console.error('Failed to load groups:', error)
+  } finally {
+    groupsLoading.value = false
   }
 }
 
@@ -1533,6 +1602,7 @@ const handleSort = (key: string, order: 'asc' | 'desc') => {
 }
 
 const editKey = (key: ApiKey) => {
+  if (submitting.value) return
   selectedKey.value = key
   const hasIPRestriction = (key.ip_whitelist?.length > 0) || (key.ip_blacklist?.length > 0)
   const hasExpiration = !!key.expires_at
@@ -1637,6 +1707,7 @@ const confirmDelete = (key: ApiKey) => {
 }
 
 const handleSubmit = async () => {
+  if (submitting.value || disposed) return
   // Validate group_id is required
   if (formData.value.group_id === null) {
     appStore.showError(t('keys.groupRequired'))
@@ -1654,6 +1725,17 @@ const handleSubmit = async () => {
       return
     }
   }
+
+  // Keep an in-flight request tied to the form and navigation that submitted it.
+  const submittedGroupId = formData.value.group_id
+  const submittedContext = creationContext.value ? { ...creationContext.value, groupId: submittedGroupId } : null
+  const submittedForm = { ...formData.value }
+  const submittedKey = selectedKey.value
+  const editing = showEditModal.value
+  const submittedPath = route.fullPath
+  const submittedContextId = JSON.stringify(buildUserAccessQuery(parseUserAccessContext(route.query)))
+  const isStillOnSubmittedPage = () => !disposed && route.fullPath === submittedPath &&
+    JSON.stringify(buildUserAccessQuery(parseUserAccessContext(route.query))) === submittedContextId
 
   // Parse IP lists only if IP restriction is enabled
   const parseIPList = (text: string): string[] =>
@@ -1692,10 +1774,11 @@ const handleSubmit = async () => {
 
   submitting.value = true
   try {
-    if (showEditModal.value && selectedKey.value) {
+    let returnToModel: { path: string; query: Record<string, string> } | null = null
+    if (editing && submittedKey) {
       const updates: UpdateApiKeyRequest = {
-        name: formData.value.name,
-        group_id: formData.value.group_id,
+        name: submittedForm.name,
+        group_id: submittedGroupId,
         ip_whitelist: ipWhitelist,
         ip_blacklist: ipBlacklist,
         quota: quota,
@@ -1704,16 +1787,17 @@ const handleSubmit = async () => {
         rate_limit_1d: rateLimitData.rate_limit_1d,
         rate_limit_7d: rateLimitData.rate_limit_7d,
       }
-      if (shouldSubmitEditStatus(selectedKey.value, formData.value.status)) {
-        updates.status = formData.value.status
+      if (shouldSubmitEditStatus(submittedKey, submittedForm.status)) {
+        updates.status = submittedForm.status
       }
-      await keysAPI.update(selectedKey.value.id, updates)
+      await keysAPI.update(submittedKey.id, updates)
+      if (!isStillOnSubmittedPage()) return
       appStore.showSuccess(t('keys.keyUpdatedSuccess'))
     } else {
-      const customKey = formData.value.use_custom_key ? formData.value.custom_key : undefined
-      await keysAPI.create(
-        formData.value.name,
-        formData.value.group_id,
+      const customKey = submittedForm.use_custom_key ? submittedForm.custom_key : undefined
+      const created = await keysAPI.create(
+        submittedForm.name,
+        submittedGroupId,
         customKey,
         ipWhitelist,
         ipBlacklist,
@@ -1721,15 +1805,24 @@ const handleSubmit = async () => {
         expiresInDays,
         rateLimitData
       )
+      if (!isStillOnSubmittedPage()) return
       appStore.showSuccess(t('keys.keyCreatedSuccess'))
+      if (submittedContext && Number.isSafeInteger(created.id) && created.id > 0) {
+        returnToModel = {
+          path: '/model-catalog',
+          query: buildUserAccessQuery(submittedContext, { keyId: created.id })
+        }
+      }
       // Only advance tour if active, on submit step, and creation succeeded
       if (onboardingStore.isCurrentStep('[data-tour="key-form-submit"]')) {
         onboardingStore.nextStep(500)
       }
     }
-    closeModals()
+    resetModals()
     loadApiKeys()
+    if (returnToModel) await router.push(returnToModel)
   } catch (error: any) {
+    if (!isStillOnSubmittedPage()) return
     const errorMsg = error.response?.data?.detail || t('keys.failedToSave')
     appStore.showError(errorMsg)
     // Don't advance tour on error
@@ -1759,9 +1852,15 @@ const handleDelete = async () => {
 }
 
 const closeModals = () => {
+  if (submitting.value) return
+  resetModals()
+}
+
+const resetModals = () => {
   showCreateModal.value = false
   showEditModal.value = false
   selectedKey.value = null
+  creationContext.value = null
   formData.value = {
     name: '',
     group_id: null,
@@ -1938,7 +2037,48 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  disposed = true
   document.removeEventListener('click', closeGroupSelector)
   if (resetTimer) clearInterval(resetTimer)
 })
 </script>
+
+<style scoped>
+.user-access-keys-workspace {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  gap: 1.5rem;
+  height: calc(100vh - 64px - 2rem);
+}
+
+.user-access-keys-workspace > :not(.user-access-keys-table) {
+  flex-shrink: 0;
+}
+
+.user-access-keys-table {
+  height: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+@media (min-width: 768px) {
+  .user-access-keys-workspace {
+    height: calc(100vh - 64px - 3rem);
+  }
+}
+
+@media (min-width: 1024px) {
+  .user-access-keys-workspace {
+    height: calc(100vh - 64px - 4rem);
+  }
+}
+
+@media (max-width: 1023px) {
+  .user-access-keys-workspace {
+    height: auto;
+    min-height: calc(100vh - 64px - 2rem);
+  }
+}
+</style>

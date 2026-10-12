@@ -200,9 +200,8 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: false,
-      title: 'API Keys',
-      titleKey: 'nav.apiKeyManagement',
-      descriptionKey: 'keys.description'
+      title: 'API Access',
+      titleKey: 'nav.userApiAccess'
     }
   },
   {
@@ -212,8 +211,8 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: false,
-      title: 'Model Test',
-      titleKey: 'modelTest.title'
+      title: 'API Access',
+      titleKey: 'nav.userApiAccess'
     }
   },
   {
@@ -223,8 +222,8 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: false,
-      title: 'Model Catalog',
-      titleKey: 'nav.userModelManagement'
+      title: 'API Access',
+      titleKey: 'nav.userApiAccess'
     }
   },
   {

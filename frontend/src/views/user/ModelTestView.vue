@@ -1,9 +1,9 @@
 <template>
   <AppLayout>
     <main class="mx-auto w-full max-w-5xl space-y-5 px-4 py-6 sm:px-6">
+      <UserAccessWorkspace />
       <div>
-        <router-link to="/model-catalog" class="text-sm text-primary-600 hover:underline">← {{ t('nav.userModelManagement') }}</router-link>
-        <h1 class="text-xl font-semibold text-gray-900 dark:text-white">{{ t('modelTest.title') }}</h1>
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">{{ t('modelTest.title') }}</h2>
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('modelTest.description') }}</p>
       </div>
 
@@ -70,6 +70,7 @@ import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import UserAccessWorkspace from '@/components/models/UserAccessWorkspace.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { buildGatewayUrl } from '@/api/url'
 import { buildModelTestRequest, parseModelTestModels, type ModelTestEndpoint } from '@/utils/modelTest'
