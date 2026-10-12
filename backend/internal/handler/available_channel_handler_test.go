@@ -118,28 +118,19 @@ func TestUserAvailableChannel_FieldWhitelist(t *testing.T) {
 	require.NoError(t, err)
 	var groupDecoded map[string]any
 	require.NoError(t, json.Unmarshal(rawGroup, &groupDecoded))
-	for _, key := range []string{"id", "name", "platform", "subscription_type", "rate_multiplier", "peak_rate_enabled", "peak_start", "peak_end", "peak_rate_multiplier", "is_exclusive"} {
+	for _, key := range []string{"id", "name", "platform", "subscription_type", "is_exclusive"} {
 		_, exists := groupDecoded[key]
 		require.Truef(t, exists, "group DTO must expose %q", key)
 	}
 
-	// pricing interval 白名单：不应暴露 id / sort_order。
-	pricing := toUserPricing(&service.ChannelModelPricing{
-		BillingMode: service.BillingModeToken,
-		Intervals: []service.PricingInterval{
-			{ID: 7, MinTokens: 0, MaxTokens: nil, SortOrder: 3},
-		},
-	})
-	require.NotNil(t, pricing)
-	require.Len(t, pricing.Intervals, 1)
-	rawIv, err := json.Marshal(pricing.Intervals[0])
-	require.NoError(t, err)
-	var ivDecoded map[string]any
-	require.NoError(t, json.Unmarshal(rawIv, &ivDecoded))
-	for _, key := range []string{"id", "pricing_id", "sort_order"} {
-		_, exists := ivDecoded[key]
-		require.Falsef(t, exists, "user pricing interval must not expose %q", key)
+	for _, key := range []string{"rate_multiplier", "peak_rate_enabled", "peak_start", "peak_end", "peak_rate_multiplier"} {
+		_, exists := groupDecoded[key]
+		require.Falsef(t, exists, "user group must not expose %q", key)
 	}
+	rawModel, err := json.Marshal(toUserSupportedModels([]service.SupportedModel{{Name: "MiniMax-H3", Platform: "openai", Pricing: &service.ChannelModelPricing{InputPrice: new(float64)}}}, nil))
+	require.NoError(t, err)
+	require.NotContains(t, string(rawModel), `"pricing"`)
+
 }
 
 func TestBuildPlatformSections_GroupsByPlatform(t *testing.T) {

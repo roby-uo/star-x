@@ -170,6 +170,7 @@ const DataTableStub = {
           <slot name="cell-id" :value="row.id" :row="row" />
         </div>
         <slot name="cell-name" :value="row.name" :row="row" />
+        <div data-test="token-usage"><slot name="cell-usage" :row="row" /></div>
         <div data-test="current-concurrency">
           <slot name="cell-current_concurrency" :value="row.current_concurrency" :row="row" />
         </div>
@@ -392,6 +393,17 @@ describe('user KeysView column settings', () => {
     const wrapper = await mountView()
 
     expect(wrapper.get('[data-test="current-concurrency"]').text()).toBe('3')
+  })
+
+  it('shows real token counts for today and the last 30 days without costs or rate requests', async () => {
+    getDashboardApiKeysUsage.mockResolvedValue({ stats: { 1: { api_key_id: 1, today_tokens: 1200, total_tokens: 23456, today_requests: 2, total_requests: 30, today_actual_cost: 9.99, total_actual_cost: 88.88 } } })
+    const wrapper = await mountView()
+    const usage = wrapper.get('[data-test="token-usage"]').text()
+    expect(usage).toContain('1,200 tokens')
+    expect(usage).toContain('23,456 tokens')
+    expect(usage).not.toContain('$')
+    expect(usage).not.toContain('88.88')
+    expect(getUserGroupRates).not.toHaveBeenCalled()
   })
 
   it('marks current concurrency as sortable', async () => {

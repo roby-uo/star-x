@@ -431,9 +431,9 @@ func (h *UserHandler) GetUserAPIKeys(c *gin.Context) {
 		return
 	}
 
-	out := make([]dto.APIKey, 0, len(keys))
+	out := make([]dto.AdminAPIKey, 0, len(keys))
 	for i := range keys {
-		out = append(out, *dto.APIKeyFromService(&keys[i]))
+		out = append(out, *dto.APIKeyFromServiceAdmin(&keys[i]))
 	}
 	response.Paginated(c, out, total, page, pageSize)
 }

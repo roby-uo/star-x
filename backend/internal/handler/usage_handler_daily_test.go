@@ -189,7 +189,7 @@ func TestGetMyAPIKeyDailyUsageAggregatesByDayForOwnedKey(t *testing.T) {
 		CacheReadTokens:  6,
 		CacheWriteTokens: 4,
 		TotalTokens:      40,
-		Cost:             0.5,
-		ActualCost:       0.4,
 	}, got.Data.Items[0])
+	require.NotContains(t, rec.Body.String(), `"cost"`)
+	require.NotContains(t, rec.Body.String(), `"actual_cost"`)
 }

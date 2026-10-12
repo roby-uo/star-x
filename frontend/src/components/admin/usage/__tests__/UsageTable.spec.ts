@@ -106,6 +106,12 @@ const baseImageRow = {
 }
 
 describe('admin UsageTable tooltip', () => {
+  it('does not render monetary slots or tooltips in user mode even with legacy cost columns', () => {
+    const wrapper = mount(UsageTable, { props: { data: [baseImageRow] as any, columns: [{ key: 'cost', label: 'Cost' }], showCosts: false }, global: { stubs: { DataTable: DataTableStub, Teleport: true } } })
+    expect(wrapper.text()).not.toContain('$')
+    expect(wrapper.text()).not.toContain('Cost Breakdown')
+    expect(wrapper.text()).not.toContain('Account rate')
+  })
   beforeEach(() => {
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
       x: 0,

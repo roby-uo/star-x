@@ -132,7 +132,7 @@ func TestUsageLogFromService_UsesRequestedModelAndKeepsUpstreamAdminOnly(t *test
 	require.Contains(t, string(adminJSON), `"upstream_model":"claude-sonnet-4-20250514"`)
 }
 
-func TestUsageLogFromService_KeepsUserBillingAndIPWithoutAdminCostFields(t *testing.T) {
+func TestUsageLogFromService_KeepsMeasuredUsageAndIPWithoutFinancialFields(t *testing.T) {
 	t.Parallel()
 
 	ipAddress := "203.0.113.10"
@@ -154,13 +154,6 @@ func TestUsageLogFromService_KeepsUserBillingAndIPWithoutAdminCostFields(t *test
 	}
 
 	userDTO := UsageLogFromService(log)
-	require.Equal(t, 0.01, userDTO.InputCost)
-	require.Equal(t, 0.02, userDTO.OutputCost)
-	require.Equal(t, 0.03, userDTO.CacheCreationCost)
-	require.Equal(t, 0.04, userDTO.CacheReadCost)
-	require.Equal(t, 0.10, userDTO.TotalCost)
-	require.Equal(t, 0.08, userDTO.ActualCost)
-	require.Equal(t, 0.8, userDTO.RateMultiplier)
 	require.NotNil(t, userDTO.IPAddress)
 	require.Equal(t, ipAddress, *userDTO.IPAddress)
 
@@ -169,6 +162,18 @@ func TestUsageLogFromService_KeepsUserBillingAndIPWithoutAdminCostFields(t *test
 	require.NotContains(t, string(userJSON), "account_rate_multiplier")
 	require.NotContains(t, string(userJSON), "account_stats_cost")
 	require.NotContains(t, string(userJSON), "account_cost")
+	for _, field := range []string{"input_cost", "output_cost", "cache_creation_cost", "cache_read_cost", "total_cost", "actual_cost", "rate_multiplier", "account_id", "image_input_cost", "image_output_cost"} {
+		require.NotContains(t, string(userJSON), `"`+field+`"`)
+	}
+	adminDTO := UsageLogFromServiceAdmin(log)
+	require.Equal(t, log.TotalCost, adminDTO.TotalCost)
+	require.Equal(t, log.ActualCost, adminDTO.ActualCost)
+	require.Equal(t, log.RateMultiplier, adminDTO.RateMultiplier)
+	adminJSON, err := json.Marshal(adminDTO)
+	require.NoError(t, err)
+	require.Contains(t, string(adminJSON), `"input_cost":0.01`)
+	require.Contains(t, string(adminJSON), `"account_stats_cost":0.21`)
+
 }
 
 func TestUsageLogFromService_FallsBackToLegacyModelWhenRequestedModelMissing(t *testing.T) {

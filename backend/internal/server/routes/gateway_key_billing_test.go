@@ -145,8 +145,11 @@ func TestGatewayRoutesKeyBillingInfoEndToEnd(t *testing.T) {
 		var body map[string]any
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
 		require.Equal(t, "sub2api.key_billing", body["object"])
-		require.Equal(t, 0.75, body["effective_rate_multiplier"])
-		require.Equal(t, 1, rateRepo.lookupCalls)
+		require.Equal(t, "admin_only", body["pricing_visibility"])
+		require.Equal(t, float64(2), body["schema_version"])
+		require.NotContains(t, body, "effective_rate_multiplier")
+		require.NotContains(t, body, "group_rate_multiplier")
+		require.Zero(t, rateRepo.lookupCalls)
 	})
 
 	t.Run("simple mode", func(t *testing.T) {

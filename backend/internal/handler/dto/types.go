@@ -41,6 +41,8 @@ type User struct {
 // 注意：普通用户接口不得返回 notes 等管理员备注信息。
 type AdminUser struct {
 	User
+	APIKeys       []AdminAPIKey           `json:"api_keys,omitempty"`
+	Subscriptions []AdminUserSubscription `json:"subscriptions,omitempty"`
 
 	Notes      string     `json:"notes"`
 	LastUsedAt *time.Time `json:"last_used_at"`
@@ -82,8 +84,35 @@ type APIKey struct {
 	Reset1dAt     *time.Time `json:"reset_1d_at,omitempty"`
 	Reset7dAt     *time.Time `json:"reset_7d_at,omitempty"`
 
-	User  *User  `json:"user,omitempty"`
+	User  *User      `json:"user,omitempty"`
+	Group *UserGroup `json:"group,omitempty"`
+}
+
+// AdminAPIKey retains administrator access to the nested group's pricing policy.
+type AdminAPIKey struct {
+	APIKey
 	Group *Group `json:"group,omitempty"`
+}
+
+// UserGroup exposes customer capabilities and quota limits without pricing or upstream policies.
+type UserGroup struct {
+	ID                        int64     `json:"id"`
+	Name                      string    `json:"name"`
+	Platform                  string    `json:"platform"`
+	IsExclusive               bool      `json:"is_exclusive"`
+	Status                    string    `json:"status"`
+	SubscriptionType          string    `json:"subscription_type"`
+	DailyLimitUSD             *float64  `json:"daily_limit_usd"`
+	WeeklyLimitUSD            *float64  `json:"weekly_limit_usd"`
+	MonthlyLimitUSD           *float64  `json:"monthly_limit_usd"`
+	AllowImageGeneration      bool      `json:"allow_image_generation"`
+	AllowBatchImageGeneration bool      `json:"allow_batch_image_generation"`
+	ClaudeCodeOnly            bool      `json:"claude_code_only"`
+	AllowMessagesDispatch     bool      `json:"allow_messages_dispatch"`
+	SupportedAgentClients     []string  `json:"supported_agent_clients"`
+	RPMLimit                  int       `json:"rpm_limit"`
+	CreatedAt                 time.Time `json:"created_at"`
+	UpdatedAt                 time.Time `json:"updated_at"`
 }
 
 type Group struct {
@@ -392,14 +421,15 @@ type RedeemCode struct {
 	// so users can see why they were charged or credited
 	Notes *string `json:"notes,omitempty"`
 
-	User  *User  `json:"user,omitempty"`
-	Group *Group `json:"group,omitempty"`
+	User  *User      `json:"user,omitempty"`
+	Group *UserGroup `json:"group,omitempty"`
 }
 
 // AdminRedeemCode 是管理员接口使用的 redeem code DTO（包含 notes 等字段）。
 // 注意：普通用户接口不得返回 notes 等内部信息。
 type AdminRedeemCode struct {
 	RedeemCode
+	Group *Group `json:"group,omitempty"`
 
 	Notes string `json:"notes"`
 }
@@ -462,7 +492,6 @@ type UsageLog struct {
 	ID        int64  `json:"id"`
 	UserID    int64  `json:"user_id"`
 	APIKeyID  int64  `json:"api_key_id"`
-	AccountID int64  `json:"account_id"`
 	RequestID string `json:"request_id"`
 	Model     string `json:"model"`
 	// ServiceTier records the OpenAI service tier used for billing, e.g. "priority" / "flex".
@@ -486,15 +515,6 @@ type UsageLog struct {
 	CacheCreation5mTokens int `json:"cache_creation_5m_tokens"`
 	CacheCreation1hTokens int `json:"cache_creation_1h_tokens"`
 
-	InputCost                 float64 `json:"input_cost"`
-	OutputCost                float64 `json:"output_cost"`
-	CacheCreationCost         float64 `json:"cache_creation_cost"`
-	CacheReadCost             float64 `json:"cache_read_cost"`
-	TotalCost                 float64 `json:"total_cost"`
-	ActualCost                float64 `json:"actual_cost"`
-	RateMultiplier            float64 `json:"rate_multiplier"`
-	LongContextBillingApplied bool    `json:"long_context_billing_applied"`
-
 	BillingType  int8   `json:"billing_type"`
 	RequestType  string `json:"request_type"`
 	Stream       bool   `json:"stream"`
@@ -508,12 +528,15 @@ type UsageLog struct {
 	ImageInputSize     *string        `json:"image_input_size"`
 	ImageOutputSize    *string        `json:"image_output_size"`
 	ImageInputTokens   int            `json:"image_input_tokens"`
-	ImageInputCost     float64        `json:"image_input_cost"`
 	ImageOutputTokens  int            `json:"image_output_tokens"`
-	ImageOutputCost    float64        `json:"image_output_cost"`
 	ImageSizeSource    *string        `json:"image_size_source"`
 	ImageSizeBreakdown map[string]int `json:"image_size_breakdown"`
 	MediaType          *string        `json:"media_type"`
+
+	// Actual video usage is reported independently from text tokens.
+	VideoCount           int     `json:"video_count"`
+	VideoResolution      *string `json:"video_resolution,omitempty"`
+	VideoDurationSeconds *int    `json:"video_duration_seconds,omitempty"`
 
 	// User-Agent
 	UserAgent *string `json:"user_agent"`
@@ -530,13 +553,27 @@ type UsageLog struct {
 
 	User         *User             `json:"user,omitempty"`
 	APIKey       *APIKey           `json:"api_key,omitempty"`
-	Group        *Group            `json:"group,omitempty"`
+	Group        *UserGroup        `json:"group,omitempty"`
 	Subscription *UserSubscription `json:"subscription,omitempty"`
 }
 
 // AdminUsageLog 是管理员接口使用的 usage log DTO（包含管理员字段）。
 type AdminUsageLog struct {
 	UsageLog
+	APIKey *AdminAPIKey `json:"api_key,omitempty"`
+
+	AccountID                 int64   `json:"account_id"`
+	InputCost                 float64 `json:"input_cost"`
+	OutputCost                float64 `json:"output_cost"`
+	CacheCreationCost         float64 `json:"cache_creation_cost"`
+	CacheReadCost             float64 `json:"cache_read_cost"`
+	TotalCost                 float64 `json:"total_cost"`
+	ActualCost                float64 `json:"actual_cost"`
+	RateMultiplier            float64 `json:"rate_multiplier"`
+	LongContextBillingApplied bool    `json:"long_context_billing_applied"`
+	ImageInputCost            float64 `json:"image_input_cost"`
+	ImageOutputCost           float64 `json:"image_output_cost"`
+	Group                     *Group  `json:"group,omitempty"`
 
 	// UpstreamModel is the actual model sent to the upstream provider after mapping.
 	// Omitted when no mapping was applied (requested model was used as-is).
@@ -624,14 +661,15 @@ type UserSubscription struct {
 	UpdatedAt time.Time  `json:"updated_at"`
 	RevokedAt *time.Time `json:"revoked_at,omitempty"`
 
-	User  *User  `json:"user,omitempty"`
-	Group *Group `json:"group,omitempty"`
+	User  *User      `json:"user,omitempty"`
+	Group *UserGroup `json:"group,omitempty"`
 }
 
 // AdminUserSubscription 是管理员接口使用的订阅 DTO（包含分配信息/备注等字段）。
 // 注意：普通用户接口不得返回 assigned_by/assigned_at/notes/assigned_by_user 等管理员字段。
 type AdminUserSubscription struct {
 	UserSubscription
+	Group *Group `json:"group,omitempty"`
 
 	AssignedBy *int64    `json:"assigned_by"`
 	AssignedAt time.Time `json:"assigned_at"`

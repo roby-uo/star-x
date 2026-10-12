@@ -95,6 +95,7 @@ vi.mock('vue-i18n', async () => {
 
 const simpleStub = { template: '<div><slot /></div>' }
 const chartStub = { template: '<div />' }
+const analysisChartStub = { template: '<div data-test="usage-analysis-chart" />' }
 
 const usageLog = {
   id: 1,
@@ -138,10 +139,10 @@ function mountUsageView() {
         Icon: true,
         UsageStatsCards: chartStub,
         UsageTable: chartStub,
-        ModelDistributionChart: chartStub,
-        GroupDistributionChart: chartStub,
-        EndpointDistributionChart: chartStub,
-        TokenUsageTrend: chartStub,
+        ModelDistributionChart: analysisChartStub,
+        GroupDistributionChart: analysisChartStub,
+        EndpointDistributionChart: analysisChartStub,
+        TokenUsageTrend: analysisChartStub,
       },
     },
   })
@@ -207,6 +208,32 @@ describe('user UsageView', () => {
     expect(getAvailable).toHaveBeenCalled()
   })
 
+  it('never offers the cost column, including saved legacy column preferences', async () => {
+    localStorage.setItem('user-usage-hidden-columns', JSON.stringify([]))
+    const wrapper = mountUsageView()
+    await flushPromises()
+    expect((wrapper.vm as any).visibleColumns.map((column: { key: string }) => column.key)).not.toContain('cost')
+    expect((wrapper.vm as any).currentToggleableColumns.map((column: { key: string }) => column.key)).not.toContain('cost')
+    wrapper.unmount()
+    localStorage.removeItem('user-usage-hidden-columns')
+  })
+
+  it('keeps analysis collapsed by default and opens the charts only when requested', async () => {
+    const wrapper = mountUsageView()
+    await flushPromises()
+    const analysis = wrapper.get('details[aria-label="用量分析"]')
+    expect((analysis.element as HTMLDetailsElement).open).toBe(false)
+    expect(wrapper.findAll('[data-test="usage-analysis-chart"]')).toHaveLength(0)
+    await analysis.get('summary').trigger('click')
+    await analysis.trigger('toggle')
+    expect((analysis.element as HTMLDetailsElement).open).toBe(true)
+    expect(wrapper.findAll('[data-test="usage-analysis-chart"]')).toHaveLength(4)
+    await analysis.get('summary').trigger('click')
+    await analysis.trigger('toggle')
+    expect(wrapper.findAll('[data-test="usage-analysis-chart"]')).toHaveLength(0)
+    wrapper.unmount()
+  })
+
   it('exports csv with current filters and without admin-only fields', async () => {
     const wrapper = mountUsageView()
     await flushPromises()
@@ -239,13 +266,15 @@ describe('user UsageView', () => {
     expect(showSuccess).toHaveBeenCalled()
     expect(csvContent.startsWith('\uFEFF')).toBe(true)
     expect(csvContent.slice(1)).toBe([
-      'Time,API Key Name,Model,Reasoning Effort,Inbound Endpoint,IP Address,Type,Billing Mode,Input Tokens,Output Tokens,Cache Read Tokens,Cache Creation Tokens,Rate Multiplier,Billed Cost,Original Cost,First Token (ms),Duration (ms)',
-      '2026-03-08T00:00:00Z,demo-key,gpt-5.4,"\'-",,203.0.113.10,Sync,Token,4057,101,278272,4,1,0.09288300,0.09288300,12,345',
+      'Time,API Key Name,Model,Reasoning Effort,Inbound Endpoint,IP Address,Type,Billing Mode,Input Tokens,Output Tokens,Cache Read Tokens,Cache Creation Tokens,First Token (ms),Duration (ms)',
+      '2026-03-08T00:00:00Z,demo-key,gpt-5.4,"\'-",,203.0.113.10,Sync,Token,4057,101,278272,4,12,345',
     ].join('\n'))
     expect(csvContent).toContain('IP Address')
     expect(csvContent).toContain('203.0.113.10')
-    expect(csvContent).toContain('Billed Cost')
-    expect(csvContent).toContain('Original Cost')
+    expect(csvContent).not.toContain('Billed Cost')
+    expect(csvContent).not.toContain('Original Cost')
+    expect(csvContent).not.toContain('Rate Multiplier')
+    expect(csvContent).not.toContain('0.092883')
     expect(csvContent).not.toContain('Upstream Endpoint')
     expect(csvContent).not.toContain('account_cost')
     expect(csvContent).not.toContain('account_rate_multiplier')

@@ -202,7 +202,10 @@ describe('KeyUsageView daily detail', () => {
     expect(text).toContain('200')
     expect(text).toContain('30')
     expect(text).toContain('10')
-    expect(text).toContain('$0.12')
+    expect(text).not.toContain('$0.12')
+    expect(text).not.toContain('Today Cost')
+    expect(text).not.toContain('Total Cost')
+    expect(wrapper.findAll('th').map(header => header.text())).not.toContain('Cost')
 
     wrapper.unmount()
   })

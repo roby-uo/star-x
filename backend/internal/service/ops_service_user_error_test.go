@@ -125,14 +125,14 @@ func TestGetUserErrorRequestDetail_OwnershipEnforced(t *testing.T) {
 	if got2.ID != 42 {
 		t.Errorf("want ID=42, got %d", got2.ID)
 	}
-	if got2.ErrorBody != `{"error":"upstream"}` {
-		t.Errorf("want ErrorBody=%q, got %q", `{"error":"upstream"}`, got2.ErrorBody)
+	if got2.ErrorBody == detail.ErrorBody {
+		t.Errorf("raw provider ErrorBody must be normalized")
 	}
 	if got2.UpstreamStatusCode == nil || *got2.UpstreamStatusCode != 503 {
 		t.Errorf("want UpstreamStatusCode=503, got %v", got2.UpstreamStatusCode)
 	}
-	if got2.Message != "upstream failed" {
-		t.Errorf("want Message=%q, got %q", "upstream failed", got2.Message)
+	if got2.Message != "上游服务暂时不可用，请稍后重试或联系管理员" {
+		t.Errorf("unexpected public Message=%q", got2.Message)
 	}
 }
 

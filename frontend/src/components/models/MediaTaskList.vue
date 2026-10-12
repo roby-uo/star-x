@@ -10,7 +10,7 @@
     <div v-for="task in filteredTasks" :key="task.id" class="rounded-lg border p-4 dark:border-dark-600">
       <div class="flex flex-wrap items-center justify-between gap-2"><strong>{{ task.model }} · {{ task.specification.resolution }} · {{ task.specification.duration }} 秒</strong><span>{{ states[task.state] || task.state }}</span></div>
       <p class="mt-2 text-xs text-gray-500">{{ new Date(task.created_at).toLocaleString() }} · {{ task.id }}<span v-if="admin"> · 用户 {{ task.user_id }} · 密钥 {{ task.api_key_id }}</span></p>
-      <p class="mt-2 text-sm">${{ task.quote.total.toFixed(4) }} · {{ billing[task.billing_state] || task.billing_state }}</p>
+      <p v-if="admin" class="mt-2 text-sm">${{ task.quote.total.toFixed(4) }} · {{ billing[task.billing_state] || task.billing_state }}</p>
       <p v-if="task.error" class="mt-2 text-sm text-amber-600">{{ task.error }}</p>
       <video v-if="safeURL(task.result?.task.content.url)" :src="safeURL(task.result?.task.content.url)" controls preload="none" class="mt-3 max-h-72 rounded-lg" />
       <div class="mt-3 flex flex-wrap gap-2"><button class="btn btn-secondary text-xs" :disabled="refreshing === task.id" @click="refresh(task.id)">更新状态</button><a v-if="safeURL(task.result?.task.content.url)" :href="safeURL(task.result?.task.content.url)" target="_blank" rel="noopener noreferrer" class="btn btn-secondary text-xs">打开／下载视频</a><button v-if="admin && task.state === 'uncertain' && task.billing_state === 'reserved'" class="btn btn-secondary text-xs" @click="releaseTask = task">核对并释放预占额度</button><button v-if="admin && ['failed','cancelled'].includes(task.state) && task.billing_state === 'charged'" class="btn btn-secondary text-xs" @click="refundTask = task">退还用户余额</button></div>

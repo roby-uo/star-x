@@ -107,7 +107,7 @@ const example = computed(() => {
   const spec = miniMaxVideoSpec(selectedModel.name)
   const payload = { model: selectedModel.name, resolution: spec?.resolutions.find(value => !selectedModel.policy?.resolutions || selectedModel.policy.resolutions.includes(value)) || '', duration: Math.max(spec?.minDuration || 0, selectedModel.policy?.min_duration || 0), ratio: mode === 'text' ? '16:9' : 'adaptive', content }
   if (spec && selectedModel.platform === 'openai') {
-    return `# 1. 获取本次请求的报价版本\n${curl('/v2/video_generation/quote', payload)}\n\n# 2. 将响应的 version 填入 X-Video-Quote；同一次请求始终使用同一 Idempotency-Key\n${curl('/v2/video_generation', payload, { 'X-Video-Quote': 'QUOTE_VERSION', 'Idempotency-Key': 'YOUR_UNIQUE_REQUEST_ID' })}\n\n# 3. 保存创建响应的 task_id，查询生成状态\ncurl '${origin.value}/v2/query/video_generation/TASK_ID' \\\n  -H 'Authorization: Bearer YOUR_API_KEY'`
+    return `# 1. 校验调用配置，获取版本凭证\n${curl('/v2/video_generation/quote', payload)}\n\n# 2. 将响应的 version 填入 X-Video-Quote；同一次请求始终使用同一 Idempotency-Key\n${curl('/v2/video_generation', payload, { 'X-Video-Quote': 'QUOTE_VERSION', 'Idempotency-Key': 'YOUR_UNIQUE_REQUEST_ID' })}\n\n# 3. 保存创建响应的 task_id，查询生成状态\ncurl '${origin.value}/v2/query/video_generation/TASK_ID' \\\n  -H 'Authorization: Bearer YOUR_API_KEY'`
   }
   return curl(endpoint.value, { model: selectedModel.name, prompt: '一只猫在阳光下缓慢走过花园' }) + `\n\n# 保存创建响应的 request_id，查询生成状态\ncurl '${origin.value}/v1/videos/REQUEST_ID' \\\n  -H 'Authorization: Bearer YOUR_API_KEY'`
 })

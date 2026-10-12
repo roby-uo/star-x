@@ -3,7 +3,6 @@ package handler
 import (
 	"sort"
 
-	"github.com/Wei-Shaw/sub2api/internal/pkg/minimax"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -52,13 +51,11 @@ func NewAvailableChannelHandler(
 // userAvailableModel is scoped to an accessible group. The catalog is independent
 // of the optional public-channel feature and never exposes upstream accounts.
 type userAvailableModel struct {
-	Name           string                      `json:"name"`
-	Platform       string                      `json:"platform"`
-	GroupID        int64                       `json:"group_id"`
-	GroupName      string                      `json:"group_name"`
-	Pricing        *userSupportedModelPricing  `json:"pricing,omitempty"`
-	Policy         *service.ModelServicePolicy `json:"policy,omitempty"`
-	RateMultiplier float64                     `json:"rate_multiplier"`
+	Name      string                  `json:"name"`
+	Platform  string                  `json:"platform"`
+	GroupID   int64                   `json:"group_id"`
+	GroupName string                  `json:"group_name"`
+	Policy    *userModelServicePolicy `json:"policy,omitempty"`
 }
 
 // ListModels returns the gateway's available models for schedulable accounts in
@@ -87,16 +84,7 @@ func (h *AvailableChannelHandler) ListModels(c *gin.Context) {
 		if policy != nil && policy.State != "published" {
 			continue
 		}
-		model.Policy = policy
-		model.Pricing = toUserPricing(h.channelService.GetChannelModelPricing(c.Request.Context(), model.GroupID, model.Name))
-		for _, group := range groups {
-			if group.ID == model.GroupID {
-				model.RateMultiplier = h.openAIService.ResolveUserGroupRateMultiplier(c.Request.Context(), subject.UserID, group.ID, group.RateMultiplier)
-				if minimax.IsVideoModel(model.Name) && group.VideoRateIndependent {
-					model.RateMultiplier = group.VideoRateMultiplier
-				}
-			}
-		}
+		model.Policy = userPolicyFromModelPolicy(policy)
 		visible = append(visible, model)
 	}
 	response.Success(c, visible)
@@ -122,54 +110,40 @@ func (h *AvailableChannelHandler) featureEnabled(c *gin.Context) bool {
 	return h.settingService.GetAvailableChannelsRuntime(c.Request.Context()).Enabled
 }
 
-// userAvailableGroup 用户可见的分组概要（白名单字段）。
-//
-// 前端据此区分专属 vs 公开分组（IsExclusive）、订阅 vs 标准分组（SubscriptionType，
-// 订阅视觉加深），并展示默认倍率与高峰倍率规则；用户专属倍率前端走
-// /groups/rates，和 API 密钥页面保持一致。
+// userAvailableGroup contains customer capabilities, with no pricing policies.
 type userAvailableGroup struct {
-	ID                 int64   `json:"id"`
-	Name               string  `json:"name"`
-	Platform           string  `json:"platform"`
-	SubscriptionType   string  `json:"subscription_type"`
-	RateMultiplier     float64 `json:"rate_multiplier"`
-	PeakRateEnabled    bool    `json:"peak_rate_enabled"`
-	PeakStart          string  `json:"peak_start"`
-	PeakEnd            string  `json:"peak_end"`
-	PeakRateMultiplier float64 `json:"peak_rate_multiplier"`
-	IsExclusive        bool    `json:"is_exclusive"`
+	ID               int64  `json:"id"`
+	Name             string `json:"name"`
+	Platform         string `json:"platform"`
+	SubscriptionType string `json:"subscription_type"`
+	IsExclusive      bool   `json:"is_exclusive"`
 }
 
-// userSupportedModelPricing 用户可见的定价字段白名单。
-type userSupportedModelPricing struct {
-	BillingMode      string                   `json:"billing_mode"`
-	InputPrice       *float64                 `json:"input_price"`
-	OutputPrice      *float64                 `json:"output_price"`
-	CacheWritePrice  *float64                 `json:"cache_write_price"`
-	CacheReadPrice   *float64                 `json:"cache_read_price"`
-	ImageInputPrice  *float64                 `json:"image_input_price"`
-	ImageOutputPrice *float64                 `json:"image_output_price"`
-	PerRequestPrice  *float64                 `json:"per_request_price"`
-	Intervals        []userPricingIntervalDTO `json:"intervals"`
+// userModelServicePolicy is the published capability contract, without administrator prices.
+type userModelServicePolicy struct {
+	Platform    string   `json:"platform"`
+	Model       string   `json:"model"`
+	ImageSizes  []string `json:"image_sizes,omitempty"`
+	MaxImages   int      `json:"max_images,omitempty"`
+	Kind        string   `json:"kind"`
+	State       string   `json:"state"`
+	Resolutions []string `json:"resolutions,omitempty"`
+	MinDuration int      `json:"min_duration,omitempty"`
+	MaxDuration int      `json:"max_duration,omitempty"`
+	Modes       []string `json:"modes,omitempty"`
 }
 
-// userPricingIntervalDTO 定价区间白名单（去掉内部 ID、SortOrder 等前端不渲染的字段）。
-type userPricingIntervalDTO struct {
-	MinTokens       int      `json:"min_tokens"`
-	MaxTokens       *int     `json:"max_tokens"`
-	TierLabel       string   `json:"tier_label,omitempty"`
-	InputPrice      *float64 `json:"input_price"`
-	OutputPrice     *float64 `json:"output_price"`
-	CacheWritePrice *float64 `json:"cache_write_price"`
-	CacheReadPrice  *float64 `json:"cache_read_price"`
-	PerRequestPrice *float64 `json:"per_request_price"`
+func userPolicyFromModelPolicy(p *service.ModelServicePolicy) *userModelServicePolicy {
+	if p == nil {
+		return nil
+	}
+	return &userModelServicePolicy{p.Platform, p.Model, p.ImageSizes, p.MaxImages, p.Kind, p.State, p.Resolutions, p.MinDuration, p.MaxDuration, p.Modes}
 }
 
 // userSupportedModel 用户可见的支持模型条目。
 type userSupportedModel struct {
-	Name     string                     `json:"name"`
-	Platform string                     `json:"platform"`
-	Pricing  *userSupportedModelPricing `json:"pricing"`
+	Name     string `json:"name"`
+	Platform string `json:"platform"`
 }
 
 // userChannelPlatformSection 单渠道内某个平台的子视图：用户可见的分组 + 该平台
@@ -293,16 +267,11 @@ func filterUserVisibleGroups(
 			continue
 		}
 		visible = append(visible, userAvailableGroup{
-			ID:                 g.ID,
-			Name:               g.Name,
-			Platform:           g.Platform,
-			SubscriptionType:   g.SubscriptionType,
-			RateMultiplier:     g.RateMultiplier,
-			PeakRateEnabled:    g.PeakRateEnabled,
-			PeakStart:          g.PeakStart,
-			PeakEnd:            g.PeakEnd,
-			PeakRateMultiplier: g.PeakRateMultiplier,
-			IsExclusive:        g.IsExclusive,
+			ID:               g.ID,
+			Name:             g.Name,
+			Platform:         g.Platform,
+			SubscriptionType: g.SubscriptionType,
+			IsExclusive:      g.IsExclusive,
 		})
 	}
 	return visible
@@ -326,43 +295,7 @@ func toUserSupportedModels(
 		out = append(out, userSupportedModel{
 			Name:     m.Name,
 			Platform: m.Platform,
-			Pricing:  toUserPricing(m.Pricing),
 		})
 	}
 	return out
-}
-
-// toUserPricing 将 service 层定价转换为用户 DTO；入参为 nil 时返回 nil。
-func toUserPricing(p *service.ChannelModelPricing) *userSupportedModelPricing {
-	if p == nil {
-		return nil
-	}
-	intervals := make([]userPricingIntervalDTO, 0, len(p.Intervals))
-	for _, iv := range p.Intervals {
-		intervals = append(intervals, userPricingIntervalDTO{
-			MinTokens:       iv.MinTokens,
-			MaxTokens:       iv.MaxTokens,
-			TierLabel:       iv.TierLabel,
-			InputPrice:      iv.InputPrice,
-			OutputPrice:     iv.OutputPrice,
-			CacheWritePrice: iv.CacheWritePrice,
-			CacheReadPrice:  iv.CacheReadPrice,
-			PerRequestPrice: iv.PerRequestPrice,
-		})
-	}
-	billingMode := string(p.BillingMode)
-	if billingMode == "" {
-		billingMode = string(service.BillingModeToken)
-	}
-	return &userSupportedModelPricing{
-		BillingMode:      billingMode,
-		InputPrice:       p.InputPrice,
-		OutputPrice:      p.OutputPrice,
-		CacheWritePrice:  p.CacheWritePrice,
-		CacheReadPrice:   p.CacheReadPrice,
-		ImageInputPrice:  p.ImageInputPrice,
-		ImageOutputPrice: p.ImageOutputPrice,
-		PerRequestPrice:  p.PerRequestPrice,
-		Intervals:        intervals,
-	}
 }

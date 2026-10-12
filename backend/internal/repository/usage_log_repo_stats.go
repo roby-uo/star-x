@@ -549,7 +549,7 @@ func (r *usageLogRepository) GetBatchUserUsageStats(ctx context.Context, userIDs
 // BatchAPIKeyUsageStats represents usage stats for a single API key
 type BatchAPIKeyUsageStats = usagestats.BatchAPIKeyUsageStats
 
-// GetBatchAPIKeyUsageStats gets today and total actual_cost for multiple API keys within a time range.
+// GetBatchAPIKeyUsageStats returns measured tokens, requests and admin costs for multiple API keys.
 // If startTime is zero, defaults to 30 days ago.
 func (r *usageLogRepository) GetBatchAPIKeyUsageStats(ctx context.Context, apiKeyIDs []int64, startTime, endTime time.Time) (map[int64]*BatchAPIKeyUsageStats, error) {
 	result := make(map[int64]*BatchAPIKeyUsageStats)
@@ -574,10 +574,14 @@ func (r *usageLogRepository) GetBatchAPIKeyUsageStats(ctx context.Context, apiKe
 		SELECT
 			api_key_id,
 			COALESCE(SUM(actual_cost) FILTER (WHERE created_at >= $2 AND created_at < $3), 0) as total_cost,
-			COALESCE(SUM(actual_cost) FILTER (WHERE created_at >= $4), 0) as today_cost
+			COALESCE(SUM(actual_cost) FILTER (WHERE created_at >= $4 AND created_at < $3), 0) as today_cost,
+			COALESCE(SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens) FILTER (WHERE created_at >= $2 AND created_at < $3), 0) as total_tokens,
+			COALESCE(SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens) FILTER (WHERE created_at >= $4 AND created_at < $3), 0) as today_tokens,
+			COUNT(*) FILTER (WHERE created_at >= $2 AND created_at < $3) as total_requests,
+			COUNT(*) FILTER (WHERE created_at >= $4 AND created_at < $3) as today_requests
 		FROM usage_logs
 		WHERE api_key_id = ANY($1)
-		  AND created_at >= LEAST($2, $4)
+		  AND created_at >= LEAST($2, $4) AND created_at < $3
 		GROUP BY api_key_id
 	`
 	today := timezone.Today()
@@ -589,13 +593,18 @@ func (r *usageLogRepository) GetBatchAPIKeyUsageStats(ctx context.Context, apiKe
 		var apiKeyID int64
 		var total float64
 		var todayTotal float64
-		if err := rows.Scan(&apiKeyID, &total, &todayTotal); err != nil {
+		var totalTokens, todayTokens, totalRequests, todayRequests int64
+		if err := rows.Scan(&apiKeyID, &total, &todayTotal, &totalTokens, &todayTokens, &totalRequests, &todayRequests); err != nil {
 			_ = rows.Close()
 			return nil, err
 		}
 		if stats, ok := result[apiKeyID]; ok {
 			stats.TotalActualCost = total
 			stats.TodayActualCost = todayTotal
+			stats.TotalTokens = totalTokens
+			stats.TodayTokens = todayTokens
+			stats.TotalRequests = totalRequests
+			stats.TodayRequests = todayRequests
 		}
 	}
 	if err := rows.Close(); err != nil {

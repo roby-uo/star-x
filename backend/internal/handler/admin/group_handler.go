@@ -561,9 +561,9 @@ func (h *GroupHandler) GetGroupAPIKeys(c *gin.Context) {
 		return
 	}
 
-	outKeys := make([]dto.APIKey, 0, len(keys))
+	outKeys := make([]dto.AdminAPIKey, 0, len(keys))
 	for i := range keys {
-		outKeys = append(outKeys, *dto.APIKeyFromService(&keys[i]))
+		outKeys = append(outKeys, *dto.APIKeyFromServiceAdmin(&keys[i]))
 	}
 	response.Paginated(c, outKeys, total, page, pageSize)
 }

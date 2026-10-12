@@ -67,12 +67,26 @@ func UserFromServiceAdmin(u *service.User) *AdminUser {
 	if base == nil {
 		return nil
 	}
-	return &AdminUser{
+	out := &AdminUser{
 		User:       *base,
 		Notes:      u.Notes,
 		LastUsedAt: u.LastUsedAt,
 		GroupRates: u.GroupRates,
 	}
+	for i := range u.APIKeys {
+		out.APIKeys = append(out.APIKeys, *APIKeyFromServiceAdmin(&u.APIKeys[i]))
+	}
+	for i := range u.Subscriptions {
+		out.Subscriptions = append(out.Subscriptions, *UserSubscriptionFromServiceAdmin(&u.Subscriptions[i]))
+	}
+	return out
+}
+
+func APIKeyFromServiceAdmin(k *service.APIKey) *AdminAPIKey {
+	if k == nil {
+		return nil
+	}
+	return &AdminAPIKey{APIKey: *APIKeyFromService(k), Group: adminGroupFromServiceShallow(k.Group)}
 }
 
 func APIKeyFromService(k *service.APIKey) *APIKey {
@@ -123,15 +137,22 @@ func APIKeyFromService(k *service.APIKey) *APIKey {
 	return out
 }
 
-func GroupFromServiceShallow(g *service.Group) *Group {
+func GroupFromServiceShallow(g *service.Group) *UserGroup {
 	if g == nil {
 		return nil
 	}
-	out := groupFromServiceBase(g)
-	return &out
+	return &UserGroup{
+		ID: g.ID, Name: g.Name, Platform: g.Platform,
+		IsExclusive: g.IsExclusive, Status: g.Status, SubscriptionType: g.SubscriptionType,
+		DailyLimitUSD: g.DailyLimitUSD, WeeklyLimitUSD: g.WeeklyLimitUSD, MonthlyLimitUSD: g.MonthlyLimitUSD,
+		AllowImageGeneration: g.AllowImageGeneration, AllowBatchImageGeneration: g.AllowBatchImageGeneration,
+		ClaudeCodeOnly: g.ClaudeCodeOnly, AllowMessagesDispatch: g.AllowMessagesDispatch,
+		SupportedAgentClients: supportedAgentClients(g.Platform, g.AllowMessagesDispatch),
+		RPMLimit:              g.RPMLimit, CreatedAt: g.CreatedAt, UpdatedAt: g.UpdatedAt,
+	}
 }
 
-func GroupFromService(g *service.Group) *Group {
+func GroupFromService(g *service.Group) *UserGroup {
 	if g == nil {
 		return nil
 	}
@@ -166,6 +187,14 @@ func GroupFromServiceAdmin(g *service.Group) *AdminGroup {
 		}
 	}
 	return out
+}
+
+func adminGroupFromServiceShallow(g *service.Group) *Group {
+	if g == nil {
+		return nil
+	}
+	out := groupFromServiceBase(g)
+	return &out
 }
 
 func groupFromServiceBase(g *service.Group) Group {
@@ -419,7 +448,7 @@ func AccountFromService(a *service.Account) *Account {
 	if len(a.Groups) > 0 {
 		out.Groups = make([]*Group, 0, len(a.Groups))
 		for _, g := range a.Groups {
-			out.Groups = append(out.Groups, GroupFromServiceShallow(g))
+			out.Groups = append(out.Groups, adminGroupFromServiceShallow(g))
 		}
 	}
 	return out
@@ -443,7 +472,7 @@ func AccountGroupFromService(ag *service.AccountGroup) *AccountGroup {
 		Priority:  ag.Priority,
 		CreatedAt: ag.CreatedAt,
 		Account:   AccountFromServiceShallow(ag.Account),
-		Group:     GroupFromServiceShallow(ag.Group),
+		Group:     adminGroupFromServiceShallow(ag.Group),
 	}
 }
 
@@ -565,6 +594,7 @@ func RedeemCodeFromServiceAdmin(rc *service.RedeemCode) *AdminRedeemCode {
 	}
 	return &AdminRedeemCode{
 		RedeemCode: redeemCodeFromServiceBase(rc),
+		Group:      adminGroupFromServiceShallow(rc.Group),
 		Notes:      rc.Notes,
 	}
 }
@@ -619,62 +649,54 @@ func usageLogFromServiceUser(l *service.UsageLog) UsageLog {
 		requestedModel = l.Model
 	}
 	return UsageLog{
-		ID:                        l.ID,
-		UserID:                    l.UserID,
-		APIKeyID:                  l.APIKeyID,
-		AccountID:                 l.AccountID,
-		RequestID:                 l.RequestID,
-		Model:                     requestedModel,
-		ServiceTier:               l.ServiceTier,
-		ReasoningEffort:           l.ReasoningEffort,
-		InboundEndpoint:           l.InboundEndpoint,
-		GroupID:                   l.GroupID,
-		SubscriptionID:            l.SubscriptionID,
-		InputTokens:               l.InputTokens,
-		OutputTokens:              l.OutputTokens,
-		CacheCreationTokens:       l.CacheCreationTokens,
-		CacheReadTokens:           l.CacheReadTokens,
-		CacheCreation5mTokens:     l.CacheCreation5mTokens,
-		CacheCreation1hTokens:     l.CacheCreation1hTokens,
-		InputCost:                 l.InputCost,
-		OutputCost:                l.OutputCost,
-		CacheCreationCost:         l.CacheCreationCost,
-		CacheReadCost:             l.CacheReadCost,
-		TotalCost:                 l.TotalCost,
-		ActualCost:                l.ActualCost,
-		RateMultiplier:            l.RateMultiplier,
-		LongContextBillingApplied: l.LongContextBillingApplied,
-		BillingType:               l.BillingType,
-		RequestType:               requestType.String(),
-		Stream:                    stream,
-		OpenAIWSMode:              openAIWSMode,
-		DurationMs:                l.DurationMs,
-		FirstTokenMs:              l.FirstTokenMs,
-		ImageCount:                l.ImageCount,
-		ImageSize:                 l.ImageSize,
-		ImageInputSize:            l.ImageInputSize,
-		ImageOutputSize:           l.ImageOutputSize,
-		ImageInputTokens:          l.ImageInputTokens,
-		ImageInputCost:            l.ImageInputCost,
-		ImageOutputTokens:         l.ImageOutputTokens,
-		ImageOutputCost:           l.ImageOutputCost,
-		ImageSizeSource:           l.ImageSizeSource,
-		ImageSizeBreakdown:        l.ImageSizeBreakdown,
-		MediaType:                 l.MediaType,
-		UserAgent:                 l.UserAgent,
-		IPAddress:                 l.IPAddress,
-		CacheTTLOverridden:        l.CacheTTLOverridden,
-		BillingMode:               l.BillingMode,
-		CreatedAt:                 l.CreatedAt,
-		User:                      UserFromServiceShallow(l.User),
-		APIKey:                    APIKeyFromService(l.APIKey),
-		Group:                     GroupFromServiceShallow(l.Group),
-		Subscription:              UserSubscriptionFromService(l.Subscription),
+		ID:                    l.ID,
+		UserID:                l.UserID,
+		APIKeyID:              l.APIKeyID,
+		RequestID:             l.RequestID,
+		Model:                 requestedModel,
+		ServiceTier:           l.ServiceTier,
+		ReasoningEffort:       l.ReasoningEffort,
+		InboundEndpoint:       l.InboundEndpoint,
+		GroupID:               l.GroupID,
+		SubscriptionID:        l.SubscriptionID,
+		InputTokens:           l.InputTokens,
+		OutputTokens:          l.OutputTokens,
+		CacheCreationTokens:   l.CacheCreationTokens,
+		CacheReadTokens:       l.CacheReadTokens,
+		CacheCreation5mTokens: l.CacheCreation5mTokens,
+		CacheCreation1hTokens: l.CacheCreation1hTokens,
+		BillingType:           l.BillingType,
+		RequestType:           requestType.String(),
+		Stream:                stream,
+		OpenAIWSMode:          openAIWSMode,
+		DurationMs:            l.DurationMs,
+		FirstTokenMs:          l.FirstTokenMs,
+		ImageCount:            l.ImageCount,
+		VideoCount:            l.VideoCount,
+		VideoResolution:       l.VideoResolution,
+		VideoDurationSeconds:  l.VideoDurationSeconds,
+		ImageSize:             l.ImageSize,
+		ImageInputSize:        l.ImageInputSize,
+		ImageOutputSize:       l.ImageOutputSize,
+		ImageInputTokens:      l.ImageInputTokens,
+		ImageOutputTokens:     l.ImageOutputTokens,
+		ImageSizeSource:       l.ImageSizeSource,
+		ImageSizeBreakdown:    l.ImageSizeBreakdown,
+		MediaType:             l.MediaType,
+		UserAgent:             l.UserAgent,
+		IPAddress:             l.IPAddress,
+		CacheTTLOverridden:    l.CacheTTLOverridden,
+		BillingMode:           l.BillingMode,
+		CreatedAt:             l.CreatedAt,
+		User:                  UserFromServiceShallow(l.User),
+		APIKey:                APIKeyFromService(l.APIKey),
+		Group:                 GroupFromServiceShallow(l.Group),
+		Subscription:          UserSubscriptionFromService(l.Subscription),
 	}
 }
 
 // UsageLogFromService converts a service UsageLog to DTO for regular users.
-// It excludes admin-only account/upstream internals while keeping user billing and request metadata.
+// It excludes admin-only account/upstream internals while keeping request metadata and measured usage.
 func UsageLogFromService(l *service.UsageLog) *UsageLog {
 	if l == nil {
 		return nil
@@ -692,15 +714,28 @@ func UsageLogFromServiceAdmin(l *service.UsageLog) *AdminUsageLog {
 	usageLog := usageLogFromServiceUser(l)
 	usageLog.UpstreamEndpoint = l.UpstreamEndpoint
 	return &AdminUsageLog{
-		UsageLog:              usageLog,
-		UpstreamModel:         l.UpstreamModel,
-		ChannelID:             l.ChannelID,
-		ModelMappingChain:     l.ModelMappingChain,
-		BillingTier:           l.BillingTier,
-		AccountRateMultiplier: l.AccountRateMultiplier,
-		AccountStatsCost:      l.AccountStatsCost,
-		IPAddress:             l.IPAddress,
-		Account:               AccountSummaryFromService(l.Account),
+		UsageLog:                  usageLog,
+		APIKey:                    APIKeyFromServiceAdmin(l.APIKey),
+		AccountID:                 l.AccountID,
+		InputCost:                 l.InputCost,
+		OutputCost:                l.OutputCost,
+		CacheCreationCost:         l.CacheCreationCost,
+		CacheReadCost:             l.CacheReadCost,
+		TotalCost:                 l.TotalCost,
+		ActualCost:                l.ActualCost,
+		RateMultiplier:            l.RateMultiplier,
+		LongContextBillingApplied: l.LongContextBillingApplied,
+		ImageInputCost:            l.ImageInputCost,
+		ImageOutputCost:           l.ImageOutputCost,
+		Group:                     adminGroupFromServiceShallow(l.Group),
+		UpstreamModel:             l.UpstreamModel,
+		ChannelID:                 l.ChannelID,
+		ModelMappingChain:         l.ModelMappingChain,
+		BillingTier:               l.BillingTier,
+		AccountRateMultiplier:     l.AccountRateMultiplier,
+		AccountStatsCost:          l.AccountStatsCost,
+		IPAddress:                 l.IPAddress,
+		Account:                   AccountSummaryFromService(l.Account),
 	}
 }
 
@@ -771,6 +806,7 @@ func UserSubscriptionFromServiceAdmin(sub *service.UserSubscription) *AdminUserS
 	}
 	return &AdminUserSubscription{
 		UserSubscription: userSubscriptionFromServiceBase(sub),
+		Group:            adminGroupFromServiceShallow(sub.Group),
 		AssignedBy:       sub.AssignedBy,
 		AssignedAt:       sub.AssignedAt,
 		Notes:            sub.Notes,

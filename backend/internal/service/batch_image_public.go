@@ -116,9 +116,9 @@ type BatchImagePublicBatch struct {
 	ItemCount       int      `json:"item_count"`
 	SuccessCount    int      `json:"success_count"`
 	FailCount       int      `json:"fail_count"`
-	EstimatedCost   float64  `json:"estimated_cost"`
-	HoldAmount      float64  `json:"hold_amount"`
-	ActualCost      *float64 `json:"actual_cost"`
+	EstimatedCost   float64  `json:"-"`
+	HoldAmount      float64  `json:"-"`
+	ActualCost      *float64 `json:"-"`
 	CreatedAt       int64    `json:"created_at"`
 	SubmittedAt     *int64   `json:"submitted_at"`
 	SettledAt       *int64   `json:"settled_at"`

@@ -24,10 +24,8 @@ export interface PlatformDashboardStats {
   platform: string
   total_requests: number
   total_tokens: number
-  total_actual_cost: number
   today_requests: number
   today_tokens: number
-  today_actual_cost: number
 }
 
 export interface UserDashboardStats {
@@ -39,16 +37,12 @@ export interface UserDashboardStats {
   total_cache_creation_tokens: number
   total_cache_read_tokens: number
   total_tokens: number
-  total_cost: number // 标准计费
-  total_actual_cost: number // 实际扣除
   today_requests: number
   today_input_tokens: number
   today_output_tokens: number
   today_cache_creation_tokens: number
   today_cache_read_tokens: number
   today_tokens: number
-  today_cost: number // 今日标准计费
-  today_actual_cost: number // 今日实际扣除
   average_duration_ms: number
   rpm: number // 近5分钟平均每分钟请求数
   tpm: number // 近5分钟平均每分钟Token数
@@ -90,8 +84,6 @@ export interface ApiKeyDailyUsagePoint {
   cache_read_tokens: number
   cache_write_tokens: number
   total_tokens: number
-  cost: number
-  actual_cost: number
 }
 
 export interface ApiKeyDailyUsageResponse {
@@ -322,8 +314,11 @@ export async function getDashboardSnapshotV2(
 
 export interface BatchApiKeyUsageStats {
   api_key_id: number
-  today_actual_cost: number
-  total_actual_cost: number
+  today_tokens: number
+  /** Total tokens in the last 30 days. */
+  total_tokens: number
+  today_requests: number
+  total_requests: number
 }
 
 export interface BatchApiKeysUsageResponse {

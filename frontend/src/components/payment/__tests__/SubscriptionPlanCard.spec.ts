@@ -52,6 +52,13 @@ const mountPlanCard = (groupPlatform: string, overrides: Partial<SubscriptionPla
   });
 
 describe("SubscriptionPlanCard", () => {
+  it("keeps the purchase price and omits model rate multipliers", () => {
+    const text = mountPlanCard("openai", { currency: "CNY", rate_multiplier: 1.4, peak_rate_enabled: true, peak_start: "18:00", peak_end: "21:00", peak_rate_multiplier: 2 }).text();
+    expect(text).toContain("¥10CNY");
+    expect(text).not.toContain("×1.4");
+    expect(text).not.toContain("payment.planCard.rate");
+    expect(text).not.toContain("payment.planCard.peakRate");
+  });
   it("does not show Antigravity model scopes for OpenAI plans", () => {
     const text = mountPlanCard("openai").text();
 

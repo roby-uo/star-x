@@ -3,7 +3,8 @@
     <span
       ref="triggerEl"
       :class="[
-        'inline-flex cursor-help items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium transition-colors',
+        'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium transition-colors',
+        showPricing ? 'cursor-help' : '',
         effectivePlatform
           ? platformBadgeClass(effectivePlatform)
           : 'border-gray-200 bg-gray-50 text-gray-700 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300',
@@ -12,7 +13,7 @@
       @mouseleave="onLeave"
       @focusin="onEnter"
       @focusout="onLeave"
-      tabindex="0"
+      :tabindex="showPricing ? 0 : undefined"
     >
       <PlatformIcon
         v-if="effectivePlatform"
@@ -31,7 +32,7 @@
     <!-- Teleport to body so the popover is not clipped by card/overflow-hidden
          ancestors. Fixed-position coords are computed from the trigger's
          bounding rect; re-measured on enter / scroll / resize. -->
-    <Teleport to="body">
+    <Teleport v-if="showPricing" to="body">
       <div
         v-show="show"
         ref="popoverEl"
@@ -182,6 +183,7 @@ const props = withDefaults(
     pricingKeyPrefix?: string
     noPricingLabel?: string
     showPlatform?: boolean
+    showPricing?: boolean
     /**
      * 当 model.platform 缺失（如 admin 聚合场景）时，用父行的平台作为兜底着色。
      * 仅用于视觉，不影响业务逻辑。
@@ -192,6 +194,7 @@ const props = withDefaults(
     pricingKeyPrefix: 'availableChannels.pricing',
     noPricingLabel: '',
     showPlatform: true,
+    showPricing: true,
     platformHint: ''
   }
 )
@@ -287,6 +290,7 @@ function updatePosition() {
 }
 
 function onEnter() {
+  if (!props.showPricing) return
   show.value = true
   nextTick(() => {
     updatePosition()

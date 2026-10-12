@@ -105,6 +105,7 @@ func RegisterAdminRoutes(
 
 		// 渠道管理
 		registerChannelRoutes(admin, h)
+		registerBillingManagementRoutes(admin, h)
 
 		// 渠道监控
 		registerChannelMonitorRoutes(admin, h)
@@ -699,6 +700,16 @@ func registerTLSFingerprintProfileRoutes(admin *gin.RouterGroup, h *handler.Hand
 		profiles.PUT("/:id", h.Admin.TLSFingerprintProfile.Update)
 		profiles.DELETE("/:id", h.Admin.TLSFingerprintProfile.Delete)
 	}
+}
+
+func registerBillingManagementRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	if h.Admin.BillingManagement == nil {
+		return
+	}
+	billing := admin.Group("/billing-management")
+	billing.GET("/config", h.Admin.BillingManagement.GetConfig)
+	billing.PUT("/config", h.Admin.BillingManagement.UpdateConfig)
+	billing.POST("/preview", h.Admin.BillingManagement.Preview)
 }
 
 func registerChannelRoutes(admin *gin.RouterGroup, h *handler.Handlers) {

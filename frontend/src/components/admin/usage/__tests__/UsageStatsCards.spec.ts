@@ -44,6 +44,15 @@ const stats = {
 }
 
 describe('UsageStatsCards', () => {
+  it('shows only usage and response statistics in user mode', () => {
+    const wrapper = mount(UsageStatsCards, { props: { stats, showCosts: false }, global: { stubs: { Icon: true } } })
+    expect(wrapper.text()).toContain('Total Tokens')
+    expect(wrapper.text()).toContain('Avg Duration')
+    expect(wrapper.text()).not.toContain('Total Cost')
+    expect(wrapper.text()).not.toContain('Standard')
+    expect(wrapper.text()).not.toContain('$')
+    expect(wrapper.findAll('.card')).toHaveLength(3)
+  })
   it('shows cache token breakdown values', () => {
     const wrapper = mount(UsageStatsCards, {
       props: {

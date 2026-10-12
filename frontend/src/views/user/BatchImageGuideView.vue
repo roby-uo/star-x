@@ -155,12 +155,6 @@
             </div>
           </template>
 
-          <template #cell-cost="{ row }">
-            <span class="block text-center text-sm text-gray-700 dark:text-gray-300">
-              {{ costLabel(displayJob(row)) }}
-            </span>
-          </template>
-
           <template #cell-downloaded="{ row }">
             <span class="block text-center text-sm" :class="row.downloaded_at ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-500 dark:text-gray-400'">
               {{ row.downloaded_at ? formatDate(row.downloaded_at) : '未下载' }}
@@ -327,7 +321,7 @@
     <BaseDialog :show="!!currentJob" title="任务详情" width="extra-wide" @close="closeDetail">
       <div v-if="currentJob" class="space-y-4">
         <div class="rounded-lg border border-gray-200 bg-gray-50/70 px-4 py-3 dark:border-dark-700 dark:bg-dark-900/40">
-          <div class="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div class="grid gap-x-6 gap-y-3 sm:grid-cols-3">
             <div class="min-w-0 text-center">
               <p class="text-xs text-gray-500 dark:text-gray-400">状态</p>
               <div class="mt-1 flex justify-center">
@@ -343,10 +337,6 @@
               <span class="text-gray-300 dark:text-dark-500">/</span>
               <span :class="(currentDisplayJob || currentJob).fail_count > 0 ? 'text-red-600 dark:text-red-300' : 'text-gray-400 dark:text-gray-500'">{{ (currentDisplayJob || currentJob).fail_count }}</span>
             </p>
-            </div>
-            <div class="min-w-0 text-center">
-              <p class="text-xs text-gray-500 dark:text-gray-400">费用</p>
-              <p class="mt-1 truncate font-medium text-gray-900 dark:text-white">{{ costLabel(currentDisplayJob || currentJob) }}</p>
             </div>
             <div class="min-w-0 text-center">
               <p class="text-xs text-gray-500 dark:text-gray-400">下载状态</p>
@@ -774,7 +764,7 @@ import {
 import type { ApiKey } from '@/types'
 import type { Column } from '@/components/common/types'
 
-type BatchImageJobRow = Pick<BatchImageJob, 'id' | 'task_name' | 'parent_batch_id' | 'status' | 'model' | 'provider' | 'item_count' | 'success_count' | 'fail_count' | 'estimated_cost' | 'hold_amount' | 'actual_cost' | 'created_at' | 'downloaded_at'> & {
+type BatchImageJobRow = Pick<BatchImageJob, 'id' | 'task_name' | 'parent_batch_id' | 'status' | 'model' | 'provider' | 'item_count' | 'success_count' | 'fail_count' | 'created_at' | 'downloaded_at'> & {
   api_key_id: number
   api_key_name: string
   child_count: number
@@ -833,7 +823,6 @@ const columns: Column[] = [
   { key: 'api_key_name', label: '提交密钥', sortable: false, class: 'w-40 max-w-40 text-center' },
   { key: 'status', label: '状态', sortable: false, class: 'w-28 text-center' },
   { key: 'counts', label: '结果', sortable: false, class: 'w-32 text-center' },
-  { key: 'cost', label: '费用', sortable: false, class: 'w-36 text-center' },
   { key: 'downloaded', label: '下载状态', sortable: false, class: 'w-40 text-center' },
   { key: 'actions', label: '操作', sortable: false, class: 'w-40 text-center' },
 ]
@@ -1321,9 +1310,6 @@ function toJobRow(job: BatchImageJob, key = selectedApiKey.value): BatchImageJob
     item_count: job.item_count,
     success_count: job.success_count,
     fail_count: job.fail_count,
-    estimated_cost: job.estimated_cost,
-    hold_amount: job.hold_amount,
-    actual_cost: job.actual_cost,
     created_at: job.created_at,
     downloaded_at: job.downloaded_at,
     api_key_id: key?.id || 0,
@@ -1341,30 +1327,20 @@ function applyChildCounts(rows: BatchImageJobRow[]) {
   return rows.map(row => ({ ...row, child_count: counts.get(row.id) || 0 }))
 }
 
-function displayJob<T extends Pick<BatchImageJob, 'id' | 'parent_batch_id' | 'status' | 'item_count' | 'success_count' | 'fail_count' | 'estimated_cost' | 'hold_amount' | 'actual_cost'>>(job: T): T {
+function displayJob<T extends Pick<BatchImageJob, 'id' | 'parent_batch_id' | 'status' | 'item_count' | 'success_count' | 'fail_count'>>(job: T): T {
   if (job.parent_batch_id) return job
   const children = childrenByParent.value.get(job.id) || []
   if (!children.length) return job
 
   const childSuccess = children.reduce((sum, child) => sum + child.success_count, 0)
-  const childEstimated = children.reduce((sum, child) => sum + child.estimated_cost, 0)
-  const childHold = children.reduce((sum, child) => sum + child.hold_amount, 0)
-  const childActual = children.reduce((sum, child) => sum + (child.actual_cost || 0), 0)
-  const childActualReady = children.every(child => child.actual_cost !== null)
   const successCount = Math.min(job.item_count, job.success_count + childSuccess)
   const failCount = Math.max(0, job.item_count - successCount)
-  const actualCost = job.actual_cost === null
-    ? (childActualReady ? childActual : null)
-    : job.actual_cost + childActual
 
   return {
     ...job,
     success_count: successCount,
     fail_count: failCount,
     status: failCount === 0 && TERMINAL_STATUSES.has(job.status) ? 'completed' : job.status,
-    estimated_cost: job.estimated_cost + childEstimated,
-    hold_amount: job.hold_amount + childHold,
-    actual_cost: actualCost,
   }
 }
 
@@ -2368,21 +2344,6 @@ function friendlyItemError(error: BatchImageItem['error']) {
   if (error.code === 'EMPTY_IMAGE_OUTPUT') return '上游返回了结果，但这条没有图片内容。通常是 Gemini/Vertex 单条生成失败或被安全策略拦截。'
   if (error.code === 'PROVIDER_ITEM_FAILED') return '上游返回的这条结果没有可用图片。'
   return error.message || error.code || '-'
-}
-
-function formatMoney(value: number | null | undefined) {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) return '$0.00'
-  return `$${Number(value).toFixed(2)}`
-}
-
-function terminalZeroCost(job: Pick<BatchImageJob, 'status' | 'actual_cost'>) {
-  return job.actual_cost === null && (job.status === 'failed' || job.status === 'cancelled')
-}
-
-function costLabel(job: Pick<BatchImageJob, 'status' | 'hold_amount' | 'actual_cost'>) {
-  if (job.actual_cost !== null) return formatMoney(job.actual_cost)
-  if (terminalZeroCost(job)) return formatMoney(0)
-  return `冻结 ${formatMoney(job.hold_amount)}`
 }
 
 type BatchImageTextKey =

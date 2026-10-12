@@ -54,6 +54,15 @@ describe('GroupDistributionChart', () => {
     },
   ]
 
+  it('shows only tokens and requests in user mode even if a legacy cost metric is selected', () => {
+    const wrapper = mount(GroupDistributionChart, { props: { groupStats, showCosts: false, metric: 'actual_cost', showMetricToggle: true }, global: { stubs: { LoadingSpinner: true } } })
+    expect(JSON.parse(wrapper.find('.chart-data').text()).datasets[0].data).toEqual([1200, 600])
+    expect(wrapper.findAll('thead th')).toHaveLength(3)
+    expect(wrapper.text()).not.toContain('$')
+    expect(wrapper.text()).not.toContain('Actual')
+    expect(wrapper.text()).not.toContain('Standard')
+  })
+
   it('uses total_tokens and token ordering by default', () => {
     const wrapper = mount(GroupDistributionChart, {
       props: {

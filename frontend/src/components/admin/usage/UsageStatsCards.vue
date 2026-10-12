@@ -1,5 +1,5 @@
 <template>
-  <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+  <div class="grid grid-cols-2 gap-4" :class="showCosts ? 'lg:grid-cols-4' : 'lg:grid-cols-3'">
     <div class="card p-4 flex items-center gap-3">
       <div class="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30 text-blue-600">
         <Icon name="document" size="md" />
@@ -58,7 +58,7 @@
         </p>
       </div>
     </div>
-    <div class="card p-4 flex items-center gap-3">
+    <div v-if="showCosts" class="card p-4 flex items-center gap-3">
       <div class="rounded-lg bg-green-100 p-2 dark:bg-green-900/30 text-green-600">
         <Icon name="dollar" size="md" />
       </div>
@@ -98,9 +98,11 @@ import Icon from '@/components/icons/Icon.vue'
 const props = withDefaults(defineProps<{
   stats: (AdminUsageStatsResponse | UsageStatsResponse) | null
   showAccountCost?: boolean
+  showCosts?: boolean
   strikeStandardCost?: boolean
 }>(), {
   showAccountCost: true,
+  showCosts: true,
   strikeStandardCost: false,
 })
 

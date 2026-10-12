@@ -18,7 +18,7 @@
     </div>
     <div class="overflow-auto">
       <DataTable
-        :columns="columns"
+        :columns="displayColumns"
         :data="data"
         :loading="loading"
         :server-side-sort="serverSideSort"
@@ -176,7 +176,7 @@
           </div>
         </template>
 
-        <template #cell-cost="{ row }">
+        <template v-if="showCosts" #cell-cost="{ row }">
           <div class="text-sm">
             <div class="flex items-center gap-1.5">
               <span class="font-medium text-green-600 dark:text-green-400">${{ row.actual_cost?.toFixed(6) || '0.000000' }}</span>
@@ -331,7 +331,7 @@
   <!-- Cost Tooltip Portal -->
   <Teleport to="body">
     <div
-      v-if="tooltipVisible"
+      v-if="showCosts && tooltipVisible"
       class="fixed z-[9999] pointer-events-none -translate-y-1/2"
       :style="{
         left: tooltipPosition.x + 'px',
@@ -530,6 +530,7 @@ interface Props {
   defaultSortKey?: string
   defaultSortOrder?: 'asc' | 'desc'
   showAccountBilling?: boolean
+  showCosts?: boolean
   showUpstreamEndpoint?: boolean
   /** 嵌入统一卡片内使用：去掉自身卡片外观 */
   flat?: boolean
@@ -541,6 +542,7 @@ const props = withDefaults(defineProps<Props>(), {
   defaultSortKey: '',
   defaultSortOrder: 'asc',
   showAccountBilling: true,
+  showCosts: true,
   showUpstreamEndpoint: true,
   flat: false
 })
@@ -551,6 +553,7 @@ const emit = defineEmits<{
 }>()
 const { t, locale } = useI18n()
 const showAccountBilling = props.showAccountBilling
+const displayColumns = computed(() => props.showCosts ? props.columns : props.columns.filter(column => column.key !== 'cost'))
 const showUpstreamEndpoint = props.showUpstreamEndpoint
 const ipGeoBatchLoading = ref(false)
 

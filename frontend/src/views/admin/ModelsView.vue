@@ -7,7 +7,7 @@
             <h2 class="text-xl font-semibold text-gray-900 dark:text-white">管理对外提供的模型</h2>
             <p class="mt-1 text-sm text-gray-500">在一个地方设置规格、基础售价和开放分组，分组倍率继续沿用原有配置。</p>
           </div>
-          <router-link to="/admin/accounts" class="btn btn-secondary">添加上游模型</router-link>
+          <div class="flex gap-2"><router-link to="/admin/billing-management" class="btn btn-secondary">费率与成本</router-link><router-link to="/admin/accounts" class="btn btn-secondary">添加上游模型</router-link></div>
         </div>
         <div class="mb-4 flex flex-wrap gap-2" role="tablist" aria-label="模型类型">
           <button v-for="tab in typeTabs" :key="tab.value" type="button" role="tab" :aria-selected="type === tab.value"

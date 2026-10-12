@@ -28,7 +28,7 @@
         v-for="group in filteredGroups"
         :key="group.id"
         class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 transition-colors hover:bg-white dark:hover:bg-dark-700"
-        :title="t('admin.groups.rateAndAccounts', { rate: group.rate_multiplier, count: group.account_count || 0 })"
+        :title="showRates ? t('admin.groups.rateAndAccounts', { rate: group.rate_multiplier, count: group.account_count || 0 }) : group.name"
       >
         <input
           type="checkbox"
@@ -41,7 +41,8 @@
           :name="group.name"
           :platform="group.platform"
           :subscription-type="group.subscription_type"
-          :rate-multiplier="group.rate_multiplier"
+          :show-rate="showRates"
+          :rate-multiplier="showRates ? group.rate_multiplier : undefined"
           class="min-w-0 flex-1"
         />
         <span class="shrink-0 text-xs text-gray-400">{{ group.account_count || 0 }}</span>
@@ -71,10 +72,12 @@ interface Props {
   platform?: GroupPlatform // Optional platform filter
   mixedScheduling?: boolean // For antigravity accounts: allow anthropic/gemini groups
   searchable?: boolean | 'auto'
+  showRates?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  searchable: 'auto'
+  searchable: 'auto',
+  showRates: true
 })
 const emit = defineEmits<{
   'update:modelValue': [value: number[]]

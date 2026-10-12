@@ -1,126 +1,14 @@
 <template>
   <AppLayout>
-    <div class="space-y-6">
-      <UsageStatsCards :stats="usageStats" :show-account-cost="false" :strike-standard-cost="true" />
+    <div class="space-y-4">
+      <UsageStatsCards :stats="usageStats" :show-costs="false" />
 
-      <div class="space-y-4">
-        <div class="card p-4">
-          <div class="flex flex-wrap items-center gap-4">
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.dashboard.timeRange') }}:</span>
-              <DateRangePicker
-                v-model:start-date="startDate"
-                v-model:end-date="endDate"
-                @change="onDateRangeChange"
-              />
-            </div>
-            <div class="ml-auto flex items-center gap-2">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.dashboard.granularity') }}:</span>
-              <div class="w-28">
-                <Select v-model="granularity" :options="granularityOptions" @change="loadChartData" />
-              </div>
-            </div>
+      <div class="card space-y-4 p-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.dashboard.timeRange') }}</span>
+            <DateRangePicker v-model:start-date="startDate" v-model:end-date="endDate" @change="onDateRangeChange" />
           </div>
-        </div>
-
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <ModelDistributionChart
-            v-model:metric="modelDistributionMetric"
-            :model-stats="requestedModelStats"
-            :loading="modelStatsLoading"
-            :show-source-toggle="false"
-            :show-metric-toggle="true"
-            :enable-breakdown="false"
-            :show-account-cost="false"
-            :start-date="startDate"
-            :end-date="endDate"
-          />
-          <GroupDistributionChart
-            v-model:metric="groupDistributionMetric"
-            :group-stats="groupStats"
-            :loading="chartsLoading"
-            :show-metric-toggle="true"
-            :enable-breakdown="false"
-            :show-account-cost="false"
-            :start-date="startDate"
-            :end-date="endDate"
-          />
-        </div>
-
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <EndpointDistributionChart
-            v-model:source="endpointDistributionSource"
-            v-model:metric="endpointDistributionMetric"
-            :endpoint-stats="inboundEndpointStats"
-            :upstream-endpoint-stats="upstreamEndpointStats"
-            :endpoint-path-stats="endpointPathStats"
-            :loading="endpointStatsLoading"
-            :show-source-toggle="false"
-            :show-metric-toggle="true"
-            :enable-breakdown="false"
-            :title="t('usage.endpointDistribution')"
-            :start-date="startDate"
-            :end-date="endDate"
-          />
-          <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
-        </div>
-      </div>
-
-      <div class="card p-6">
-        <div class="flex flex-wrap items-end justify-between gap-4">
-          <div v-if="activeTab === 'errors'" class="flex flex-1 flex-wrap items-end gap-4">
-            <div class="w-full sm:w-auto sm:min-w-[220px]">
-              <label class="input-label">{{ t('usage.errors.keyName') }}</label>
-              <Select v-model="errorFilter.api_key_id" :options="errorKeyOptions" @change="applyErrorFilters" />
-            </div>
-            <div class="w-full sm:w-auto sm:min-w-[220px]">
-              <label class="input-label">{{ t('usage.errors.model') }}</label>
-              <Select
-                v-model="errorFilter.model"
-                :options="errorModelOptions"
-                searchable
-                creatable
-                clearable
-                :placeholder="t('usage.errors.modelPlaceholder')"
-                @change="applyErrorFilters"
-              />
-            </div>
-            <div class="w-full sm:w-auto sm:min-w-[200px]">
-              <label class="input-label">{{ t('usage.errors.category') }}</label>
-              <Select v-model="errorFilter.category" :options="errorCategoryOptions" @change="applyErrorFilters" />
-            </div>
-            <div class="w-full sm:w-auto sm:min-w-[180px]">
-              <label class="input-label">{{ t('usage.errors.status') }}</label>
-              <Select v-model="errorFilter.status_code" :options="errorStatusOptions" @change="applyErrorFilters" />
-            </div>
-          </div>
-          <div v-else class="flex flex-1 flex-wrap items-end gap-4">
-            <div class="w-full sm:w-auto sm:min-w-[220px]">
-              <label class="input-label">{{ t('usage.apiKeyFilter') }}</label>
-              <Select v-model="filters.api_key_id" :options="apiKeyOptions" @change="applyFilters" />
-            </div>
-            <div class="w-full sm:w-auto sm:min-w-[220px]">
-              <label class="input-label">{{ t('usage.model') }}</label>
-              <Select v-model="filters.model" :options="modelOptions" searchable @change="applyFilters" />
-            </div>
-            <div class="w-full sm:w-auto sm:min-w-[200px]">
-              <label class="input-label">{{ t('admin.usage.group') }}</label>
-              <Select v-model="filters.group_id" :options="groupOptions" searchable @change="applyFilters" />
-            </div>
-            <div class="w-full sm:w-auto sm:min-w-[180px]">
-              <label class="input-label">{{ t('usage.type') }}</label>
-              <Select v-model="filters.request_type" :options="requestTypeOptions" @change="applyFilters" />
-            </div>
-            <div class="w-full sm:w-auto sm:min-w-[200px]">
-              <label class="input-label">{{ t('admin.usage.billingType') }}</label>
-              <Select v-model="filters.billing_type" :options="billingTypeOptions" @change="applyFilters" />
-            </div>
-            <div class="w-full sm:w-auto sm:min-w-[200px]">
-              <label class="input-label">{{ t('admin.usage.billingMode') }}</label>
-              <Select v-model="filters.billing_mode" :options="billingModeOptions" @change="applyFilters" />
-            </div>
-          </div>
-
           <div class="flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
             <button type="button" @click="refreshData" :disabled="activeTab === 'errors' ? errorLoading : loading" class="btn btn-secondary">
               {{ t('common.refresh') }}
@@ -159,6 +47,58 @@
             </button>
           </div>
         </div>
+        <div v-if="activeTab === 'errors'" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div class="min-w-0">
+            <label class="input-label">{{ t('usage.errors.keyName') }}</label>
+            <Select v-model="errorFilter.api_key_id" :options="errorKeyOptions" @change="applyErrorFilters" />
+          </div>
+          <div class="min-w-0">
+            <label class="input-label">{{ t('usage.errors.model') }}</label>
+            <Select
+              v-model="errorFilter.model"
+              :options="errorModelOptions"
+              searchable
+              creatable
+              clearable
+              :placeholder="t('usage.errors.modelPlaceholder')"
+              @change="applyErrorFilters"
+            />
+          </div>
+          <div class="min-w-0">
+            <label class="input-label">{{ t('usage.errors.category') }}</label>
+            <Select v-model="errorFilter.category" :options="errorCategoryOptions" @change="applyErrorFilters" />
+          </div>
+          <div class="min-w-0">
+            <label class="input-label">{{ t('usage.errors.status') }}</label>
+            <Select v-model="errorFilter.status_code" :options="errorStatusOptions" @change="applyErrorFilters" />
+          </div>
+        </div>
+        <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <div class="min-w-0">
+            <label class="input-label">{{ t('usage.apiKeyFilter') }}</label>
+            <Select v-model="filters.api_key_id" :options="apiKeyOptions" @change="applyFilters" />
+          </div>
+          <div class="min-w-0">
+            <label class="input-label">{{ t('usage.model') }}</label>
+            <Select v-model="filters.model" :options="modelOptions" searchable @change="applyFilters" />
+          </div>
+          <div class="min-w-0">
+            <label class="input-label">{{ t('admin.usage.group') }}</label>
+            <Select v-model="filters.group_id" :options="groupOptions" searchable @change="applyFilters" />
+          </div>
+          <div class="min-w-0">
+            <label class="input-label">调用类型</label>
+            <Select v-model="filters.request_type" :options="requestTypeOptions" @change="applyFilters" />
+          </div>
+          <div class="min-w-0">
+            <label class="input-label">额度来源</label>
+            <Select v-model="filters.billing_type" :options="billingTypeOptions" @change="applyFilters" />
+          </div>
+          <div class="min-w-0">
+            <label class="input-label">用量类型</label>
+            <Select v-model="filters.billing_mode" :options="billingModeOptions" @change="applyFilters" />
+          </div>
+        </div>
       </div>
 
       <div v-if="errorViewEnabled" class="flex gap-2 border-b border-gray-200 dark:border-dark-700">
@@ -177,6 +117,7 @@
           :columns="visibleColumns"
           :server-side-sort="true"
           :show-account-billing="false"
+          :show-costs="false"
           :show-upstream-endpoint="false"
           default-sort-key="created_at"
           default-sort-order="desc"
@@ -192,6 +133,60 @@
           @update:page="handlePageChange"
           @update:pageSize="handlePageSizeChange"
         />
+
+        <details class="card overflow-hidden" aria-label="用量分析" :open="analysisOpen" @toggle="analysisOpen = ($event.target as HTMLDetailsElement).open">
+          <summary class="flex cursor-pointer list-none items-center justify-between gap-3 p-4">
+            <div><h2 class="text-sm font-semibold text-gray-900 dark:text-white">用量分析</h2><p class="mt-1 text-xs text-gray-500">按需查看模型、分组和接口分布，以及 token 消耗趋势</p></div>
+            <Icon name="chevronDown" size="sm" class="shrink-0 text-gray-400 transition-transform" :class="analysisOpen ? 'rotate-180' : ''" />
+          </summary>
+          <div v-if="analysisOpen" class="space-y-4 border-t border-gray-100 p-4 dark:border-dark-700">
+            <div class="flex items-center justify-end gap-2"><span class="text-xs text-gray-500">趋势粒度</span><div class="w-28"><Select v-model="granularity" :options="granularityOptions" @change="loadChartData" /></div></div>
+            <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <ModelDistributionChart
+                v-model:metric="modelDistributionMetric"
+                :model-stats="requestedModelStats"
+                :loading="modelStatsLoading"
+                :show-source-toggle="false"
+                :show-metric-toggle="false"
+                :show-costs="false"
+                :enable-breakdown="false"
+                :show-account-cost="false"
+                :start-date="startDate"
+                :end-date="endDate"
+              />
+              <GroupDistributionChart
+                v-model:metric="groupDistributionMetric"
+                :group-stats="groupStats"
+                :loading="chartsLoading"
+                :show-metric-toggle="false"
+                :show-costs="false"
+                :enable-breakdown="false"
+                :show-account-cost="false"
+                :start-date="startDate"
+                :end-date="endDate"
+              />
+            </div>
+
+            <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <EndpointDistributionChart
+                v-model:source="endpointDistributionSource"
+                v-model:metric="endpointDistributionMetric"
+                :endpoint-stats="inboundEndpointStats"
+                :upstream-endpoint-stats="upstreamEndpointStats"
+                :endpoint-path-stats="endpointPathStats"
+                :loading="endpointStatsLoading"
+                :show-source-toggle="false"
+                :show-metric-toggle="false"
+                :show-costs="false"
+                :enable-breakdown="false"
+                :title="t('usage.endpointDistribution')"
+                :start-date="startDate"
+                :end-date="endDate"
+              />
+              <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
+            </div>
+          </div>
+        </details>
       </template>
 
       <UserErrorRequestsTable
@@ -344,6 +339,7 @@ const startDate = ref(defaultRange.start)
 const endDate = ref(defaultRange.end)
 const granularity = ref<'day' | 'hour'>(getGranularityForRange(startDate.value, endDate.value))
 
+const analysisOpen = ref(false)
 const modelDistributionMetric = ref<DistributionMetric>('tokens')
 const groupDistributionMetric = ref<DistributionMetric>('tokens')
 const endpointDistributionMetric = ref<DistributionMetric>('tokens')
@@ -374,22 +370,22 @@ const granularityOptions = computed<SelectOption[]>(() => [
   { value: 'hour', label: t('admin.dashboard.hour') },
 ])
 const requestTypeOptions = computed<SelectOption[]>(() => [
-  { value: null, label: t('admin.usage.allTypes') },
+  { value: null, label: '全部调用类型' },
   { value: 'ws_v2', label: t('usage.ws') },
   { value: 'stream', label: t('usage.stream') },
   { value: 'sync', label: t('usage.sync') },
 ])
 const billingTypeOptions = computed<SelectOption[]>(() => [
-  { value: null, label: t('admin.usage.allBillingTypes') },
-  { value: 0, label: t('admin.usage.billingTypeBalance') },
-  { value: 1, label: t('admin.usage.billingTypeSubscription') },
+  { value: null, label: '全部额度来源' },
+  { value: 0, label: '账户余额' },
+  { value: 1, label: '订阅额度' },
 ])
 const billingModeOptions = computed<SelectOption[]>(() => [
-  { value: null, label: t('admin.usage.allBillingModes') },
-  { value: 'token', label: t('admin.usage.billingModeToken') },
-  { value: 'per_request', label: t('admin.usage.billingModePerRequest') },
-  { value: 'image', label: t('admin.usage.billingModeImage') },
-  { value: 'video', label: t('admin.usage.billingModeVideo') },
+  { value: null, label: '全部用量类型' },
+  { value: 'token', label: 'Token 消耗' },
+  { value: 'per_request', label: '请求次数' },
+  { value: 'image', label: '图片数量（张）' },
+  { value: 'video', label: '视频时长（秒）' },
 ])
 
 const apiKeys = ref<ApiKey[]>([])
@@ -649,9 +645,6 @@ const exportToCSV = async () => {
       'Output Tokens',
       'Cache Read Tokens',
       'Cache Creation Tokens',
-      'Rate Multiplier',
-      'Billed Cost',
-      'Original Cost',
       'First Token (ms)',
       'Duration (ms)',
     ]
@@ -668,9 +661,6 @@ const exportToCSV = async () => {
       log.output_tokens,
       log.cache_read_tokens,
       log.cache_creation_tokens,
-      log.rate_multiplier,
-      log.actual_cost.toFixed(8),
-      log.total_cost.toFixed(8),
       log.first_token_ms ?? '',
       log.duration_ms ?? '',
     ].map(escapeCSVValue))
@@ -705,10 +695,9 @@ const allColumns = computed<Column[]>(() => [
   { key: 'endpoint', label: t('usage.endpoint'), sortable: false },
   { key: 'ip_address', label: 'IP', sortable: false },
   { key: 'group', label: t('admin.usage.group'), sortable: false },
-  { key: 'stream', label: t('usage.type'), sortable: false },
-  { key: 'billing_mode', label: t('admin.usage.billingMode'), sortable: false },
+  { key: 'stream', label: '调用类型', sortable: false },
+  { key: 'billing_mode', label: '用量类型', sortable: false },
   { key: 'tokens', label: t('usage.tokens'), sortable: false },
-  { key: 'cost', label: t('usage.cost'), sortable: false },
   { key: 'latency', label: t('usage.latency'), sortable: false },
   { key: 'created_at', label: t('usage.time'), sortable: true },
   { key: 'user_agent', label: t('usage.userAgent'), sortable: false },

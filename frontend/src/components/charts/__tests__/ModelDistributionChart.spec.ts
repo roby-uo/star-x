@@ -145,6 +145,17 @@ describe('ModelDistributionChart', () => {
     expect(wrapper.findAll('tbody tr')[0].findAll('td')).toHaveLength(5)
   })
 
+  it('forces token statistics and hides every cost control in user mode', () => {
+    const wrapper = mount(ModelDistributionChart, { props: { modelStats, showCosts: false, showMetricToggle: true, metric: 'actual_cost', enableRankingView: true }, global: { stubs: { LoadingSpinner: true } } })
+    const chartData = JSON.parse(wrapper.find('.chart-data').text())
+    expect(chartData.datasets[0].data).toEqual([1000, 500])
+    expect(wrapper.findAll('thead th')).toHaveLength(3)
+    expect(wrapper.text()).not.toContain('$')
+    expect(wrapper.text()).not.toContain('Actual')
+    expect(wrapper.text()).not.toContain('Standard')
+    expect(wrapper.text()).not.toContain('Spending')
+  })
+
   it('renders Others in the spending ranking table and uses a dedicated chart color', async () => {
     const wrapper = mount(ModelDistributionChart, {
       props: {

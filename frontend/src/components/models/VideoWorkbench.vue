@@ -53,8 +53,10 @@ import { list } from '@/api/keys'
 import { apiClient } from '@/api/client'
 import { buildGatewayUrl } from '@/api/url'
 import type { ApiKey } from '@/types'
-import { videoModes, type VideoQuote } from '@/types/modelService'
+import { videoModes } from '@/types/modelService'
 import { miniMaxVideoSpec } from '@/utils/minimaxVideo'
+
+interface VideoCallVersion { version: string }
 
 const props = defineProps<{ model: UserAvailableModel; embedded?: boolean; selectedKeyId?: number; contextKeys?: ApiKey[] }>()
 const emit = defineEmits<{ close: []; submitted: []; busy: [value: boolean] }>()
@@ -79,7 +81,7 @@ const prompt = ref('')
 const firstFrame = ref('')
 const lastFrame = ref('')
 const ratio = ref('16:9')
-const quote = ref<VideoQuote | null>(null)
+const quote = ref<VideoCallVersion | null>(null)
 const accepted = ref(false)
 const error = ref('')
 const querying = ref(false)
@@ -155,7 +157,7 @@ async function generate() {
   quoting.value = true
   error.value = ''
   try {
-    quote.value = await createRequest('/v2/video_generation/quote', key.key, requestPayload) as VideoQuote
+    quote.value = await createRequest('/v2/video_generation/quote', key.key, requestPayload) as VideoCallVersion
     if (current !== revision || disposed) return
     if (!quote.value || typeof quote.value.version !== 'string' || !quote.value.version) throw new Error('调用配置校验未返回有效凭证，请稍后重试')
     submitting.value = true

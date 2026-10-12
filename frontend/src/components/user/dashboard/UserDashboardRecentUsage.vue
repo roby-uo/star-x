@@ -23,11 +23,8 @@
             </div>
           </div>
           <div class="text-right">
-            <p class="text-sm font-semibold">
-              <span class="text-green-600 dark:text-green-400" :title="t('dashboard.actual')">${{ formatCost(log.actual_cost) }}</span>
-              <span class="font-normal text-gray-400 dark:text-gray-500" :title="t('dashboard.standard')"> / ${{ formatCost(log.total_cost) }}</span>
-            </p>
-            <p class="text-xs text-gray-500 dark:text-dark-400">{{ (log.input_tokens + log.output_tokens).toLocaleString() }} tokens</p>
+            <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ ((log.input_tokens || 0) + (log.output_tokens || 0) + (log.cache_creation_tokens || 0) + (log.cache_read_tokens || 0)).toLocaleString() }} tokens</p>
+            <p class="text-xs text-gray-500 dark:text-dark-400">{{ log.duration_ms == null ? '—' : `${(log.duration_ms / 1000).toFixed(2)}s` }}</p>
           </div>
         </div>
 
@@ -53,5 +50,4 @@ defineProps<{
   loading: boolean
 }>()
 const { t } = useI18n()
-const formatCost = (c: number) => c.toFixed(4)
 </script>

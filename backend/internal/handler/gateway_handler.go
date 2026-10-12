@@ -1342,7 +1342,7 @@ func (h *GatewayHandler) Usage(c *gin.Context) {
 	var modelStats any
 	if h.usageService != nil {
 		if stats, err := h.usageService.GetAPIKeyModelStats(ctx, apiKey.ID, startTime, endTime); err == nil && len(stats) > 0 {
-			modelStats = stats
+			modelStats = userModelStatsFromUsageStats(stats)
 		}
 	}
 
@@ -1393,8 +1393,6 @@ func (h *GatewayHandler) buildUsageData(ctx context.Context, apiKeyID int64) gin
 			"cache_creation_tokens": dashStats.TodayCacheCreationTokens,
 			"cache_read_tokens":     dashStats.TodayCacheReadTokens,
 			"total_tokens":          dashStats.TodayTokens,
-			"cost":                  dashStats.TodayCost,
-			"actual_cost":           dashStats.TodayActualCost,
 		},
 		"total": gin.H{
 			"requests":              dashStats.TotalRequests,
@@ -1403,8 +1401,6 @@ func (h *GatewayHandler) buildUsageData(ctx context.Context, apiKeyID int64) gin
 			"cache_creation_tokens": dashStats.TotalCacheCreationTokens,
 			"cache_read_tokens":     dashStats.TotalCacheReadTokens,
 			"total_tokens":          dashStats.TotalTokens,
-			"cost":                  dashStats.TotalCost,
-			"actual_cost":           dashStats.TotalActualCost,
 		},
 		"average_duration_ms": dashStats.AverageDurationMs,
 		"rpm":                 dashStats.Rpm,
@@ -1421,7 +1417,7 @@ func (h *GatewayHandler) buildAPIKeyDailyUsage(c *gin.Context, userID, apiKeyID 
 	if err != nil {
 		return nil
 	}
-	return stats
+	return userDailyUsageFromUsage(stats)
 }
 
 // usageQuotaLimited 处理 quota_limited 模式的响应

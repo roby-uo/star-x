@@ -1,6 +1,9 @@
 package service
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // UserErrorRequest 是面向终端用户的"错误请求"精简脱敏视图（白名单）。
 // 严禁包含 account / api_key_prefix / upstream_endpoint / user_email 等
@@ -9,7 +12,7 @@ import "time"
 // client_ip / user_agent / group_name / request_type / stream 均为该用户
 // 自己请求的属性，经产品决策（2026-07-03）开放，
 // 与用量明细已向用户展示自身 ip_address/user_agent/分组/类型 的口径对齐；
-// error_body 仅在详情接口（GetUserErrorRequestDetail）按归属校验后返回。
+// error_body 仅返回标准化的用户错误，供应商原始正文留在管理员接口。
 type UserErrorRequest struct {
 	ID              int64     `json:"id"`
 	CreatedAt       time.Time `json:"created_at"`
@@ -110,7 +113,7 @@ func ToUserErrorRequest(e *OpsErrorLog) *UserErrorRequest {
 		StatusCode:      e.StatusCode,
 		Category:        MapUserErrorCategory(e.Phase, e.Type),
 		Platform:        e.Platform,
-		Message:         e.Message,
+		Message:         userErrorMessage(e),
 		KeyName:         e.APIKeyName,
 		KeyDeleted:      e.APIKeyDeleted,
 		ClientIP:        clientIP,
@@ -122,7 +125,7 @@ func ToUserErrorRequest(e *OpsErrorLog) *UserErrorRequest {
 }
 
 // UserErrorRequestDetail 是错误请求详情的脱敏视图(点击单行查看)。
-// 在 UserErrorRequest 基础上额外暴露 error_body(上游错误响应正文)与 upstream_status_code;
+// 在 UserErrorRequest 基础上额外暴露标准化 error_body 与 upstream_status_code;
 // 仍严禁任何内部/敏感字段。
 type UserErrorRequestDetail struct {
 	UserErrorRequest
@@ -136,9 +139,27 @@ func ToUserErrorRequestDetail(e *OpsErrorLogDetail) *UserErrorRequestDetail {
 		return nil
 	}
 	base := ToUserErrorRequest(&e.OpsErrorLog)
+	body, _ := json.Marshal(map[string]any{"error": map[string]string{
+		"type": base.Category, "message": base.Message,
+	}})
 	return &UserErrorRequestDetail{
 		UserErrorRequest:   *base,
-		ErrorBody:          e.ErrorBody,
+		ErrorBody:          string(body),
 		UpstreamStatusCode: e.UpstreamStatusCode,
+	}
+}
+
+func userErrorMessage(e *OpsErrorLog) string {
+	switch MapUserErrorCategory(e.Phase, e.Type) {
+	case "upstream":
+		return "上游服务暂时不可用，请稍后重试或联系管理员"
+	case "service_unavailable":
+		return "当前模型暂时不可用，请稍后重试或联系管理员"
+	case "internal", "other":
+		return "请求未能完成，请联系管理员并提供请求记录"
+	default:
+		// Authentication/request validation and the customer's own quota errors
+		// already use gateway messages and contain useful corrective information.
+		return e.Message
 	}
 }

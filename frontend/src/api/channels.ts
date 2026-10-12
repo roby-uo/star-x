@@ -1,7 +1,7 @@
 import type { ModelServicePolicy } from '@/types/modelService'
 /**
  * User Channels API endpoints (non-admin)
- * 用户侧「可用渠道」聚合查询：渠道 + 用户可访问的分组 + 支持模型（含定价）。
+ * 用户侧「可用渠道」聚合查询：渠道 + 用户可访问的分组 + 支持模型。
  */
 
 import { apiClient } from './client'
@@ -13,12 +13,12 @@ export interface UserAvailableGroup {
   platform: string
   /** 'standard' | 'subscription' — 订阅分组视觉加深，和 API 密钥页保持一致。 */
   subscription_type: string
-  /** 分组默认倍率。用户专属倍率（若有）通过 /groups/rates 获取后在前端 join。 */
-  rate_multiplier: number
-  peak_rate_enabled: boolean
-  peak_start: string
-  peak_end: string
-  peak_rate_multiplier: number
+  /** Historical optional fields; user endpoints omit billing data. */
+  rate_multiplier?: number
+  peak_rate_enabled?: boolean
+  peak_start?: string
+  peak_end?: string
+  peak_rate_multiplier?: number
   /** true = 专属分组（小范围授权）；false = 公开分组。 */
   is_exclusive: boolean
 }
@@ -49,7 +49,7 @@ export interface UserSupportedModelPricing {
 export interface UserSupportedModel {
   name: string
   platform: string
-  pricing: UserSupportedModelPricing | null
+  pricing?: UserSupportedModelPricing | null
 }
 
 /**
@@ -72,7 +72,7 @@ export interface UserAvailableChannel {
 export interface UserAvailableModel {
   pricing?: UserSupportedModelPricing
   policy?: ModelServicePolicy
-  rate_multiplier: number
+  rate_multiplier?: number
   name: string
   platform: string
   group_id: number

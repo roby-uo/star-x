@@ -78,7 +78,15 @@ func (h *AvailableChannelHandler) listMediaTasks(c *gin.Context, userID int64) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	response.Success(c, tasks)
+	if userID == 0 {
+		response.Success(c, tasks)
+		return
+	}
+	out := make([]*userMediaTask, 0, len(tasks))
+	for _, task := range tasks {
+		out = append(out, userMediaTaskFromService(task))
+	}
+	response.Success(c, out)
 }
 func (h *AvailableChannelHandler) RefreshMediaTask(c *gin.Context) {
 	subject, ok := middleware.GetAuthSubjectFromContext(c)
@@ -104,7 +112,11 @@ func (h *AvailableChannelHandler) refreshMediaTask(c *gin.Context, userID int64)
 		response.ErrorFrom(c, err)
 		return
 	}
-	response.Success(c, task)
+	if userID == 0 {
+		response.Success(c, task)
+		return
+	}
+	response.Success(c, userMediaTaskFromService(task))
 }
 
 func (h *AvailableChannelHandler) ReleaseUncertainMediaTask(c *gin.Context) {

@@ -37,7 +37,7 @@ func (h *OpenAIGatewayHandler) MiniMaxVideoQuote(c *gin.Context) {
 		return
 	}
 	c.Header("Cache-Control", "no-store")
-	c.JSON(http.StatusOK, quote)
+	c.JSON(http.StatusOK, userQuoteFromVideoQuote(quote))
 }
 
 // MiniMaxVideoGeneration accepts the native H3 request body. The OpenAI-style
@@ -97,7 +97,7 @@ func (h *OpenAIGatewayHandler) MiniMaxVideoGeneration(c *gin.Context) {
 				h.errorResponse(c, http.StatusConflict, "idempotency_conflict", "幂等键已用于不同请求")
 				return
 			}
-			c.JSON(http.StatusOK, gin.H{"id": task.ID, "task_id": task.UpstreamTaskID, "state": task.State, "quote": task.Quote})
+			c.JSON(http.StatusOK, gin.H{"id": task.ID, "task_id": task.UpstreamTaskID, "state": task.State, "quote": userQuoteFromVideoQuote(&task.Quote)})
 			return
 		}
 	}
@@ -171,7 +171,7 @@ func (h *OpenAIGatewayHandler) MiniMaxVideoGeneration(c *gin.Context) {
 		return
 	}
 	if !fresh {
-		c.JSON(http.StatusOK, gin.H{"id": task.ID, "task_id": task.UpstreamTaskID, "state": task.State, "quote": task.Quote})
+		c.JSON(http.StatusOK, gin.H{"id": task.ID, "task_id": task.UpstreamTaskID, "state": task.State, "quote": userQuoteFromVideoQuote(&task.Quote)})
 		return
 	}
 	created, err := client.Create(ctx, account.GetCredential("api_key"), input)
@@ -198,7 +198,7 @@ func (h *OpenAIGatewayHandler) MiniMaxVideoGeneration(c *gin.Context) {
 		logger.L().Error("minimax_video.settlement_pending", zap.String("id", task.ID), zap.Error(err))
 	}
 	setOpsSelectedAccount(c, account.ID, account.Platform)
-	c.JSON(http.StatusOK, gin.H{"id": task.ID, "task_id": created.TaskID, "quote": quote, "state": "queued"})
+	c.JSON(http.StatusOK, gin.H{"id": task.ID, "task_id": created.TaskID, "quote": userQuoteFromVideoQuote(quote), "state": "queued"})
 }
 
 func miniMaxPublicContentAllowed(items []minimax.VideoContent) bool {

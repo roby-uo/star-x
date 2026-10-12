@@ -140,11 +140,11 @@ func TestToUserErrorRequestDetail_WhitelistAndRedacts(t *testing.T) {
 	if out.ID != 999 {
 		t.Errorf("want ID=999, got %d", out.ID)
 	}
-	if out.Message != "upstream error" {
-		t.Errorf("want message=%q, got %q", "upstream error", out.Message)
+	if out.Message != "上游服务暂时不可用，请稍后重试或联系管理员" {
+		t.Errorf("unexpected public message %q", out.Message)
 	}
-	if out.ErrorBody != src.ErrorBody {
-		t.Errorf("ErrorBody mismatch")
+	if out.ErrorBody == src.ErrorBody || !strings.Contains(out.ErrorBody, out.Message) {
+		t.Errorf("expected normalized public ErrorBody")
 	}
 	if out.UpstreamStatusCode == nil || *out.UpstreamStatusCode != 503 {
 		t.Errorf("UpstreamStatusCode mismatch")
@@ -180,5 +180,22 @@ func TestToUserErrorRequestDetail_WhitelistAndRedacts(t *testing.T) {
 func TestToUserErrorRequestDetail_Nil(t *testing.T) {
 	if out := ToUserErrorRequestDetail(nil); out != nil {
 		t.Errorf("expected nil for nil input, got %+v", out)
+	}
+}
+
+func TestUserErrorDetailsDoNotExposeSupplierFinancialData(t *testing.T) {
+	original := &OpsErrorLogDetail{OpsErrorLog: OpsErrorLog{Phase: "upstream", Type: "api_error", Message: "supplier account balance $1.20, rate_multiplier=0.5"}, ErrorBody: `{"balance":1.20,"currency":"USD","account_cost":0.2,"input_price":0.03}`}
+	result := ToUserErrorRequestDetail(original)
+	raw, err := json.Marshal(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{"balance", "account_cost", "input_price", "$1.20", "rate_multiplier"} {
+		if strings.Contains(string(raw), field) {
+			t.Fatalf("supplier finance leaked: %s", raw)
+		}
+	}
+	if !strings.Contains(original.ErrorBody, "account_cost") {
+		t.Fatal("original administrator error must remain unchanged")
 	}
 }

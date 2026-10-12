@@ -285,7 +285,7 @@ func (h *APIKeyHandler) GetAvailableGroups(c *gin.Context) {
 		return
 	}
 
-	out := make([]dto.Group, 0, len(groups))
+	out := make([]dto.UserGroup, 0, len(groups))
 	for i := range groups {
 		out = append(out, *dto.GroupFromService(&groups[i]))
 	}
@@ -295,17 +295,12 @@ func (h *APIKeyHandler) GetAvailableGroups(c *gin.Context) {
 // GetUserGroupRates 获取当前用户的专属分组倍率配置
 // GET /api/v1/groups/rates
 func (h *APIKeyHandler) GetUserGroupRates(c *gin.Context) {
-	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	_, ok := middleware2.GetAuthSubjectFromContext(c)
 	if !ok {
 		response.Unauthorized(c, "User not authenticated")
 		return
 	}
 
-	rates, err := h.apiKeyService.GetUserGroupRates(c.Request.Context(), subject.UserID)
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	response.Success(c, rates)
+	// Pricing policies belong to administrator routes; preserve the response shape for older clients.
+	response.Success(c, map[int64]float64{})
 }

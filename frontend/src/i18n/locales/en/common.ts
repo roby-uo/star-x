@@ -162,6 +162,7 @@ export default {
     upstreamPools: 'Pools',
     upstreamMonitor: 'Connection Monitor',
     modelServices: 'Model Services',
+    billingManagement: 'Billing Management',
     groupRates: 'Groups & Rates',
     mediaTasks: 'Task Center',
     advancedChannels: 'Advanced Channel Configuration',

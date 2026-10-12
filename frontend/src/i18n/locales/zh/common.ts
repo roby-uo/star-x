@@ -162,6 +162,7 @@ export default {
     upstreamPools: '资源池',
     upstreamMonitor: '连接监控',
     modelServices: '模型服务',
+    billingManagement: '计费管理',
     groupRates: '分组与倍率',
     mediaTasks: '任务中心',
     advancedChannels: '高级渠道配置',

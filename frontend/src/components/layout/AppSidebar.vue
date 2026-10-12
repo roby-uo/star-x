@@ -728,6 +728,7 @@ const adminNavItems = computed((): NavItem[] => {
     { path: '/admin/users', label: t('nav.users'), icon: UsersIcon, hideInSimpleMode: true },
     { path: '/admin/accounts', label: t('nav.upstreamManagement'), icon: GlobeIcon },
     { path: '/admin/models', label: t('nav.modelServices'), icon: PriceTagIcon },
+    { path: '/admin/billing-management', label: t('nav.billingManagement'), icon: CreditCardIcon },
     { path: '/admin/groups', label: t('nav.groupRates'), icon: UsersIcon, hideInSimpleMode: true },
     { path: '/admin/media-tasks', label: t('nav.mediaTasks'), icon: OrderIcon },
     { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },

@@ -559,6 +559,17 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/billing-management',
+    name: 'AdminBillingManagement',
+    component: () => import('@/views/admin/BillingManagementView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Billing Management',
+      titleKey: 'nav.billingManagement'
+    }
+  },
+  {
     path: '/admin/media-tasks',
     name: 'AdminMediaTasks',
     component: () => import('@/views/admin/MediaTasksView.vue'),
