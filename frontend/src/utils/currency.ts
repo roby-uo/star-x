@@ -19,7 +19,10 @@ export function cnyToLedger(amount: MoneyValue): number {
 
 export function formatCny(amount: MoneyValue, fractionDigits?: number): string {
   const value = numericMoney(amount)
-  const digits = fractionDigits ?? (value !== 0 && Math.abs(value) < 0.01 ? 6 : 2)
+  let digits = fractionDigits ?? (value !== 0 && Math.abs(value) < 0.01 ? 6 : 2)
+  if (value !== 0 && Math.abs(value) < 0.5 * 10 ** -digits) {
+    digits = Math.min(12, Math.max(digits, Math.ceil(-Math.log10(Math.abs(value))) + 2))
+  }
   return `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: digits, maximumFractionDigits: digits })}`
 }
 

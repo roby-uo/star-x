@@ -44,7 +44,9 @@ export function costCoverage(config: BillingManagementConfig, accounts: Account[
 export function money(value: number | null | undefined, currency = 'CNY'): string {
   if (value == null || !Number.isFinite(value)) return '待配置'
   if (!['CNY', 'USD'].includes(currency)) return '待核对'
-  return new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: 6 }).format(currency === 'USD' ? value * USD_TO_CNY_RATE : value)
+  const amount = currency === 'USD' ? value * USD_TO_CNY_RATE : value
+  const digits = amount !== 0 && Math.abs(amount) < 0.0000005 ? Math.min(12, Math.max(6, Math.ceil(-Math.log10(Math.abs(amount))) + 2)) : 6
+  return new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: digits }).format(amount)
 }
 
 export function procurementToCny(value: number | null | undefined, currency: string): number | null {

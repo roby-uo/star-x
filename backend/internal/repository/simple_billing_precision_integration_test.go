@@ -25,6 +25,7 @@ func TestSimpleBillingPrecisionIntegration_TinyChargeSnapshotAndDedup(t *testing
 	user := mustCreateUser(t, client, &service.User{Balance: 1})
 	key := mustCreateApiKey(t, client, &service.APIKey{UserID: user.ID, Key: "sk-integration-" + uuid.NewString(), Name: "tiny-billing", Quota: 1})
 	account := mustCreateAccount(t, client, &service.Account{Name: "tiny-billing-" + uuid.NewString(), Type: service.AccountTypeAPIKey, Extra: map[string]any{"quota_limit": 1.0}})
+	cleanupSimpleBillingPrecisionFixture(t, user.ID, key.ID, account.ID)
 	const costUSD = 0.000000009
 	inputPrice, freePrice := costUSD/1.4*1000000, 0.0
 	q := &service.SimpleBillingSnapshot{Version: 11, AccountID: account.ID, Model: "integration-tiny-model", Modality: "chat", Route: "api", Source: "manual", Multiplier: 1.4, Currency: "USD", DiscountMultiplier: 1, BillingUnit: "per_million_tokens",
@@ -88,6 +89,7 @@ func TestSimpleBillingPrecisionIntegration_MetadataFailureRollsBackClaimAndCharg
 	client := testEntClient(t)
 	user := mustCreateUser(t, client, &service.User{Balance: 1})
 	key := mustCreateApiKey(t, client, &service.APIKey{UserID: user.ID, Key: "sk-integration-" + uuid.NewString(), Name: "failed-metadata", Quota: 1})
+	cleanupSimpleBillingPrecisionFixture(t, user.ID, key.ID, 0)
 	repo := NewUsageBillingRepository(client, integrationDB)
 	cmd := &service.UsageBillingCommand{RequestID: uuid.NewString(), UserID: user.ID, APIKeyID: key.ID, BalanceCost: .5, APIKeyQuotaCost: .5,
 		PriceSnapshot: &service.SimpleBillingSnapshot{Version: 12, Model: "integration-model", Multiplier: math.NaN()}}
@@ -118,6 +120,7 @@ func TestSimpleBillingPrecisionIntegration_LaterEffectFailureRollsBackSnapshot(t
 	ctx := context.Background()
 	client := testEntClient(t)
 	user := mustCreateUser(t, client, &service.User{Balance: 1})
+	cleanupSimpleBillingPrecisionFixture(t, user.ID, 0, 0)
 	// No API key has this negative id. The snapshot insert and wallet update
 	// happen first; the later quota error must roll both changes back.
 	cmd := &service.UsageBillingCommand{RequestID: uuid.NewString(), UserID: user.ID, APIKeyID: -1, BalanceCost: .25, APIKeyQuotaCost: .25,
@@ -145,6 +148,12 @@ func TestSimpleBillingPrecisionIntegration_MigrationsKeepCashAndLegacyPlans(t *t
 		require.Equal(t, column.scale, scale, "%s.%s precision", column.table, column.name)
 	}
 	group := mustCreateGroup(t, testEntClient(t), &service.Group{Name: "legacy-cash-plan-" + uuid.NewString()})
+	t.Cleanup(func() {
+		_, err := integrationDB.ExecContext(ctx, "DELETE FROM subscription_plans WHERE group_id=$1", group.ID)
+		require.NoError(t, err)
+		_, err = integrationDB.ExecContext(ctx, "DELETE FROM groups WHERE id=$1", group.ID)
+		require.NoError(t, err)
+	})
 	var planID int64
 	require.NoError(t, integrationDB.QueryRowContext(ctx, `INSERT INTO subscription_plans(group_id,name,price,currency) VALUES($1,'legacy price label',20,'CNY') RETURNING id`, group.ID).Scan(&planID))
 	require.NoError(t, ApplyMigrations(ctx, integrationDB))
@@ -154,4 +163,29 @@ func TestSimpleBillingPrecisionIntegration_MigrationsKeepCashAndLegacyPlans(t *t
 	require.Equal(t, "20.00", price)
 	require.True(t, cashIsNull)
 	require.True(t, originalCashIsNull, "a display-only old CNY label must not create a new cash price")
+}
+
+func cleanupSimpleBillingPrecisionFixture(t *testing.T, userID, keyID, accountID int64) {
+	t.Helper()
+	t.Cleanup(func() {
+		ctx := context.Background()
+		// Global dashboard integration tests include all successful usage. Remove
+		// only this fixture's rows so their expected totals remain independent.
+		for _, statement := range []struct {
+			query string
+			id    int64
+		}{
+			{"DELETE FROM usage_logs WHERE user_id=$1", userID},
+			{"DELETE FROM usage_billing_price_snapshots WHERE user_id=$1", userID},
+			{"DELETE FROM usage_billing_dedup WHERE api_key_id=$1", keyID},
+			{"DELETE FROM api_keys WHERE id=$1", keyID},
+			{"DELETE FROM accounts WHERE id=$1", accountID},
+			{"DELETE FROM users WHERE id=$1", userID},
+		} {
+			if statement.id > 0 {
+				_, err := integrationDB.ExecContext(ctx, statement.query, statement.id)
+				require.NoError(t, err, "clean up only the current financial fixture")
+			}
+		}
+	})
 }
