@@ -31,9 +31,10 @@ func TestOpenAIGatewayHandlerResponses_GrokResponsesLiteImageToolDeclarationBypa
 
 func TestOpenAIGatewayHandlerResponses_ImagePermissionHardSignalsStillRejected(t *testing.T) {
 	tests := []struct {
-		name     string
-		platform string
-		body     string
+		name                   string
+		platform               string
+		body                   string
+		primaryGenerationModel bool
 	}{
 		{
 			name:     "Grok native image_generation declaration",
@@ -51,15 +52,21 @@ func TestOpenAIGatewayHandlerResponses_ImagePermissionHardSignalsStillRejected(t
 			body:     `{"model":"gpt-5.5","tools":[{"type":"image_generation","model":"gpt-image-2"}],"input":"draw a cat"}`,
 		},
 		{
-			name:     "OpenAI image model",
-			platform: service.PlatformOpenAI,
-			body:     `{"model":"gpt-image-2","input":"draw a cat"}`,
+			name:                   "OpenAI image model",
+			platform:               service.PlatformOpenAI,
+			body:                   `{"model":"gpt-image-2","input":"draw a cat"}`,
+			primaryGenerationModel: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rec := runOpenAIResponsesImagePermissionGateTest(t, tt.platform, tt.body)
+			if tt.primaryGenerationModel {
+				require.Equal(t, http.StatusBadRequest, rec.Code)
+				require.Contains(t, rec.Body.String(), "model_endpoint_mismatch")
+				return
+			}
 
 			require.Equal(t, http.StatusForbidden, rec.Code)
 			require.Contains(t, rec.Body.String(), service.ImageGenerationPermissionMessage())

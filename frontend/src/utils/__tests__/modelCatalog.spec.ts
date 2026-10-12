@@ -21,6 +21,16 @@ describe('model catalog classification', () => {
     expect(catalogModelEndpoint('Videos', 'openai', 'other-video')).toBe('暂未适配')
   })
 
+  it('prioritizes explicit text policy and does not confuse media understanding with generation', () => {
+    expect(catalogModelType('MiniMax-H3', 'chat')).toBe('Chat')
+    expect(catalogModelType('sora-reader', 'text')).toBe('Chat')
+    expect(catalogModelType('custom-video-understanding')).toBe('Chat')
+    expect(catalogModelType('gpt-image-1', 'chat')).toBe('Chat')
+    expect(catalogModelType('custom-picture', 'image')).toBe('Images')
+    expect(catalogModelType('custom-movie', 'video')).toBe('Videos')
+    for (const name of ['sora-2', 'kling-v2', 'veo-3', 'doubao-seedance-2-0']) expect(catalogModelType(name)).toBe('Videos')
+  })
+
   it('uses native text request endpoints for each protocol', () => {
     expect(catalogModelEndpoint('Chat', 'anthropic', 'claude-sonnet')).toBe('/v1/messages')
     expect(catalogModelEndpoint('Chat', 'gemini', 'gemini-2.5-pro')).toBe('/v1beta/models/gemini-2.5-pro:generateContent')

@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -15,8 +18,9 @@ import (
 // Codex CLI and the Codex desktop app refresh their model picker from
 // GET {base_url}/models?client_version=... (custom provider mode) or
 // GET /backend-api/codex/models (chatgpt_base_url mode). Both routes land
-// here. The manifest is proxied verbatim from the selected account's ChatGPT
-// backend or custom API key upstream. API key manifests use a short-lived,
+// here. Known standalone image/video generation models are excluded; other
+// fields remain from the selected account's ChatGPT backend or custom upstream.
+// API key manifests use a short-lived,
 // asynchronously revalidated cache to tolerate canceled client requests.
 func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 	if c.Request.Context().Err() != nil {
@@ -56,7 +60,9 @@ func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 		// 让 ops 错误日志携带实际选中的上游账号，便于定位失效账号（#4544）。
 		setOpsSelectedAccount(c, account.ID, account.Platform)
 
-		manifest, err := h.gatewayService.FetchCodexModelsManifest(c.Request.Context(), account, c.Query("client_version"), c.GetHeader("If-None-Match"))
+		// The upstream cache must supply a body: downstream validators describe
+		// the filtered representation and may change with local model policies.
+		manifest, err := h.gatewayService.FetchCodexModelsManifest(c.Request.Context(), account, c.Query("client_version"), "")
 		if err != nil {
 			if c.Request.Context().Err() != nil {
 				return
@@ -74,14 +80,43 @@ func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 			return
 		}
 
-		if manifest.ETag != "" {
-			c.Header("ETag", manifest.ETag)
-		}
 		if manifest.NotModified {
+			h.errorResponse(c, http.StatusBadGateway, "upstream_error", "Codex models upstream returned no model body")
+			return
+		}
+		filtered, filterErr := filterCodexAgentModels(manifest.Body, func(model string) (service.ModelEndpointCapability, error) {
+			capability, capabilityErr := modelCapabilityForKey(c.Request.Context(), h.gatewayService, apiKey, model)
+			if capabilityErr != nil || capability.IsGenerationModel() {
+				return capability, capabilityErr
+			}
+			mapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, model)
+			accountCapability := selectedAccountModelCapability(apiKey, account, mapping.MappedModel, "")
+			if accountCapability.IsGenerationModel() {
+				return accountCapability, nil
+			}
+			return capability, nil
+		})
+		if filterErr != nil {
+			h.errorResponse(c, http.StatusServiceUnavailable, "api_error", "模型接入能力暂时无法读取")
+			return
+		}
+		etag := fmt.Sprintf(`"starx-agent-%x"`, sha256.Sum256(filtered))
+		c.Header("ETag", etag)
+		if modelDiscoveryETagMatches(c.GetHeader("If-None-Match"), etag) {
 			c.Status(http.StatusNotModified)
 			return
 		}
-		c.Data(http.StatusOK, "application/json", manifest.Body)
+		c.Data(http.StatusOK, "application/json", filtered)
 		return
 	}
+}
+
+func modelDiscoveryETagMatches(value, etag string) bool {
+	for _, candidate := range strings.Split(value, ",") {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "*" || strings.TrimPrefix(candidate, "W/") == etag {
+			return true
+		}
+	}
+	return false
 }

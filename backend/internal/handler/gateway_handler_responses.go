@@ -75,6 +75,9 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		return
 	}
 	reqModel := modelResult.String()
+	if rejectGenerationModelOnTextEndpoint(c, h.gatewayService, apiKey, reqModel, false) {
+		return
+	}
 	reqStream, ok := parseOpenAICompatibleStream(body)
 	if !ok {
 		h.responsesErrorResponse(c, http.StatusBadRequest, "invalid_request_error", invalidStreamFieldTypeMessage)
@@ -191,6 +194,9 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 			}
 		}
 		account := selection.Account
+		if rejectSelectedAccountGenerationModel(c, apiKey, selection, reqModel, channelMapping.MappedModel, "", false) {
+			return
+		}
 		setOpsSelectedAccount(c, account.ID, account.Platform)
 
 		// 4. Acquire account concurrency slot

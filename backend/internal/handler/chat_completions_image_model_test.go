@@ -44,7 +44,7 @@ func TestChatCompletionsRejectsGPTImageModelsBeforeScheduling(t *testing.T) {
 
 				require.Equal(t, http.StatusBadRequest, recorder.Code)
 				require.Equal(t, "invalid_request_error", gjson.Get(recorder.Body.String(), "error.type").String())
-				require.Contains(t, gjson.Get(recorder.Body.String(), "error.message").String(), "Chat Completions")
+				require.Equal(t, "model_endpoint_mismatch", gjson.Get(recorder.Body.String(), "error.code").String())
 				_, selected := c.Get(opsAccountIDKey)
 				require.False(t, selected, "rejection must happen before account selection")
 			})

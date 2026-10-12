@@ -1,15 +1,20 @@
-import { isSeedreamModel } from './modelTest'
 import { miniMaxVideoSpec } from './minimaxVideo'
 
 export type CatalogModelType = 'Chat' | 'Images' | 'Videos'
 
+// Shared with generated client import scripts so legacy catalogs use the same fallback.
+export const catalogImageModelPattern = /^(?:(?:doubao-)?seedream-|gpt-image(?:-|$)|dall-e-|imagen[-.]|flux[-.])/i
+export const catalogVideoModelPattern = /^(?:minimax-h3(?:-max)?$|(?:doubao-)?seedance[-.]|kling[-.]|sora(?:[-.]|$)|veo(?:[-.]|$))/i
+export const catalogAudioModelPattern = /audio|tts|whisper/i
+
 export function isAudioModel(model: string): boolean {
-  return /audio|tts|whisper/i.test(model)
+  return catalogAudioModelPattern.test(model)
 }
 
 export function catalogModelType(model: string, billingMode?: string | null): CatalogModelType {
-  if (billingMode === 'image' || isSeedreamModel(model) || /^gpt-image/i.test(model)) return 'Images'
-  if (billingMode === 'video' || /video|seedance|kling|sora|^minimax-h3(?:-max)?$/i.test(model)) return 'Videos'
+  if (billingMode === 'chat' || billingMode === 'text') return 'Chat'
+  if (billingMode === 'image' || catalogImageModelPattern.test(model)) return 'Images'
+  if (billingMode === 'video' || catalogVideoModelPattern.test(model)) return 'Videos'
   return 'Chat'
 }
 

@@ -5,6 +5,7 @@
         <div class="min-w-0">
           <p class="mb-2 text-xs text-gray-500">{{ modelSupplier(item.name, item.platform) }} · {{ catalogTypeLabels[item.type] }}</p>
           <h2 id="model-details-title" class="break-words text-lg font-semibold text-gray-900 dark:text-white">{{ item.name }}</h2>
+          <p class="mt-2 text-xs font-medium text-primary-600 dark:text-primary-300">{{ modelAccessLabels[item.type] }}</p>
         </div>
         <button class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 disabled:opacity-40 dark:hover:bg-dark-700" :disabled="busy" aria-label="关闭模型详情" @click="close"><Icon name="x" size="md" /></button>
       </header>
@@ -23,10 +24,11 @@
           <button v-for="entry in tabs" :key="entry.value" class="border-b-2 pb-3 text-sm font-medium disabled:opacity-50" :class="tab === entry.value ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500'" :aria-pressed="tab === entry.value" :disabled="busy" @click="tab = entry.value">{{ entry.label }}</button>
         </div>
         <section v-show="tab === 'api'" class="space-y-5">
+          <p class="rounded-lg bg-gray-50 px-4 py-3 text-sm leading-6 text-gray-600 dark:bg-dark-900 dark:text-gray-300" data-testid="model-client-purpose">{{ clientPurposeDescription }}</p>
           <dl class="grid gap-4 sm:grid-cols-2">
             <div><dt class="text-xs text-gray-500">Base URL（服务地址）</dt><dd class="mt-1 break-all font-mono text-sm text-gray-800 dark:text-gray-200">{{ baseUrl }}</dd></div>
             <div><dt class="text-xs text-gray-500">调用模型名称</dt><dd class="mt-1 break-all font-mono text-sm text-gray-800 dark:text-gray-200">{{ model.name }}</dd></div>
-            <div class="sm:col-span-2"><dt class="text-xs text-gray-500">接口 · {{ protocolLabel(model.platform) }}</dt><dd class="mt-1 break-all font-mono text-sm text-gray-800 dark:text-gray-200">{{ endpoint === '暂未适配' ? endpoint : `POST ${endpoint}` }}</dd></div>
+            <div class="sm:col-span-2"><dt class="text-xs text-gray-500">接口 · {{ requestProtocolLabel }}</dt><dd class="mt-1 break-all font-mono text-sm text-gray-800 dark:text-gray-200">{{ endpoint === '暂未适配' ? endpoint : `POST ${endpoint}` }}</dd></div>
           </dl>
           <template v-if="endpoint !== '暂未适配'">
             <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-dark-600">
@@ -44,6 +46,7 @@
           <p v-if="item.type === 'Videos'" class="text-xs text-gray-500">切换分组或密钥会重置测试显示，已受理的请求不会取消，请保存任务编号。</p>
           <p v-if="keysLoading" class="py-6 text-center text-sm text-gray-500">正在加载调用密钥…</p>
           <p v-else-if="!selectedKey" class="rounded-xl bg-gray-50 p-4 text-sm text-gray-500 dark:bg-dark-900">请选择可用的调用密钥后开始测试。</p>
+          <p v-else-if="endpoint === '暂未适配'" class="rounded-xl bg-gray-50 p-4 text-sm text-gray-500 dark:bg-dark-900">此模型暂无对应的调用适配，请联系管理员确认接入方式。</p>
           <TextModelTester v-else-if="item.type === 'Chat'" :key="contextId" :model="model" :api-key="selectedKey.key" @busy="busy = $event" />
           <ImageWorkbench v-else-if="item.type === 'Images' && ['openai', 'grok'].includes(model.platform)" :key="contextId" embedded :model="model" :selected-key-id="selectedKey.id" :context-keys="keys" @busy="busy = $event" />
           <VideoWorkbench v-else-if="item.type === 'Videos' && miniMaxVideoSpec(item.name) && model.platform === 'openai'" :key="contextId" embedded :model="model" :selected-key-id="selectedKey.id" :context-keys="keys" @busy="busy = $event" />
@@ -66,7 +69,7 @@ import type { ApiKey } from '@/types'
 import { catalogModelEndpoint } from '@/utils/modelCatalog'
 import { isSeedreamModel } from '@/utils/modelTest'
 import { miniMaxVideoSpec } from '@/utils/minimaxVideo'
-import { buildTextRequest, catalogTypeLabels, modelSupplier, protocolLabel, type UserCatalogItem } from './userModelCatalog'
+import { buildTextRequest, catalogTypeLabels, modelAccessLabels, modelSupplier, protocolLabel, type UserCatalogItem } from './userModelCatalog'
 const props = withDefaults(defineProps<{ item: UserCatalogItem; initialTab?: 'api' | 'test' }>(), { initialTab: 'api' })
 const emit = defineEmits<{ close: [] }>()
 const appStore = useAppStore()
@@ -85,7 +88,22 @@ const copyError = ref('')
 const model = computed(() => props.item.groups.find(group => group.group_id === groupId.value) || props.item.groups[0])
 const selectedKey = computed(() => keys.value.find(key => key.id === keyId.value))
 const contextId = computed(() => `${groupId.value}:${keyId.value}`)
-const endpoint = computed(() => catalogModelEndpoint(props.item.type, model.value.platform, model.value.name))
+const endpoint = computed(() => {
+  const guessed = catalogModelEndpoint(props.item.type, model.value.platform, model.value.name)
+  // Empty unknown metadata means unverified, preserving legacy text compatibility.
+  const declaredType = model.value.policy?.kind || model.value.model_type
+  const supported = model.value.supported_endpoints
+  if (supported !== undefined && ((declaredType && declaredType !== 'unknown') || supported.length) && !supported.includes(guessed)) return '暂未适配'
+  return guessed
+})
+const requestProtocolLabel = computed(() => endpoint.value === '暂未适配' ? '暂无调用适配' : props.item.type === 'Chat'
+  ? protocolLabel(model.value.platform)
+  : props.item.type === 'Images'
+    ? (['openai', 'grok'].includes(model.value.platform) ? 'OpenAI 图片兼容接口' : '图片生成接口')
+    : (miniMaxVideoSpec(model.value.name) && model.value.platform === 'openai' ? 'MiniMax 视频接口 · 异步任务' : model.value.platform === 'grok' ? 'xAI 视频接口 · 异步任务' : '视频生成接口 · 异步任务'))
+const clientPurposeDescription = computed(() => props.item.type === 'Chat'
+  ? '可作为 Agent 的文本推理主模型候选。请先确认客户端所需协议和工具调用能力，再进行最小连接测试；支持图片输入表示能理解图片，不代表能生成图片。'
+  : `${props.item.type === 'Images' ? '图片' : '视频'}生成模型不能填入 Codex、OpenCode、WorkBuddy 等客户端的主模型配置。请由应用直接调用下方接口，或让 Agent 通过支持该接口的独立工具调用；主模型仍使用文本模型。`)
 const origin = computed(() => {
   try { return new URL(appStore.apiBaseUrl || buildGatewayUrl('/'), window.location.origin).origin }
   catch { return window.location.origin }

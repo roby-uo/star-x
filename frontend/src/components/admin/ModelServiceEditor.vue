@@ -2,7 +2,7 @@
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-6" @click.self="!saving && emit('close')">
     <section role="dialog" aria-modal="true" aria-labelledby="service-title" class="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-dark-800">
       <header class="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-5 dark:border-dark-700 sm:px-7">
-        <div><p class="mb-1 text-xs text-gray-500">{{ kindLabel }}模型 · {{ catalogModelProvider(model, platform) }}</p><h2 id="service-title" class="break-all text-xl font-semibold text-gray-900 dark:text-white">{{ model }}</h2><p class="mt-1 text-xs text-gray-500">调用名称与当前模型一致。配置按选定分组范围生效。</p></div>
+        <div><p class="mb-1 text-xs text-gray-500">{{ kindLabel }}模型 · {{ catalogModelProvider(model, platform) }}</p><h2 id="service-title" class="break-all text-xl font-semibold text-gray-900 dark:text-white">{{ model }}</h2><p class="mt-1 text-xs text-gray-500">调用名称与当前模型一致。配置按选定分组范围生效。</p><p class="mt-2 text-xs leading-5 text-gray-500">{{ accessPurpose }}</p></div>
         <button type="button" class="btn btn-secondary shrink-0" :disabled="saving" @click="emit('close')">关闭</button>
       </header>
       <div class="overflow-y-auto px-5 py-5 sm:px-7">
@@ -129,6 +129,11 @@ const unassignedGroups = computed(() => groups.value.filter(group => group.platf
 const eligibleGroups = computed(() => groups.value.filter(group => group.platform === props.platform && currentChannel.value?.group_ids.includes(group.id)))
 const hasWildcardPrice = computed(() => !!currentChannel.value && !modelPricing(currentChannel.value, props.model, props.platform) && !!wildcardPricing(currentChannel.value, props.model, props.platform))
 const kindLabel = computed(() => ({ chat: '文本', image: '图片', video: '视频' })[props.kind])
+const accessPurpose = computed(() => ({
+  chat: '接入用途：对话与推理。Agent 客户端还需兼容调用协议和工具调用能力。',
+  image: '接入用途：图像生成 API 或图片工具。此模型不能直接作为 Agent 对话主模型。',
+  video: '接入用途：视频生成 API 或视频工具，通过任务编号查询结果。此模型不能直接作为 Agent 对话主模型。'
+})[props.kind])
 const unsupportedVideo = computed(() => props.kind === 'video' && !videoSpec.value)
 const currentStateLabel = computed(() => ({ draft: '草稿', published: '已开放', paused: '已暂停' })[initialPolicy.value.state])
 const canSaveDraft = computed(() => initialPolicy.value.state === 'draft')

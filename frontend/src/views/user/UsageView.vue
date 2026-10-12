@@ -183,7 +183,7 @@
                 :start-date="startDate"
                 :end-date="endDate"
               />
-              <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
+              <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" :show-costs="false" />
             </div>
           </div>
         </details>

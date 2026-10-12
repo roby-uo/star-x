@@ -168,6 +168,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	}
 	body = parsedReq.Body.Bytes()
 	reqModel := parsedReq.Model
+	if rejectGenerationModelOnTextEndpoint(c, h.gatewayService, apiKey, reqModel, true) {
+		return
+	}
 	reqStream := parsedReq.Stream
 	reqLog = reqLog.With(zap.String("model", reqModel), zap.Bool("stream", reqStream))
 
@@ -345,6 +348,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				}
 			}
 			account := selection.Account
+			if rejectSelectedAccountGenerationModel(c, apiKey, selection, reqModel, channelMapping.MappedModel, "", true) {
+				return
+			}
 			setOpsSelectedAccount(c, account.ID, account.Platform)
 
 			// 检查请求拦截（预热请求、SUGGESTION MODE等）
@@ -633,6 +639,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				}
 			}
 			account := selection.Account
+			if rejectSelectedAccountGenerationModel(c, currentAPIKey, selection, reqModel, channelMapping.MappedModel, "", true) {
+				return
+			}
 			setOpsSelectedAccount(c, account.ID, account.Platform)
 
 			// [DEBUG-STICKY] 打印账号选择结果
@@ -1015,51 +1024,54 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 	if forcedPlatform, ok := middleware2.GetForcePlatformFromContext(c); ok && strings.TrimSpace(forcedPlatform) != "" {
 		platform = forcedPlatform
 	}
+	resolveCapability := func(model string) (service.ModelEndpointCapability, error) {
+		return h.gatewayService.ResolveModelEndpointCapability(c.Request.Context(), groupID, platform, model)
+	}
 
 	// Get available models from account configurations for the selected group platform.
 	availableModels := h.gatewayService.GetAvailableModels(c.Request.Context(), groupID, platform)
 	if apiKey != nil && apiKey.Group != nil && apiKey.Group.CustomModelsListEnabled() {
 		fallbackModels := defaultModelIDsForPlatform(platform)
 		availableModels = filterModelsByCustomList(customModelsListSource(platform, availableModels, fallbackModels), fallbackModels, apiKey.Group.ModelsListConfig.Models)
-		writeCustomModelsList(c, platform, availableModels)
+		writeCustomModelsList(c, platform, availableModels, resolveCapability)
 		return
 	}
 
 	if len(availableModels) > 0 {
-		writeModelsList(c, platform, availableModels)
+		writeModelsList(c, platform, availableModels, resolveCapability)
 		return
 	}
 
 	// Fallback to default models
 	if platform == service.PlatformOpenAI {
-		c.JSON(http.StatusOK, gin.H{
+		writeGatewayModelsPayload(c, gin.H{
 			"object": "list",
 			"data":   openai.DefaultModels,
-		})
+		}, resolveCapability)
 		return
 	}
 
 	if platform == service.PlatformGemini {
-		c.JSON(http.StatusOK, gin.H{
+		writeGatewayModelsPayload(c, gin.H{
 			"object": "list",
 			"data":   geminicli.DefaultModels,
-		})
+		}, resolveCapability)
 		return
 	}
 	if platform == service.PlatformGrok {
-		writeGrokModelsList(c, xai.DefaultModelIDs())
+		writeGrokModelsList(c, xai.DefaultModelIDs(), resolveCapability)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	writeGatewayModelsPayload(c, gin.H{
 		"object": "list",
 		"data":   claude.DefaultModels,
-	})
+	}, resolveCapability)
 }
 
-func writeModelsList(c *gin.Context, platform string, modelIDs []string) {
+func writeModelsList(c *gin.Context, platform string, modelIDs []string, resolvers ...discoveryModelResolver) {
 	if platform == service.PlatformGrok {
-		writeGrokModelsList(c, modelIDs)
+		writeGrokModelsList(c, modelIDs, resolvers...)
 		return
 	}
 	models := make([]claude.Model, 0, len(modelIDs))
@@ -1071,18 +1083,18 @@ func writeModelsList(c *gin.Context, platform string, modelIDs []string) {
 			CreatedAt:   "2024-01-01T00:00:00Z",
 		})
 	}
-	c.JSON(http.StatusOK, gin.H{
+	writeGatewayModelsPayload(c, gin.H{
 		"object": "list",
 		"data":   models,
-	})
+	}, resolvers...)
 }
 
-func writeCustomModelsList(c *gin.Context, platform string, modelIDs []string) {
+func writeCustomModelsList(c *gin.Context, platform string, modelIDs []string, resolvers ...discoveryModelResolver) {
 	if platform == service.PlatformOpenAI {
-		writeOpenAIModelsList(c, modelIDs)
+		writeOpenAIModelsList(c, modelIDs, resolvers...)
 		return
 	}
-	writeModelsList(c, platform, modelIDs)
+	writeModelsList(c, platform, modelIDs, resolvers...)
 }
 
 type grokReasoningEffortOption struct {
@@ -1098,7 +1110,7 @@ type grokModelListItem struct {
 	ReasoningEfforts        []grokReasoningEffortOption `json:"reasoningEfforts,omitempty"`
 }
 
-func writeGrokModelsList(c *gin.Context, modelIDs []string) {
+func writeGrokModelsList(c *gin.Context, modelIDs []string, resolvers ...discoveryModelResolver) {
 	defaults := xai.DefaultModels()
 	defaultsByID := make(map[string]xai.Model, len(defaults))
 	for _, model := range defaults {
@@ -1129,10 +1141,10 @@ func writeGrokModelsList(c *gin.Context, modelIDs []string) {
 		models = append(models, item)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	writeGatewayModelsPayload(c, gin.H{
 		"object": "list",
 		"data":   models,
-	})
+	}, resolvers...)
 }
 
 func grokModelSupportsConfigurableReasoning(modelID string) bool {
@@ -1144,7 +1156,7 @@ func grokModelSupportsConfigurableReasoning(modelID string) bool {
 	}
 }
 
-func writeOpenAIModelsList(c *gin.Context, modelIDs []string) {
+func writeOpenAIModelsList(c *gin.Context, modelIDs []string, resolvers ...discoveryModelResolver) {
 	defaultsByID := make(map[string]openai.Model, len(openai.DefaultModels))
 	for _, model := range openai.DefaultModels {
 		defaultsByID[model.ID] = model
@@ -1165,10 +1177,10 @@ func writeOpenAIModelsList(c *gin.Context, modelIDs []string) {
 			DisplayName: modelID,
 		})
 	}
-	c.JSON(http.StatusOK, gin.H{
+	writeGatewayModelsPayload(c, gin.H{
 		"object": "list",
 		"data":   models,
-	})
+	}, resolvers...)
 }
 
 func customModelsListSource(platform string, availableModels, fallbackModels []string) []string {

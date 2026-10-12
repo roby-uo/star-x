@@ -146,8 +146,9 @@ type ChannelService struct {
 	authCacheInvalidator APIKeyAuthCacheInvalidator
 	pricingService       *PricingService // 用于「可用渠道」展示时回落到全局定价；可为 nil（测试场景）
 
-	cache   atomic.Value // *channelCache
-	cacheSF singleflight.Group
+	cache                    atomic.Value // *channelCache
+	cacheSF                  singleflight.Group
+	accountAliasCapabilities accountAliasCapabilityCache
 }
 
 // NewChannelService 创建渠道服务实例。

@@ -28,6 +28,10 @@ describe('model connection details', () => {
     expect(wrapper.text()).not.toContain('secret-1')
     expect(wrapper.text()).not.toContain('价格与限制')
     expect(wrapper.text()).not.toContain('我的视频任务')
+    expect(wrapper.text()).toContain('视频生成 · API / 工具接入')
+    expect(wrapper.text()).toContain('MiniMax 视频接口 · 异步任务')
+    expect(wrapper.text()).not.toContain('接口 · OpenAI 兼容')
+    expect(wrapper.get('[data-testid="model-client-purpose"]').text()).toContain('不能填入 Codex、OpenCode、WorkBuddy')
     await wrapper.findAll('select')[0].setValue(2)
     await flushPromises()
     expect(wrapper.findComponent({ name: 'VideoWorkbench' }).props('selectedKeyId')).toBe(20)
@@ -71,6 +75,37 @@ describe('model connection details', () => {
     expect(example).toContain('"duration": 5')
     expect(example).not.toContain('"duration": 4')
     expect(wrapper.text()).not.toContain('价格与限制')
+    wrapper.unmount()
+  })
+
+  it('does not offer calls or generation tests when catalog metadata says there is no adapter', async () => {
+    const unsupported = aggregateUserModels([{ name: 'custom-picture', platform: 'openai', group_id: 1, group_name: '普通用户', model_type: 'image', supported_endpoints: [] }])[0]
+    const wrapper = mount(ModelDetails, { props: { item: unsupported, initialTab: 'test' }, global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+    await flushPromises()
+    expect(wrapper.text()).toContain('暂无调用适配')
+    expect(wrapper.find('pre').exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'ImageWorkbench' }).exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('clarifies text model protocol and image-input limitations without promising client compatibility', async () => {
+    const textItem = aggregateUserModels([{ name: 'video-understanding-vl', platform: 'openai', group_id: 1, group_name: '普通用户', model_type: 'chat', supported_endpoints: ['/v1/chat/completions'] }])[0]
+    const wrapper = mount(ModelDetails, { props: { item: textItem }, global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+    await flushPromises()
+    expect(wrapper.text()).toContain('文本推理 · Agent 主模型候选')
+    expect(wrapper.get('[data-testid="model-client-purpose"]').text()).toContain('协议和工具调用能力')
+    expect(wrapper.get('[data-testid="model-client-purpose"]').text()).toContain('支持图片输入表示能理解图片，不代表能生成图片')
+    expect(wrapper.get('pre').text()).toContain('/v1/chat/completions')
+    wrapper.unmount()
+  })
+
+  it('keeps unknown text models callable when an empty endpoint list means unverified', async () => {
+    const textItem = aggregateUserModels([{ name: 'MiniMax-M3', platform: 'openai', group_id: 1, group_name: '普通用户', model_type: 'unknown', supported_endpoints: [] }])[0]
+    const wrapper = mount(ModelDetails, { props: { item: textItem, initialTab: 'test' }, global: { stubs: { RouterLink: { template: '<a><slot /></a>' }, TextModelTester: { name: 'TextModelTester', template: '<div>Text test</div>' } } } })
+    await flushPromises()
+    expect(wrapper.get('pre').text()).toContain('/v1/chat/completions')
+    expect(wrapper.findComponent({ name: 'TextModelTester' }).exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('暂未适配')
     wrapper.unmount()
   })
 })

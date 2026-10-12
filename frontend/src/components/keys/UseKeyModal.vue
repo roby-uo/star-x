@@ -27,6 +27,10 @@
         <p class="text-sm text-gray-600 dark:text-gray-400">
           {{ platformDescription }}
         </p>
+        <p class="text-xs leading-6 text-gray-500 dark:text-gray-400" data-testid="agent-model-purpose">
+          {{ t('keys.useKeyModal.agentModelPurpose') }}
+          <router-link to="/models" class="ml-1 text-primary-600 hover:underline dark:text-primary-300">{{ t('keys.useKeyModal.modelCatalogLink') }}</router-link>
+        </p>
 
         <!-- Client Tabs -->
         <div v-if="clientTabs.length" class="overflow-x-auto border-b border-gray-200 dark:border-dark-700">
@@ -293,6 +297,7 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import type { AgentClientId, GroupPlatform } from '@/types'
+import { buildWorkBuddyInstaller } from '@/utils/workBuddyInstaller'
 
 interface Props {
   show: boolean
@@ -825,7 +830,7 @@ const quickInstallCommand = computed(() => {
     return buildJsonMergeInstaller('.config/opencode/opencode.json', files[0].content, 'OpenCode')
   }
   if (activeClientTab.value === 'workbuddy' && files[0]) {
-    return buildWorkBuddyInstaller(files[0].content)
+    return buildWorkBuddyInstaller({ apiKey: props.apiKey, baseUrl: props.baseUrl || window.location.origin, windows: activeTab.value === 'windows' })
   }
   if (activeClientTab.value === 'hermes' && files[0]) {
     return buildFileInstaller('.hermes/config.yaml', files[0].content, 'Hermes')
@@ -884,112 +889,6 @@ with open(path, 'w', encoding='utf-8') as handle:
     handle.write('\\n')
 STARX_PY
 printf '%s\\n' 'Star-X ${clientName} configuration completed. Please restart ${clientName}.'`
-}
-
-function buildWorkBuddyInstaller(content: string): string {
-  const parsed = JSON.parse(content) as { models: Array<{ id: string }> }
-  const model = JSON.stringify(parsed.models[0], null, 2)
-  const configuredRoot = (props.baseUrl || window.location.origin).replace(/\/+$/, '').replace(/\/v1\/?$/, '')
-  const configuredBaseUrl = `${configuredRoot}/v1`
-  const modelsEndpoint = `${configuredBaseUrl}/models`
-  const chatEndpoint = `${configuredBaseUrl}/chat/completions`
-  if (activeTab.value === 'windows') {
-    return `$path = Join-Path $env:USERPROFILE ".workbuddy\\models.json"
-New-Item -ItemType Directory -Force -Path (Split-Path $path) | Out-Null
-if (Test-Path $path) { Copy-Item $path "$path.starx-backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')" }
-$current = if (Test-Path $path) { Get-Content $path -Raw | ConvertFrom-Json } else { [PSCustomObject]@{ models = @() } }
-$headers = @{ Authorization = "Bearer ${props.apiKey}" }
-$remoteIds = @()
-try {
-  $response = Invoke-RestMethod -Uri "${modelsEndpoint}" -Headers $headers -Method Get -TimeoutSec 20
-  $remoteIds = @($response.data | ForEach-Object { $_.id } | Where-Object { $_ -is [string] -and $_.Trim() })
-} catch {
-  Write-Warning "Could not load Star-X model list; preserving existing models and adding the fallback model."
-}
-$fallback = @'
-${model}
-'@ | ConvertFrom-Json
-$ids = @($remoteIds)
-if ($ids.Count -eq 0) { $ids = @($fallback.id) }
-$models = @($current.models)
-foreach ($id in $ids) {
-  $existing = @($models | Where-Object { $_.id -eq $id }) | Select-Object -First 1
-  if ($null -eq $existing) {
-    $models += [PSCustomObject]@{
-      id = $id
-      name = "Star-X $id"
-      vendor = "star-X"
-      apiKey = "${props.apiKey}"
-      maxInputTokens = 400000
-      maxOutputTokens = 128000
-      url = "${chatEndpoint}"
-      supportsToolCall = $true
-      supportsImages = $false
-      supportsReasoning = $true
-    }
-  } elseif ($existing.vendor -eq "star-X") {
-    $existing.name = "Star-X $id"
-    $existing.apiKey = "${props.apiKey}"
-    $existing.url = "${chatEndpoint}"
-  }
-}
-$availableModels = @($current.availableModels) + @($ids) | Select-Object -Unique
-$current | Add-Member -NotePropertyName models -NotePropertyValue $models -Force
-$current | Add-Member -NotePropertyName availableModels -NotePropertyValue $availableModels -Force
-$json = $current | ConvertTo-Json -Depth 100
-[System.IO.File]::WriteAllText($path, $json, (New-Object System.Text.UTF8Encoding($false)))
-Write-Host "Star-X WorkBuddy configuration completed. Loaded $($ids.Count) model(s). Please restart WorkBuddy." -ForegroundColor Green`
-  }
-  return `set -e
-path="$HOME/.workbuddy/models.json"
-mkdir -p "$(dirname "$path")"
-[ ! -f "$path" ] || cp "$path" "$path.starx-backup-$(date +%Y%m%d-%H%M%S)"
-python3 - "$path" <<'STARX_PY'
-import json, sys, urllib.request
-path = sys.argv[1]
-api_key = ${JSON.stringify(props.apiKey)}
-models_url = ${JSON.stringify(modelsEndpoint)}
-chat_url = ${JSON.stringify(chatEndpoint)}
-try:
-    with open(path, 'r', encoding='utf-8-sig') as handle: current = json.load(handle)
-except FileNotFoundError: current = {}
-ids = []
-try:
-    request = urllib.request.Request(models_url, headers={'Authorization': f'Bearer {api_key}'})
-    with urllib.request.urlopen(request, timeout=20) as response:
-        payload = json.load(response)
-    ids = [item.get('id') for item in payload.get('data', []) if isinstance(item, dict) and item.get('id')]
-except Exception as error:
-    print(f'Warning: could not load Star-X model list ({error}); preserving existing models.', file=sys.stderr)
-if not ids:
-    fallback = json.loads(r'''${model}''')
-    ids = [fallback['id']]
-models = current.get('models') or []
-by_id = {item.get('id'): item for item in models if isinstance(item, dict) and item.get('id')}
-for model_id in ids:
-    model = by_id.get(model_id)
-    if model is None:
-        by_id[model_id] = {
-            'id': model_id,
-            'name': f'Star-X {model_id}',
-            'vendor': 'star-X',
-            'apiKey': api_key,
-            'maxInputTokens': 400000,
-            'maxOutputTokens': 128000,
-            'url': chat_url,
-            'supportsToolCall': True,
-            'supportsImages': False,
-            'supportsReasoning': True,
-        }
-    elif model.get('vendor') == 'star-X':
-        model.update({'name': f'Star-X {model_id}', 'apiKey': api_key, 'url': chat_url})
-current['models'] = list(by_id.values())
-available = current.get('availableModels') or []
-current['availableModels'] = list(dict.fromkeys(available + ids))
-with open(path, 'w', encoding='utf-8') as handle:
-    json.dump(current, handle, ensure_ascii=False, indent=2); handle.write('\\n')
-STARX_PY
-printf '%s\\n' 'Star-X WorkBuddy configuration completed. Model list refreshed. Please restart WorkBuddy.'`
 }
 
 function buildFileInstaller(relativePath: string, content: string, clientName: string): string {
@@ -1090,18 +989,13 @@ function generateWorkBuddyConfig(baseUrl: string, apiKey: string): FileConfig {
   const endpoint = `${baseUrl.replace(/\/+$/, '')}/chat/completions`
   const content = JSON.stringify({
     models: [{
-      id: 'star-x-gpt-5.5',
+      id: OPENAI_COMPATIBLE_AGENT_MODEL,
       name: 'star-X GPT-5.5',
       vendor: 'star-X',
       apiKey,
-      maxInputTokens: 400000,
-      maxOutputTokens: 128000,
-      url: endpoint,
-      supportsToolCall: true,
-      supportsImages: true,
-      supportsReasoning: true
+      url: endpoint
     }],
-    availableModels: ['star-x-gpt-5.5']
+    availableModels: [OPENAI_COMPATIBLE_AGENT_MODEL]
   }, null, 2)
 
   return {

@@ -70,6 +70,8 @@ export interface UserAvailableChannel {
 }
 
 export interface UserAvailableModel {
+  model_type?: 'chat' | 'image' | 'video' | 'unknown'
+  supported_endpoints?: string[]
   pricing?: UserSupportedModelPricing
   policy?: ModelServicePolicy
   rate_multiplier?: number

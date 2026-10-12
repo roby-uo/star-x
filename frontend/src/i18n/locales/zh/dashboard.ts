@@ -131,6 +131,8 @@ export default {
     useKey: '使用密钥',
     useKeyModal: {
       title: '使用 API 密钥',
+      agentModelPurpose: '此处配置 Agent 的文本推理主模型，兼容性取决于接口协议和工具调用支持。图片输入识别不等于生成图片；图像、视频生成模型需要独立 API 或工具接入，请勿填作主模型。',
+      modelCatalogLink: '查看模型接入方式',
       description: '将以下环境变量添加到您的终端配置文件或直接在终端中运行。',
       copy: '复制',
       copied: '已复制',
@@ -166,7 +168,7 @@ export default {
       },
       agentQuickSetup: {
         title: '方式二：一键配置 {client}',
-        description: '复制并运行下面的命令，即可自动创建配置目录、备份已有文件并添加 Star-X 配置；再次运行时会从 /models 刷新当前可用模型。',
+        description: '复制并运行命令，自动备份并添加 Star-X 配置。WorkBuddy 会刷新密钥可用的文本模型，并排除图像、视频生成模型；其他客户端使用下方配置示例。',
         stepThree: '完全退出并重新打开 {client}，然后新建一个任务。',
         agentPromptTitle: '方式一：让 {client} Agent 自动配置',
         agentPromptDescription: '复制这段提示词，粘贴给当前 Agent，让它在你的电脑上完成配置并测试连接。',
@@ -179,7 +181,7 @@ API Key：{apiKey}
 
 请按以下要求执行：
 1. 先识别 {client} 当前版本和正确的用户级配置文件位置；如果已有配置，先备份，不要删除其他账号、模型或插件设置。
-2. 使用适合 {client} 的原生配置格式，把 Star-X 接口写入配置；模型列表从兼容接口的 /models 获取，或保留当前中转站返回的可用模型名称，不要自行猜测模型 ID。
+2. 使用适合 {client} 的原生配置格式，把 Star-X 接口写入配置；从 /models?purpose=agent 获取主模型候选，检查 model_type 和 supported_endpoints，排除图像与视频生成模型。主模型必须使用匹配客户端协议的文本模型，不要猜测模型 ID 或工具、视觉、上下文能力。图像和视频需要独立 API 或工具接入。
 3. 配置完成后，用一个最小请求测试连通性和模型可用性；如果失败，请告诉我实际 HTTP 状态码和错误原因，但不要在输出中再次显示 API Key。
 4. 最后告诉我修改了哪个文件、使用了哪个模型，以及是否需要我重启 {client}。`,
         backupNotice: '脚本会先生成带时间戳的 .starx-backup 备份。命令内含你的 API 密钥，请勿转发或发布到代码仓库。Hermes 配置会在备份后替换，其他 JSON 配置会尽量保留原有内容并合并 Star-X 项。',
@@ -237,7 +239,7 @@ API Key：{apiKey}
       },
       workbuddy: {
         description: '向 WorkBuddy 添加一个 star-X 自定义模型。',
-        hint: '用户级配置，路径为 ~/.workbuddy/models.json。若文件已存在，请合并模型，不要覆盖其他模型。',
+        hint: '用户级配置，路径为 ~/.workbuddy/models.json。手动示例中的模型 ID 请替换为当前密钥可用的文本模型；按实际能力补充工具调用等选项。已有配置请合并，不要覆盖其他模型。',
         note: '保存后重启 WorkBuddy。自定义模型使用 OpenAI Chat Completions 接口。'
       },
       'trae-ide': {

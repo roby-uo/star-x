@@ -234,12 +234,6 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	if !ok {
 		return
 	}
-	// body-signal compact：上游 unary 等待期间向下游发 SSE 注释行心跳，防止
-	// 反向代理空闲超时掐断长压缩连接（#3887）。首拍延迟一个心跳间隔，快速
-	// 失败仍走 JSON+状态码链路；未标记客户端流式或间隔为 0 时是 no-op。
-	stopCompactKeepalive := service.StartOpenAICompactSSEKeepalive(c, h.openAICompactKeepaliveInterval())
-	defer stopCompactKeepalive()
-
 	// 校验请求体 JSON 合法性
 	if !gjson.ValidBytes(body) {
 		logRequestBodyParseFailure(reqLog, body, nil)
@@ -254,12 +248,19 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		return
 	}
 	reqModel := modelResult.String()
+	if rejectGenerationModelOnTextEndpoint(c, h.gatewayService, apiKey, reqModel, false) {
+		return
+	}
 
 	reqStream, ok := parseOpenAICompatibleStream(body)
 	if !ok {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", invalidStreamFieldTypeMessage)
 		return
 	}
+	// Start compact heartbeats after model/stream validation so known endpoint
+	// mismatches retain HTTP 400 before any response bytes are committed.
+	stopCompactKeepalive := service.StartOpenAICompactSSEKeepalive(c, h.openAICompactKeepaliveInterval())
+	defer stopCompactKeepalive()
 	reqLog = reqLog.With(zap.String("model", reqModel), zap.Bool("stream", reqStream))
 	previousResponseID := strings.TrimSpace(gjson.GetBytes(body, "previous_response_id").String())
 	if previousResponseID != "" {
@@ -450,6 +451,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		account := selection.Account
 		sessionHash = ensureOpenAIPoolModeSessionHash(sessionHash, account)
 		reqLog.Debug("openai.account_selected", zap.Int64("account_id", account.ID), zap.String("account_name", account.Name))
+		if rejectSelectedAccountGenerationModel(c, apiKey, selection, reqModel, channelMapping.MappedModel, "", false) {
+			return
+		}
 		setOpsSelectedAccount(c, account.ID, account.Platform)
 
 		accountReleaseFunc, acquired := h.acquireResponsesAccountSlot(c, apiKey.GroupID, sessionHash, selection, reqStream, &streamStarted, reqLog)
@@ -858,6 +862,9 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 	}
 	reqModel := modelResult.String()
 	routingModel := service.NormalizeOpenAICompatRequestedModel(reqModel)
+	if rejectGenerationModelOnTextEndpoint(c, h.gatewayService, apiKey, reqModel, true) {
+		return
+	}
 	preferredMappedModel := resolveOpenAIMessagesDispatchMappedModel(apiKey, reqModel)
 	reqStream := gjson.GetBytes(body, "stream").Bool()
 
@@ -980,6 +987,9 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		account := selection.Account
 		sessionHash = ensureOpenAIPoolModeSessionHash(sessionHash, account)
 		reqLog.Debug("openai_messages.account_selected", zap.Int64("account_id", account.ID), zap.String("account_name", account.Name))
+		if rejectSelectedAccountGenerationModel(c, apiKey, selection, reqModel, channelMappingMsg.MappedModel, effectiveMappedModel, true) {
+			return
+		}
 		_ = scheduleDecision
 		setOpsSelectedAccount(c, account.ID, account.Platform)
 
@@ -1473,6 +1483,16 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "model is required in first response.create payload")
 		return
 	}
+	capability, capabilityErr := modelCapabilityForKey(ctx, h.gatewayService, apiKey, reqModel)
+	if capabilityErr != nil {
+		closeOpenAIClientWS(wsConn, coderws.StatusTryAgainLater, "model_capability_unavailable")
+		return
+	}
+	if capability.IsGenerationModel() {
+		writeModelEndpointMismatchWSError(ctx, wsConn, reqModel, capability)
+		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "model_endpoint_mismatch")
+		return
+	}
 	previousResponseID := strings.TrimSpace(gjson.GetBytes(firstMessage, "previous_response_id").String())
 	previousResponseIDKind := service.ClassifyOpenAIPreviousResponseIDKind(previousResponseID)
 	if previousResponseID != "" && previousResponseIDKind == service.OpenAIPreviousResponseIDKindMessageID {
@@ -1674,6 +1694,16 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 
 		account := selection.Account
 		accountMaxConcurrency := account.Concurrency
+		accountCapability := selectedAccountModelCapability(apiKey, account, channelMappingWS.MappedModel, "")
+		if accountCapability.IsGenerationModel() {
+			if selection.ReleaseFunc != nil {
+				selection.ReleaseFunc()
+				selection.ReleaseFunc = nil
+			}
+			writeModelEndpointMismatchWSError(ctx, wsConn, reqModel, accountCapability)
+			closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "model_endpoint_mismatch")
+			return
+		}
 		if selection.WaitPlan != nil && selection.WaitPlan.MaxConcurrency > 0 {
 			accountMaxConcurrency = selection.WaitPlan.MaxConcurrency
 		}
@@ -1744,6 +1774,20 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				}
 				if model == "" {
 					model = reqModel
+				}
+				capability, capabilityErr := modelCapabilityForKey(ctx, h.gatewayService, apiKey, model)
+				if capabilityErr != nil {
+					return service.NewOpenAIWSClientCloseError(coderws.StatusTryAgainLater, "model_capability_unavailable", capabilityErr)
+				}
+				if capability.IsGenerationModel() {
+					writeModelEndpointMismatchWSError(ctx, wsConn, model, capability)
+					return service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "model_endpoint_mismatch", nil)
+				}
+				mapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(ctx, apiKey.GroupID, model)
+				accountCapability := selectedAccountModelCapability(apiKey, account, mapping.MappedModel, "")
+				if accountCapability.IsGenerationModel() {
+					writeModelEndpointMismatchWSError(ctx, wsConn, model, accountCapability)
+					return service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "model_endpoint_mismatch", nil)
 				}
 				if decision := h.checkSecurityAuditStage(c, reqLog, apiKey, subject, service.ContentModerationProtocolOpenAIResponses, model, payload, "subsequent_turn"); decision != nil && !decision.AllowNextStage {
 					writeSecurityAuditWSError(ctx, wsConn, decision)

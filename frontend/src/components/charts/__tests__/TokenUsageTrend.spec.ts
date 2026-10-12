@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { Line } from 'vue-chartjs'
 
 import TokenUsageTrend from '../TokenUsageTrend.vue'
 
@@ -26,6 +27,52 @@ vi.mock('vue-chartjs', () => ({
 }))
 
 describe('TokenUsageTrend', () => {
+  const usagePoint = {
+    date: '2026-10-12', requests: 1, input_tokens: 10, output_tokens: 20,
+    cache_creation_tokens: 0, cache_read_tokens: 0,
+  }
+
+  it('keeps user tooltip labels usable when the API omits financial fields', () => {
+    const wrapper = mount(TokenUsageTrend, {
+      props: { trendData: [usagePoint] as any, showCosts: false },
+    })
+    const callbacks = wrapper.findComponent(Line).props('options').plugins.tooltip.callbacks
+
+    expect(callbacks.label({ dataset: { label: 'Input' }, raw: 10 })).toBe('Input: 10')
+    expect(() => callbacks.footer([{ dataIndex: 0 }])).not.toThrow()
+    expect(callbacks.footer([{ dataIndex: 0 }])).toBe('')
+    wrapper.unmount()
+  })
+
+  it('omits financial tooltip details in user mode even if legacy responses contain costs', () => {
+    const wrapper = mount(TokenUsageTrend, {
+      props: { trendData: [{ ...usagePoint, cost: 9.87, actual_cost: 8.76 }], showCosts: false },
+    })
+    const callbacks = wrapper.findComponent(Line).props('options').plugins.tooltip.callbacks
+
+    expect(callbacks.footer([{ dataIndex: 0 }])).toBe('')
+    wrapper.unmount()
+  })
+
+  it('continues showing financial tooltip details in administrator mode by default', () => {
+    const wrapper = mount(TokenUsageTrend, {
+      props: { trendData: [{ ...usagePoint, cost: 9.87, actual_cost: 8.76 }] },
+    })
+    const callbacks = wrapper.findComponent(Line).props('options').plugins.tooltip.callbacks
+
+    expect(callbacks.footer([{ dataIndex: 0 }])).toBe('Actual: $8.76 | Standard: $9.87')
+    wrapper.unmount()
+  })
+
+  it('does not invent a zero cost or crash when financial fields are absent in administrator mode', () => {
+    const wrapper = mount(TokenUsageTrend, { props: { trendData: [usagePoint] as any } })
+    const callbacks = wrapper.findComponent(Line).props('options').plugins.tooltip.callbacks
+
+    expect(() => callbacks.footer([{ dataIndex: 0 }])).not.toThrow()
+    expect(callbacks.footer([{ dataIndex: 0 }])).toBe('')
+    wrapper.unmount()
+  })
+
   it('calculates cache hit rate against all prompt tokens', () => {
     const wrapper = mount(TokenUsageTrend, {
       props: {

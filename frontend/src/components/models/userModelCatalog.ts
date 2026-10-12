@@ -13,8 +13,9 @@ export interface UserCatalogItem {
 export function aggregateUserModels(models: UserAvailableModel[]): UserCatalogItem[] {
   const items = new Map<string, UserCatalogItem>()
   for (const model of models) {
-    if (isAudioModel(model.name)) continue
-    const type = catalogModelType(model.name, model.policy?.kind || model.pricing?.billing_mode)
+    const declaredType = model.policy?.kind || (model.model_type !== 'unknown' ? model.model_type : undefined)
+    if (declaredType !== 'chat' && isAudioModel(model.name)) continue
+    const type = catalogModelType(model.name, declaredType || model.pricing?.billing_mode)
     const key = JSON.stringify([model.platform, model.name, type])
     const item = items.get(key) || { key, name: model.name, platform: model.platform, type, groups: [] }
     if (!item.groups.some(group => group.group_id === model.group_id)) item.groups.push(model)
@@ -24,6 +25,7 @@ export function aggregateUserModels(models: UserAvailableModel[]): UserCatalogIt
 }
 
 export const catalogTypeLabels: Record<CatalogModelType, string> = { Chat: '文本', Images: '图像', Videos: '视频' }
+export const modelAccessLabels: Record<CatalogModelType, string> = { Chat: '文本推理 · Agent 主模型候选', Images: '图片生成 · API / 工具接入', Videos: '视频生成 · API / 工具接入' }
 
 export function modelSupplier(name: string, platform: string): string {
   return catalogModelProvider(name, platform)

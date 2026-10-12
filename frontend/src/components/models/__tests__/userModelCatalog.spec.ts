@@ -18,6 +18,14 @@ describe('user model catalog', () => {
     expect(aggregateUserModels([{ ...model(1), policy: { platform: 'openai', model: 'shared-model', kind: 'image', state: 'published' } }, model(1, 'openai', 'tts-1')]).map(item => item.type)).toEqual(['Images'])
   })
 
+  it('uses declared types for aliases and keeps explicit text understanding models', () => {
+    expect(aggregateUserModels([{ ...model(1, 'openai', 'custom-picture'), model_type: 'image' }])[0].type).toBe('Images')
+    expect(aggregateUserModels([{ ...model(1, 'openai', 'custom-movie'), model_type: 'video' }])[0].type).toBe('Videos')
+    expect(aggregateUserModels([{ ...model(1, 'openai', 'MiniMax-H3'), model_type: 'unknown' }])[0].type).toBe('Videos')
+    expect(aggregateUserModels([{ ...model(1, 'openai', 'audio-understanding'), model_type: 'chat' }])[0].type).toBe('Chat')
+    expect(aggregateUserModels([{ ...model(1, 'openai', 'sora-reader'), model_type: 'video', policy: { model: 'sora-reader', platform: 'openai', kind: 'chat', state: 'published' } }])[0].type).toBe('Chat')
+  })
+
   it('uses the selected platform native request and extracts its response', () => {
     expect(buildTextRequest(model(1, 'anthropic'), '你好')).toMatchObject({ path: '/v1/messages', body: { max_tokens: 256 } })
     expect(buildTextRequest(model(1, 'gemini', 'gemini-3'), '你好')).toMatchObject({ path: '/v1beta/models/gemini-3:generateContent' })

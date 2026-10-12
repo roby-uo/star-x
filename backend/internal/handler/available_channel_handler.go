@@ -51,11 +51,13 @@ func NewAvailableChannelHandler(
 // userAvailableModel is scoped to an accessible group. The catalog is independent
 // of the optional public-channel feature and never exposes upstream accounts.
 type userAvailableModel struct {
-	Name      string                  `json:"name"`
-	Platform  string                  `json:"platform"`
-	GroupID   int64                   `json:"group_id"`
-	GroupName string                  `json:"group_name"`
-	Policy    *userModelServicePolicy `json:"policy,omitempty"`
+	Name               string                  `json:"name"`
+	Platform           string                  `json:"platform"`
+	GroupID            int64                   `json:"group_id"`
+	GroupName          string                  `json:"group_name"`
+	Policy             *userModelServicePolicy `json:"policy,omitempty"`
+	ModelType          string                  `json:"model_type"`
+	SupportedEndpoints []string                `json:"supported_endpoints"`
 }
 
 // ListModels returns the gateway's available models for schedulable accounts in
@@ -85,6 +87,13 @@ func (h *AvailableChannelHandler) ListModels(c *gin.Context) {
 			continue
 		}
 		model.Policy = userPolicyFromModelPolicy(policy)
+		capability, capabilityErr := h.gatewayService.ResolveModelEndpointCapability(c.Request.Context(), &model.GroupID, model.Platform, model.Name)
+		if capabilityErr != nil {
+			response.ErrorFrom(c, capabilityErr)
+			return
+		}
+		model.ModelType = capability.ModelType
+		model.SupportedEndpoints = capability.SupportedEndpoints
 		visible = append(visible, model)
 	}
 	response.Success(c, visible)

@@ -41,5 +41,6 @@ describe('user dashboard billing privacy', () => {
     expect(wrapper.text()).toContain('example-model')
     expect(wrapper.text()).not.toContain('$')
     expect(wrapper.text()).not.toContain('dashboard.actual')
+    expect(wrapper.findComponent({ name: 'TokenUsageTrend' }).props('showCosts')).toBe(false)
   })
 })

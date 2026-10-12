@@ -4,7 +4,7 @@
       <header class="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 class="text-xl font-semibold text-gray-900 dark:text-white">选择模型，开始接入</h1>
-          <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">查看可用模型、复制 API 示例，或用已有密钥在线测试。</p>
+          <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">为 Agent 选择文本模型；图像与视频使用独立 API 或工具接入。</p>
         </div>
         <router-link to="/keys" class="btn btn-secondary"><Icon name="key" size="sm" class="mr-2" />管理调用密钥</router-link>
       </header>
@@ -30,9 +30,10 @@
             <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-600 dark:bg-dark-700 dark:text-gray-300">{{ catalogTypeLabels[item.type] }}</span>
           </div>
           <h2 class="break-words text-base font-semibold text-gray-900 dark:text-white">{{ item.name }}</h2>
+          <p class="mt-2 text-xs font-medium text-primary-600 dark:text-primary-300">{{ modelAccessLabels[item.type] }}</p>
           <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ capabilityDescriptions[item.type] }}</p>
-          <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">{{ item.groups.map(group => group.group_name).join(' · ') }}</p>
-          <div class="mt-5 flex flex-wrap gap-2 border-t border-gray-100 pt-4 dark:border-dark-700">
+          <p class="mb-5 mt-4 text-xs text-gray-500 dark:text-gray-400">{{ item.groups.map(group => group.group_name).join(' · ') }}</p>
+          <div class="mt-auto flex flex-wrap gap-2 border-t border-gray-100 pt-4 dark:border-dark-700">
             <button class="btn btn-primary flex-1 text-sm" @click="open(item, 'api')">API 接入</button>
             <button class="btn btn-secondary flex-1 text-sm" @click="open(item, 'test')">在线测试</button>
           </div>
@@ -56,7 +57,7 @@ import userChannelsAPI, { type UserAvailableModel } from '@/api/channels'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import type { CatalogModelType } from '@/utils/modelCatalog'
-import { aggregateUserModels, catalogTypeLabels, modelSupplier, type UserCatalogItem } from '@/components/models/userModelCatalog'
+import { aggregateUserModels, catalogTypeLabels, modelAccessLabels, modelSupplier, type UserCatalogItem } from '@/components/models/userModelCatalog'
 const models = ref<UserAvailableModel[]>([])
 const loading = ref(false)
 const query = ref('')
@@ -65,7 +66,7 @@ const selected = ref<UserCatalogItem | null>(null)
 const initialTab = ref<'api' | 'test'>('api')
 const appStore = useAppStore()
 const categories: { value: CatalogModelType | ''; label: string }[] = [{ value: '', label: '全部' }, { value: 'Chat', label: '文本' }, { value: 'Images', label: '图像' }, { value: 'Videos', label: '视频' }]
-const capabilityDescriptions = { Chat: '文本生成与对话 · 同步调用', Images: '图像生成 · 通过 API 调用', Videos: '视频生成 · 异步 API 调用' }
+const capabilityDescriptions = { Chat: '文本生成与对话 · 客户端需匹配接口协议和工具调用能力', Images: '生成图片 · 请勿填写为 Agent 主模型', Videos: '生成视频 · 异步任务接口，请勿填写为 Agent 主模型' }
 const items = computed(() => aggregateUserModels(models.value))
 const filteredItems = computed(() => {
   const search = query.value.trim().toLowerCase()

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { config, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 
 const { copyToClipboardMock } = vi.hoisted(() => ({
@@ -19,6 +19,8 @@ vi.mock('@/composables/useClipboard', () => ({
 }))
 
 import UseKeyModal from '../UseKeyModal.vue'
+
+config.global.stubs.RouterLink = { template: '<a><slot /></a>' }
 
 function findJsonConfig(wrapper: ReturnType<typeof mount>) {
   const content = wrapper
@@ -376,19 +378,21 @@ describe('UseKeyModal', () => {
     const workBuddyBlocks = await selectClient('keys.useKeyModal.cliTabs.workbuddy')
     const workBuddy = JSON.parse(workBuddyBlocks.find((content) => content.trim().startsWith('{')) ?? '{}')
     expect(workBuddy.models[0]).toMatchObject({
-      id: 'star-x-gpt-5.5',
+      id: 'gpt-5.5',
       apiKey: 'sk-agent-test',
-      url: 'https://example.com/v1/chat/completions',
-      supportsToolCall: true
+      url: 'https://example.com/v1/chat/completions'
     })
-    expect(workBuddy.availableModels).toContain('star-x-gpt-5.5')
+    expect(workBuddy.availableModels).toContain('gpt-5.5')
+    expect(workBuddy.models[0]).not.toHaveProperty('supportsToolCall')
+    expect(workBuddy.models[0]).not.toHaveProperty('maxInputTokens')
     expect(wrapper.text()).toContain('~/.workbuddy/models.json')
 
     const workBuddyInstaller = wrapper.find('[data-testid="copy-agent-installer"]')
     await workBuddyInstaller.trigger('click')
     const installerCommand = copyToClipboardMock.mock.calls.at(-1)?.[0] as string
-    expect(installerCommand).toContain('/models')
-    expect(installerCommand).toContain('Model list refreshed')
+    expect(installerCommand).toContain('/models?purpose=agent')
+    expect(installerCommand).toContain('Text model list refreshed')
+    expect(wrapper.get('[data-testid="agent-model-purpose"]').text()).toContain('keys.useKeyModal.agentModelPurpose')
 
     expect(wrapper.text()).toContain('keys.useKeyModal.agentQuickSetup.stepThree')
     expect(wrapper.find('[data-testid="copy-agent-prompt"]').exists()).toBe(true)

@@ -1190,6 +1190,9 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 	}
 
 	if err != nil || len(accounts) == 0 {
+		if s.channelService != nil {
+			s.channelService.clearAccountAliasCapabilityScope(groupID, platform)
+		}
 		return nil
 	}
 
@@ -1202,6 +1205,9 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 			}
 		}
 		accounts = filtered
+	}
+	if s.channelService != nil {
+		s.channelService.cacheAccountAliasCapabilities(groupID, platform, accounts, s.modelsListCacheTTL)
 	}
 
 	// Collect unique models from all accounts
@@ -1257,7 +1263,13 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 }
 
 func (s *GatewayService) InvalidateAvailableModelsCache(groupID *int64, platform string) {
-	if s == nil || s.modelsListCache == nil {
+	if s == nil {
+		return
+	}
+	if s.channelService != nil {
+		s.channelService.invalidateAccountAliasCapabilities(groupID, platform)
+	}
+	if s.modelsListCache == nil {
 		return
 	}
 

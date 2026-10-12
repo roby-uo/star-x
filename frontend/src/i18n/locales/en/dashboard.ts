@@ -131,6 +131,8 @@ export default {
     useKey: 'Use Key',
     useKeyModal: {
       title: 'Use API Key',
+      agentModelPurpose: 'Configure a text reasoning model as the agent primary model. Compatibility depends on the protocol and tool calling support. Understanding image input does not mean generating images; image and video generation require separate APIs or tools, not the primary model setting.',
+      modelCatalogLink: 'View model connection options',
       description:
         'Add the following environment variables to your terminal profile or run directly in terminal to configure API access.',
       copy: 'Copy',
@@ -165,7 +167,7 @@ export default {
       },
       agentQuickSetup: {
         title: 'Method 2: Configure {client} in one step',
-        description: 'Copy and run the command below to create the config directory, back up existing files, and add the Star-X configuration. Running it again refreshes the available models from /models.',
+        description: 'Run the command to back up and add the Star-X configuration. WorkBuddy refreshes the text models available to this key and excludes image and video generation models. Other clients use the examples below.',
         stepThree: 'Completely quit and reopen {client}, then create a new task.',
         agentPromptTitle: 'Method 1: Let the {client} agent configure it',
         agentPromptDescription: 'Copy this prompt and paste it into the current agent so it can configure and test the connection on your computer.',
@@ -178,7 +180,7 @@ API key: {apiKey}
 
 Please follow these requirements:
 1. Identify the correct user-level configuration file for this {client} version. Back up existing files first and preserve other accounts, models, and plugin settings.
-2. Use {client}'s native configuration format. Load the available model IDs from the compatible /models endpoint or preserve the model names returned by the gateway; do not guess model IDs.
+2. Use {client}'s native configuration format. Load primary model candidates from /models?purpose=agent, check model_type and supported_endpoints, and exclude image and video generation models. Choose a text model matching the client protocol. Do not guess model IDs, tool calling, vision, or context limits. Image and video generation need separate APIs or tools.
 3. Run a minimal request to verify connectivity and model availability. If it fails, report the HTTP status and cause without printing the API key again.
 4. Tell me which file you changed, which model you tested, and whether {client} needs to be restarted.`,
         backupNotice: 'The script first creates a timestamped .starx-backup copy. It contains your API key; never share it or commit it. Hermes is replaced after backup; JSON clients preserve existing content and merge the Star-X entry where possible.',
@@ -233,7 +235,7 @@ Please follow these requirements:
       },
       workbuddy: {
         description: 'Add a star-X custom model to WorkBuddy.',
-        hint: 'User-level configuration at ~/.workbuddy/models.json. Merge this entry instead of replacing other models.',
+        hint: 'User-level configuration at ~/.workbuddy/models.json. Replace the sample model ID with a text model available to this key and add capability options only after verification. Merge existing entries instead of replacing other models.',
         note: 'Restart WorkBuddy after saving. Custom models use the OpenAI Chat Completions endpoint.',
       },
       'trae-ide': {

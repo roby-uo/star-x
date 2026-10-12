@@ -95,7 +95,7 @@ vi.mock('vue-i18n', async () => {
 
 const simpleStub = { template: '<div><slot /></div>' }
 const chartStub = { template: '<div />' }
-const analysisChartStub = { template: '<div data-test="usage-analysis-chart" />' }
+const analysisChartStub = { props: ['showCosts'], template: '<div data-test="usage-analysis-chart" :data-show-costs="showCosts" />' }
 
 const usageLog = {
   id: 1,
@@ -228,6 +228,9 @@ describe('user UsageView', () => {
     await analysis.trigger('toggle')
     expect((analysis.element as HTMLDetailsElement).open).toBe(true)
     expect(wrapper.findAll('[data-test="usage-analysis-chart"]')).toHaveLength(4)
+    for (const chart of wrapper.findAll('[data-test="usage-analysis-chart"]')) {
+      expect(chart.attributes('data-show-costs')).toBe('false')
+    }
     await analysis.get('summary').trigger('click')
     await analysis.trigger('toggle')
     expect(wrapper.findAll('[data-test="usage-analysis-chart"]')).toHaveLength(0)
