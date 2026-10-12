@@ -91,9 +91,9 @@ const contextId = computed(() => `${groupId.value}:${keyId.value}`)
 const endpoint = computed(() => {
   const guessed = catalogModelEndpoint(props.item.type, model.value.platform, model.value.name)
   // Empty unknown metadata means unverified, preserving legacy text compatibility.
-  const declaredType = model.value.policy?.kind || model.value.model_type
   const supported = model.value.supported_endpoints
-  if (supported !== undefined && ((declaredType && declaredType !== 'unknown') || supported.length) && !supported.includes(guessed)) return '暂未适配'
+  const confirmedType = model.value.model_type && model.value.model_type !== 'unknown'
+  if (supported !== undefined && (props.item.type !== 'Chat' || confirmedType || supported.length) && !supported.includes(guessed)) return '暂未适配'
   return guessed
 })
 const requestProtocolLabel = computed(() => endpoint.value === '暂未适配' ? '暂无调用适配' : props.item.type === 'Chat'

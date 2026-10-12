@@ -23,7 +23,8 @@ describe('user model catalog', () => {
     expect(aggregateUserModels([{ ...model(1, 'openai', 'custom-movie'), model_type: 'video' }])[0].type).toBe('Videos')
     expect(aggregateUserModels([{ ...model(1, 'openai', 'MiniMax-H3'), model_type: 'unknown' }])[0].type).toBe('Videos')
     expect(aggregateUserModels([{ ...model(1, 'openai', 'audio-understanding'), model_type: 'chat' }])[0].type).toBe('Chat')
-    expect(aggregateUserModels([{ ...model(1, 'openai', 'sora-reader'), model_type: 'video', policy: { model: 'sora-reader', platform: 'openai', kind: 'chat', state: 'published' } }])[0].type).toBe('Chat')
+    expect(aggregateUserModels([{ ...model(1, 'openai', 'sora-reader'), model_type: 'video', policy: { model: 'sora-reader', platform: 'openai', kind: 'chat', state: 'published' } }])[0].type).toBe('Videos')
+    expect(aggregateUserModels([{ ...model(1, 'openai', 'sora-reader'), model_type: 'unknown', policy: { model: 'sora-reader', platform: 'openai', kind: 'chat', state: 'published' } }])[0].type).toBe('Chat')
   })
 
   it('uses the selected platform native request and extracts its response', () => {

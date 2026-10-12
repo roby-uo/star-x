@@ -13,8 +13,10 @@ export function isAudioModel(model: string): boolean {
 
 export function catalogModelType(model: string, billingMode?: string | null): CatalogModelType {
   if (billingMode === 'chat' || billingMode === 'text') return 'Chat'
-  if (billingMode === 'image' || catalogImageModelPattern.test(model)) return 'Images'
-  if (billingMode === 'video' || catalogVideoModelPattern.test(model)) return 'Videos'
+  if (billingMode === 'image') return 'Images'
+  if (billingMode === 'video') return 'Videos'
+  if (catalogImageModelPattern.test(model)) return 'Images'
+  if (catalogVideoModelPattern.test(model)) return 'Videos'
   return 'Chat'
 }
 

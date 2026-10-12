@@ -28,6 +28,8 @@ describe('model catalog classification', () => {
     expect(catalogModelType('gpt-image-1', 'chat')).toBe('Chat')
     expect(catalogModelType('custom-picture', 'image')).toBe('Images')
     expect(catalogModelType('custom-movie', 'video')).toBe('Videos')
+    expect(catalogModelType('gpt-image-route', 'video')).toBe('Videos')
+    expect(catalogModelType('sora-image-route', 'image')).toBe('Images')
     for (const name of ['sora-2', 'kling-v2', 'veo-3', 'doubao-seedance-2-0']) expect(catalogModelType(name)).toBe('Videos')
   })
 

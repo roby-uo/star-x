@@ -13,7 +13,7 @@ export interface UserCatalogItem {
 export function aggregateUserModels(models: UserAvailableModel[]): UserCatalogItem[] {
   const items = new Map<string, UserCatalogItem>()
   for (const model of models) {
-    const declaredType = model.policy?.kind || (model.model_type !== 'unknown' ? model.model_type : undefined)
+    const declaredType = (model.model_type !== 'unknown' ? model.model_type : undefined) || model.policy?.kind
     if (declaredType !== 'chat' && isAudioModel(model.name)) continue
     const type = catalogModelType(model.name, declaredType || model.pricing?.billing_mode)
     const key = JSON.stringify([model.platform, model.name, type])
