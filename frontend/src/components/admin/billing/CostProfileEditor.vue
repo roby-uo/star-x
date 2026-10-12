@@ -50,7 +50,7 @@
                   <label class="block text-sm">模型名称<textarea :value="row.models.join('\n')" class="input mt-1" rows="2" required placeholder="每行一个模型；可使用末尾 * 匹配同系列" @input="setModels(row, $event)" /></label>
                   <div class="grid gap-3 sm:grid-cols-2">
                     <label class="text-sm">模型类型<select v-model="row.modality" class="input mt-1" aria-label="模型类型" @change="changeModality(row)"><option value="chat">文本</option><option value="image">图像</option><option value="video">视频</option></select></label>
-                    <label class="text-sm">计费单位<select v-model="row.billing_unit" class="input mt-1" aria-label="计费单位"><option v-if="row.modality === 'chat' || row.modality === 'image'" value="per_million_tokens">每百万 tokens</option><option v-if="row.modality === 'image'" value="per_image">每张</option><option v-if="row.modality === 'video'" value="per_second">每秒</option><option value="per_request">每次请求</option></select></label>
+                    <label class="text-sm">计费单位<select v-model="row.billing_unit" class="input mt-1" aria-label="计费单位" @change="changeUnit(row)"><option v-if="row.modality === 'chat' || row.modality === 'image'" value="per_million_tokens">每百万 tokens</option><option v-if="row.modality === 'image'" value="per_image">每张</option><option v-if="row.modality === 'video'" value="per_second">每秒</option><option value="per_request">每次请求</option></select></label>
                     <label v-if="row.modality === 'chat'" class="text-sm">服务档位<select v-model="row.service_tier" class="input mt-1" aria-label="服务档位"><option value="">标准</option><option value="priority">优先处理 priority</option><option value="flex">弹性处理 flex</option></select></label>
                     <label v-if="row.modality === 'chat' && row.billing_unit === 'per_request'" class="text-sm">调用用途<select v-model="row.operation" class="input mt-1" aria-label="调用用途"><option :value="undefined">普通模型请求</option><option value="alpha_search">Codex 独立搜索</option></select><span class="mt-1 block text-xs text-gray-500">独立搜索按调用次数计费，与普通文本请求分开。</span></label>
                     <label v-if="row.modality !== 'chat'" class="text-sm">分辨率<input v-model="row.resolution" class="input mt-1" placeholder="如 480P、768P、2K；留空适用全部" /></label>
@@ -119,6 +119,9 @@ function addMiniMaxTemplate() {
 }
 function setModels(row: ProcurementPrice, event: Event) {
   row.models = [...new Set((event.target as HTMLTextAreaElement).value.split(/[\n,，]/).map(model => model.trim()).filter(Boolean))]
+}
+function changeUnit(row: ProcurementPrice) {
+  if (row.billing_unit !== 'per_request') row.operation = undefined
 }
 function changeModality(row: ProcurementPrice) {
   row.billing_unit = row.modality === 'chat' ? 'per_million_tokens' : row.modality === 'image' ? 'per_image' : 'per_second'
