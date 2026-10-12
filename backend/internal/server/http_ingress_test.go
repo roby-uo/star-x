@@ -17,6 +17,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/net/http2"
 )
 
 func ingressTestConfig() *config.Config {
@@ -53,6 +54,65 @@ func TestProvideHTTPServerEnablesBoundedH2C(t *testing.T) {
 	require.NotNil(t, srv.Protocols)
 	require.True(t, srv.Protocols.UnencryptedHTTP2())
 	require.True(t, srv.Protocols.HTTP1())
+}
+
+func TestHTTPServerH2CWireSettingsAndIndependentIdleTimeout(t *testing.T) {
+	router := gin.New()
+	router.GET("/", func(c *gin.Context) { c.String(http.StatusOK, "ok") })
+	cfg := ingressTestConfig()
+	cfg.Server.IdleTimeout = 5
+	cfg.Server.H2C = config.H2CConfig{Enabled: true, MaxConcurrentStreams: 25, IdleTimeout: 1, MaxReadFrameSize: 64 * 1024, MaxUploadBufferPerConnection: 1024 * 1024, MaxUploadBufferPerStream: 256 * 1024}
+	addr, stop := serveIngressTestServer(t, ProvideHTTPServer(cfg, router))
+	defer stop()
+	h1, err := net.DialTimeout("tcp", addr, time.Second)
+	require.NoError(t, err)
+	defer func() { _ = h1.Close() }()
+	reader := bufio.NewReader(h1)
+	http1Request := func() {
+		require.NoError(t, h1.SetDeadline(time.Now().Add(3*time.Second)))
+		_, err := io.WriteString(h1, "GET / HTTP/1.1\r\nHost: local\r\n\r\n")
+		require.NoError(t, err)
+		response, err := http.ReadResponse(reader, nil)
+		require.NoError(t, err)
+		_, err = io.ReadAll(response.Body)
+		require.NoError(t, err)
+		require.NoError(t, response.Body.Close())
+		require.Equal(t, http.StatusOK, response.StatusCode)
+	}
+	http1Request()
+	h2, err := net.DialTimeout("tcp", addr, time.Second)
+	require.NoError(t, err)
+	defer func() { _ = h2.Close() }()
+	require.NoError(t, h2.SetDeadline(time.Now().Add(2500*time.Millisecond)))
+	_, err = io.WriteString(h2, http2.ClientPreface)
+	require.NoError(t, err)
+	frames := http2.NewFramer(h2, h2)
+	require.NoError(t, frames.WriteSettings())
+	sawSettings, sawGoAway := false, false
+	for !sawGoAway {
+		frame, err := frames.ReadFrame()
+		require.NoError(t, err, "H2C must send GOAWAY at its own one-second idle limit")
+		switch frame := frame.(type) {
+		case *http2.SettingsFrame:
+			if frame.IsAck() {
+				continue
+			}
+			values := map[http2.SettingID]uint32{}
+			require.NoError(t, frame.ForeachSetting(func(setting http2.Setting) error { values[setting.ID] = setting.Val; return nil }))
+			require.Equal(t, uint32(25), values[http2.SettingMaxConcurrentStreams])
+			require.Equal(t, uint32(64*1024), values[http2.SettingMaxFrameSize])
+			require.Equal(t, uint32(256*1024), values[http2.SettingInitialWindowSize])
+			sawSettings = true
+			require.NoError(t, frames.WriteSettingsAck())
+		case *http2.GoAwayFrame:
+			require.Equal(t, http2.ErrCodeNo, frame.ErrCode)
+			sawGoAway = true
+		}
+	}
+	require.True(t, sawSettings)
+	// Reuse the original H1 connection after H2 has timed out. A shared
+	// Server.IdleTimeout override would incorrectly close this connection too.
+	http1Request()
 }
 
 func TestConfigureTrustedProxies(t *testing.T) {

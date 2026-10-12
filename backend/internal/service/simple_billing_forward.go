@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
 )
@@ -113,14 +112,6 @@ func simpleBillingForwardInput(c *gin.Context, account *Account, model, modality
 		}
 	}
 	return in
-}
-
-func simpleBillingRequestTier(c *gin.Context, body []byte) string {
-	tier := strings.TrimSpace(gjson.GetBytes(body, "service_tier").String())
-	if tier == "" && c != nil && containsBetaToken(c.GetHeader("anthropic-beta"), claude.BetaFastMode) {
-		return "priority"
-	}
-	return tier
 }
 
 // Pricing failures are emitted before model generation. Do not expose supplier

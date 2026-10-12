@@ -569,7 +569,8 @@ func (s *BillingService) strictReferencePricing(model string) (*ModelPricing, er
 }
 
 func (s *BillingService) strictMediaPrice(model, modality, resolution string) (float64, string, error) {
-	if modality == "video" {
+	switch modality {
+	case "video":
 		name := strings.ToLower(strings.TrimSpace(model))
 		grokExact := name == "grok-imagine-video" || name == "grok-imagine-video-1.5"
 		grokSize := slices.Contains([]string{"480P", "720P", "1080P"}, strings.ToUpper(resolution))
@@ -580,7 +581,7 @@ func (s *BillingService) strictMediaPrice(model, modality, resolution string) (f
 		if spec, ok := miniMaxSimpleGlobalVideoPrice(model, resolution); ok {
 			return spec, "per_second", nil
 		}
-	} else if modality == "image" {
+	case "image":
 		if price, ok := getDefaultGrokImagineImagePrice(model, resolution); ok && slices.Contains([]string{"1K", "2K", "4K"}, strings.ToUpper(resolution)) {
 			return price, "per_image", nil
 		}

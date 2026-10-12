@@ -134,6 +134,7 @@ func ProvideHTTPServer(cfg *config.Config, router *gin.Engine) *http.Server {
 	// 根据配置决定是否启用 H2C
 	if cfg.Server.H2C.Enabled {
 		h2cConfig := cfg.Server.H2C
+		//nolint:staticcheck // SA1019: Go 1.26 HTTP2Config has no independent H2 idle timeout; this patched adapter preserves separate HTTP1/H2C idle limits.
 		if err := http2.ConfigureServer(server, &http2.Server{
 			MaxConcurrentStreams:         h2cConfig.MaxConcurrentStreams,
 			IdleTimeout:                  time.Duration(h2cConfig.IdleTimeout) * time.Second,
