@@ -12,7 +12,7 @@ import (
 func TestBillingCostBookCASRejectsConcurrentInitialInsertAndUpdate(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	repo := NewBillingManagementRepository(db)
 	query := regexp.QuoteMeta(`INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO NOTHING`)
 	mock.ExpectExec(query).WithArgs(billingManagementSettingKey, `{"version":1}`).WillReturnResult(sqlmock.NewResult(0, 0))

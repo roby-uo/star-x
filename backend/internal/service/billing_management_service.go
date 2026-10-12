@@ -451,14 +451,15 @@ func estimatePurchaseCost(cfg *BillingManagementConfig, in BillingPreviewInput, 
 	}
 	amount = amount.Mul(decimal.NewFromFloat(selected.DiscountMultiplier))
 	out.Reason = "按原币采购单价和协议折扣估算，尚未供应商对账"
-	if selected.PurchaseMode == "credit_pack" {
+	switch selected.PurchaseMode {
+	case "credit_pack":
 		if selected.PeriodCost == nil || selected.CreditAmount == nil || *selected.CreditAmount <= 0 {
 			out.Reason = "额度包缺少实付或标称额度"
 			return out
 		}
 		amount = amount.Mul(decimal.NewFromFloat(*selected.PeriodCost)).Div(decimal.NewFromFloat(*selected.CreditAmount))
 		out.Reason = "按额度包实付/原币标称额度分摊估算；额度未用完、过期或超额费用另计"
-	} else if selected.PurchaseMode == "hybrid" {
+	case "hybrid":
 		out.Reason = "仅为按量部分估算；本期固定实付单列，尚未分摊"
 	}
 	value := amount.Round(12).InexactFloat64()

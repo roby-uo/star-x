@@ -75,8 +75,12 @@ func (*userUsagePrivacyRepo) GetAPIKeyDashboardStats(context.Context, int64) (*u
 func TestPublicKeyUsageSummaryReturnsTokensWithoutFees(t *testing.T) {
 	h := &GatewayHandler{usageService: service.NewUsageService(&userUsagePrivacyRepo{}, nil, nil, nil)}
 	data := h.buildUsageData(context.Background(), 5)
-	require.Equal(t, int64(77), data["today"].(gin.H)["total_tokens"])
-	require.Equal(t, int64(123), data["total"].(gin.H)["total_tokens"])
+	today, ok := data["today"].(gin.H)
+	require.True(t, ok)
+	total, ok := data["total"].(gin.H)
+	require.True(t, ok)
+	require.Equal(t, int64(77), today["total_tokens"])
+	require.Equal(t, int64(123), total["total_tokens"])
 	assertNoFinanceFields(t, data)
 }
 
