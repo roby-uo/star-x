@@ -32,8 +32,8 @@
               <td class="px-3 py-2 font-mono text-gray-900 dark:text-white">{{ row.platform }}</td>
               <td class="px-3 py-2">
                 <div class="flex items-center gap-1">
-                  <input
-                    v-model.number="row.daily_limit_usd"
+                  <LedgerAmountInput
+                    v-model="row.daily_limit_usd"
                     type="number"
                     min="0"
                     step="0.01"
@@ -51,8 +51,8 @@
               </td>
               <td class="px-3 py-2">
                 <div class="flex items-center gap-1">
-                  <input
-                    v-model.number="row.weekly_limit_usd"
+                  <LedgerAmountInput
+                    v-model="row.weekly_limit_usd"
                     type="number"
                     min="0"
                     step="0.01"
@@ -70,8 +70,8 @@
               </td>
               <td class="px-3 py-2">
                 <div class="flex items-center gap-1">
-                  <input
-                    v-model.number="row.monthly_limit_usd"
+                  <LedgerAmountInput
+                    v-model="row.monthly_limit_usd"
                     type="number"
                     min="0"
                     step="0.01"
@@ -115,6 +115,8 @@
 </template>
 
 <script setup lang="ts">
+import LedgerAmountInput from '@/components/common/LedgerAmountInput.vue'
+import { formatCnyFromLedger } from '@/utils/currency'
 import { ref, reactive, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
@@ -181,7 +183,7 @@ function normalize(items: PlatformQuotaItem[]): QuotaRow[] {
 
 function formatUsage(n: number): string {
   if (n == null || Number.isNaN(n)) return '-'
-  return n.toFixed(2)
+  return formatCnyFromLedger(n)
 }
 
 async function load() {

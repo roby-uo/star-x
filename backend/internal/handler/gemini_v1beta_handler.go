@@ -140,6 +140,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		googleError(c, http.StatusUnauthorized, "Invalid API key")
 		return
 	}
+	c.Request = c.Request.WithContext(h.gatewayService.WithSimpleBillingContext(c.Request.Context(), apiKey.Group))
 	authSubject, ok := middleware.GetAuthSubjectFromContext(c)
 	if !ok {
 		googleError(c, http.StatusInternalServerError, "User context not found")

@@ -1,5 +1,6 @@
 import type { Account } from '@/types'
 import type { BillingManagementConfig, ProcurementPrice, ProcurementProfile } from '@/api/admin/billingManagement'
+import { USD_TO_CNY_RATE } from '@/utils/currency'
 
 export const purchaseLabels = { payg: '按量付费', subscription: '包月 / 订阅', credit_pack: '预付额度包', hybrid: '固定费 + 按量' }
 export const unitLabels = { per_million_tokens: '百万 tokens', per_image: '张', per_second: '秒', per_request: '次' }
@@ -15,7 +16,8 @@ export function profileIssue(profile: ProcurementProfile): string {
   if (!profile.name.trim() || !profile.provider.trim()) return '请填写采购方案名称和供应商。'
   if (!Number.isFinite(profile.discount_multiplier) || profile.discount_multiplier <= 0) return '采购折扣必须大于 0；原价填写 1。'
   if (profile.valid_from && profile.valid_until && new Date(profile.valid_until) <= new Date(profile.valid_from)) return '结束时间须晚于开始时间。'
-  if (['subscription', 'hybrid'].includes(profile.purchase_mode) && (profile.period_cost == null || !Number.isFinite(profile.period_cost) || profile.period_cost < 0)) return '请填写有效的周期实付费用。'
+  if (profile.purchase_mode === 'hybrid' && (profile.period_cost == null || !Number.isFinite(profile.period_cost) || profile.period_cost < 0)) return '请填写有效的周期实付费用。'
+  if (profile.period_cost != null && (!Number.isFinite(profile.period_cost) || profile.period_cost < 0)) return '周期实付费用须为非负数。'
   if (profile.purchase_mode === 'credit_pack' && (profile.period_cost == null || profile.period_cost <= 0 || profile.credit_amount == null || profile.credit_amount <= 0)) return '额度包须填写实付金额和供应商额度。'
   for (const row of profile.prices) {
     if (!row.models.length || row.models.some(model => !model.trim())) return '每条成本规则至少填写一个模型。'
@@ -42,5 +44,17 @@ export function costCoverage(config: BillingManagementConfig, accounts: Account[
 export function money(value: number | null | undefined, currency = 'CNY'): string {
   if (value == null || !Number.isFinite(value)) return '待配置'
   if (!['CNY', 'USD'].includes(currency)) return '待核对'
-  return new Intl.NumberFormat('zh-CN', { style: 'currency', currency, maximumFractionDigits: 6 }).format(value)
+  return new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: 6 }).format(currency === 'USD' ? value * USD_TO_CNY_RATE : value)
+}
+
+export function procurementToCny(value: number | null | undefined, currency: string): number | null {
+  return value == null ? null : value * (currency === 'USD' ? USD_TO_CNY_RATE : 1)
+}
+export function procurementFromCny(value: number | null, currency: string): number | null {
+  return value == null ? null : value / (currency === 'USD' ? USD_TO_CNY_RATE : 1)
+}
+export function changeProfileCurrency(profile: ProcurementProfile, previous: string): void {
+  const factor = (previous === 'USD' ? USD_TO_CNY_RATE : 1) / (profile.currency === 'USD' ? USD_TO_CNY_RATE : 1)
+  for (const field of ['period_cost', 'credit_amount'] as const) if (profile[field] != null) profile[field] *= factor
+  for (const row of profile.prices) for (const field of ['input_price', 'output_price', 'cache_read_price', 'cache_write_price', 'image_input_price', 'image_output_price', 'unit_price', 'input_image_unit_price'] as const) if (row[field] != null) row[field] *= factor
 }

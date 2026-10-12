@@ -47,10 +47,10 @@ func (User) Fields() []ent.Field {
 			MaxLen(20).
 			Default(domain.RoleUser),
 		field.Float("balance").
-			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}).
+			SchemaType(map[string]string{dialect.Postgres: "decimal(24,12)"}).
 			Default(0),
 		field.Float("frozen_balance").
-			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}).
+			SchemaType(map[string]string{dialect.Postgres: "decimal(24,12)"}).
 			Default(0),
 		field.Int("concurrency").
 			Default(5),
@@ -102,14 +102,14 @@ func (User) Fields() []ent.Field {
 		field.String("balance_notify_threshold_type").
 			Default("fixed"), // "fixed" | "percentage"
 		field.Float("balance_notify_threshold").
-			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}).
+			SchemaType(map[string]string{dialect.Postgres: "decimal(24,12)"}).
 			Optional().
 			Nillable(),
 		field.String("balance_notify_extra_emails").
 			SchemaType(map[string]string{dialect.Postgres: "text"}).
 			Default("[]"),
 		field.Float("total_recharged").
-			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}).
+			SchemaType(map[string]string{dialect.Postgres: "decimal(24,12)"}).
 			Default(0),
 
 		// 用户级每分钟请求数上限（0 = 不限制）。仅当所在分组未设置 rpm_limit 时作为兜底生效。

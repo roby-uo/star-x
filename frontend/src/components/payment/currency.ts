@@ -1,3 +1,4 @@
+import { formatMoney } from '@/utils/currency'
 export const DEFAULT_PAYMENT_CURRENCY = 'CNY'
 
 const PAYMENT_CURRENCY_SYMBOLS: Record<string, string> = {
@@ -44,6 +45,7 @@ function paymentCurrencyFractionDigits(currency: string): number {
 
 export function formatPaymentAmount(amount: number, currency?: string | null, locale?: string): string {
   const normalized = normalizePaymentCurrency(currency)
+  if (normalized === 'USD' || normalized === 'CNY' || normalized === 'RMB') return formatMoney(amount, normalized)
   const fractionDigits = paymentCurrencyFractionDigits(normalized)
   try {
     return new Intl.NumberFormat(locale || undefined, {

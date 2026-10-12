@@ -596,7 +596,7 @@ func (s *OpenAIGatewayService) ForwardImages(
 	body []byte,
 	parsed *OpenAIImagesRequest,
 	channelMappedModel string,
-) (*OpenAIForwardResult, error) {
+) (forwardedResult *OpenAIForwardResult, forwardErr error) {
 	if parsed == nil {
 		return nil, fmt.Errorf("parsed images request is required")
 	}
@@ -617,7 +617,7 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 	body []byte,
 	parsed *OpenAIImagesRequest,
 	channelMappedModel string,
-) (*OpenAIForwardResult, error) {
+) (forwardedResult *OpenAIForwardResult, forwardErr error) {
 	startTime := time.Now()
 	requestModel := strings.TrimSpace(parsed.Model)
 	if mapped := strings.TrimSpace(channelMappedModel); mapped != "" {
@@ -659,6 +659,24 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 			return nil, err
 		}
 	}
+	quality := parsed.Quality
+	if !parsed.Multipart {
+		quality = strings.TrimSpace(gjson.GetBytes(forwardBody, "quality").String())
+	}
+	pricingInput := simpleBillingForwardInput(c, account, upstreamModel, "image", parsed.Size, quality, "")
+	pricingInput.InputImageCount = len(parsed.InputImageURLs) + len(parsed.Uploads)
+	pricingInput.HasImageInput = pricingInput.InputImageCount > 0
+	pricingInput.Scene = simpleBillingImageScene(forwardBody)
+	snapshot, pricingErr := s.PrepareSimpleBilling(ctx, pricingInput)
+	if pricingErr != nil {
+		writeSimpleBillingPreflightError(c)
+		return nil, pricingErr
+	}
+	defer func() {
+		if forwardedResult != nil {
+			forwardedResult.SimpleBilling = snapshot
+		}
+	}()
 	upstreamCtx, releaseUpstreamCtx := detachStreamUpstreamContext(ctx, parsed.Stream)
 	defer releaseUpstreamCtx()
 

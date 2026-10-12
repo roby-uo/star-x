@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"strconv"
@@ -24,6 +25,8 @@ const (
 	SettingLoadBalanceStrategy = "LOAD_BALANCE_STRATEGY"
 	SettingBalancePayDisabled  = "BALANCE_PAYMENT_DISABLED"
 	SettingBalanceRechargeMult = "BALANCE_RECHARGE_MULTIPLIER"
+	// A gift ratio, independent of the legacy ledger-units-per-payment-unit rule.
+	SettingRechargeBonusMultiplier = "BALANCE_RECHARGE_BONUS_MULTIPLIER"
 	// SettingSubscriptionUSDToCNYRate 是订阅 CNY 换算汇率（1 USD = X CNY）。
 	// 0/未配置 = 关闭换算（订阅按 price 数值直付），显式配置后 CNY 通道订阅按 price × rate 收款。
 	SettingSubscriptionUSDToCNYRate = "SUBSCRIPTION_USD_TO_CNY_RATE"
@@ -48,6 +51,12 @@ const (
 
 // PaymentConfig holds the payment system configuration.
 type PaymentConfig struct {
+	SimpleBillingEnabled      bool     `json:"simple_billing_enabled"`
+	BalanceRechargeMode       string   `json:"balance_recharge_mode"`
+	RechargeBonusMultiplier   float64  `json:"recharge_bonus_multiplier"`
+	USDToCNYRate              float64  `json:"usd_to_cny_rate"`
+	LedgerCurrency            string   `json:"ledger_currency"`
+	DisplayCurrency           string   `json:"display_currency"`
 	Enabled                   bool     `json:"enabled"`
 	MinAmount                 float64  `json:"min_amount"`
 	MaxAmount                 float64  `json:"max_amount"`
@@ -80,6 +89,7 @@ type PaymentConfig struct {
 
 // UpdatePaymentConfigRequest contains fields to update payment configuration.
 type UpdatePaymentConfigRequest struct {
+	RechargeBonusMultiplier   *float64 `json:"recharge_bonus_multiplier"`
 	Enabled                   *bool    `json:"enabled"`
 	MinAmount                 *float64 `json:"min_amount"`
 	MaxAmount                 *float64 `json:"max_amount"`
@@ -157,33 +167,37 @@ type UpdateProviderInstanceRequest struct {
 	AllowUserRefund *bool             `json:"allow_user_refund"`
 }
 type CreatePlanRequest struct {
-	GroupID       int64    `json:"group_id"`
-	Name          string   `json:"name"`
-	Description   string   `json:"description"`
-	Price         float64  `json:"price"`
-	OriginalPrice *float64 `json:"original_price"`
-	Currency      string   `json:"currency"`
-	ValidityDays  int      `json:"validity_days"`
-	ValidityUnit  string   `json:"validity_unit"`
-	Features      string   `json:"features"`
-	ProductName   string   `json:"product_name"`
-	ForSale       bool     `json:"for_sale"`
-	SortOrder     int      `json:"sort_order"`
+	CashPriceCNY         *float64 `json:"cash_price_cny"`
+	CashOriginalPriceCNY *float64 `json:"cash_original_price_cny"`
+	GroupID              int64    `json:"group_id"`
+	Name                 string   `json:"name"`
+	Description          string   `json:"description"`
+	Price                float64  `json:"price"`
+	OriginalPrice        *float64 `json:"original_price"`
+	Currency             string   `json:"currency"`
+	ValidityDays         int      `json:"validity_days"`
+	ValidityUnit         string   `json:"validity_unit"`
+	Features             string   `json:"features"`
+	ProductName          string   `json:"product_name"`
+	ForSale              bool     `json:"for_sale"`
+	SortOrder            int      `json:"sort_order"`
 }
 
 type UpdatePlanRequest struct {
-	GroupID       *int64   `json:"group_id"`
-	Name          *string  `json:"name"`
-	Description   *string  `json:"description"`
-	Price         *float64 `json:"price"`
-	OriginalPrice *float64 `json:"original_price"`
-	Currency      *string  `json:"currency"`
-	ValidityDays  *int     `json:"validity_days"`
-	ValidityUnit  *string  `json:"validity_unit"`
-	Features      *string  `json:"features"`
-	ProductName   *string  `json:"product_name"`
-	ForSale       *bool    `json:"for_sale"`
-	SortOrder     *int     `json:"sort_order"`
+	CashPriceCNY         *float64 `json:"cash_price_cny"`
+	CashOriginalPriceCNY *float64 `json:"cash_original_price_cny"`
+	GroupID              *int64   `json:"group_id"`
+	Name                 *string  `json:"name"`
+	Description          *string  `json:"description"`
+	Price                *float64 `json:"price"`
+	OriginalPrice        *float64 `json:"original_price"`
+	Currency             *string  `json:"currency"`
+	ValidityDays         *int     `json:"validity_days"`
+	ValidityUnit         *string  `json:"validity_unit"`
+	Features             *string  `json:"features"`
+	ProductName          *string  `json:"product_name"`
+	ForSale              *bool    `json:"for_sale"`
+	SortOrder            *int     `json:"sort_order"`
 }
 
 // PaymentConfigService manages payment configuration and CRUD for
@@ -221,12 +235,16 @@ func (s *PaymentConfigService) GetPaymentConfig(ctx context.Context) (*PaymentCo
 		SettingAlipayForceQRCode,
 		SettingPaymentVisibleMethodAlipayEnabled, SettingPaymentVisibleMethodAlipaySource,
 		SettingPaymentVisibleMethodWxpayEnabled, SettingPaymentVisibleMethodWxpaySource,
+		SettingRechargeBonusMultiplier, "billing_management_config_v1",
 	}
 	vals, err := s.settingRepo.GetMultiple(ctx, keys)
 	if err != nil {
 		return nil, fmt.Errorf("get payment config settings: %w", err)
 	}
 	cfg := s.parsePaymentConfig(vals)
+	if err := applySimplePaymentConfig(cfg, vals["billing_management_config_v1"]); err != nil {
+		return nil, err
+	}
 	// Load Stripe publishable key from the first enabled Stripe provider instance
 	cfg.StripePublishableKey = s.getStripePublishableKey(ctx)
 	return cfg, nil
@@ -234,6 +252,11 @@ func (s *PaymentConfigService) GetPaymentConfig(ctx context.Context) (*PaymentCo
 
 func (s *PaymentConfigService) parsePaymentConfig(vals map[string]string) *PaymentConfig {
 	cfg := &PaymentConfig{
+		RechargeBonusMultiplier:   normalizeBalanceRechargeMultiplier(pcParseFloat(vals[SettingRechargeBonusMultiplier], 1)),
+		BalanceRechargeMode:       "legacy",
+		USDToCNYRate:              FixedUSDToCNYRate,
+		LedgerCurrency:            "USD",
+		DisplayCurrency:           "CNY",
 		Enabled:                   vals[SettingPaymentEnabled] == "true",
 		MinAmount:                 pcParseFloat(vals[SettingMinRechargeAmount], 1),
 		MaxAmount:                 pcParseFloat(vals[SettingMaxRechargeAmount], 0),
@@ -274,6 +297,22 @@ func (s *PaymentConfigService) parsePaymentConfig(vals map[string]string) *Payme
 	return cfg
 }
 
+func applySimplePaymentConfig(cfg *PaymentConfig, raw string) error {
+	var saved struct {
+		SimpleBillingEnabled *bool `json:"simple_billing_enabled"`
+	}
+	if raw != "" {
+		if err := json.Unmarshal([]byte(raw), &saved); err != nil {
+			return fmt.Errorf("invalid persisted billing management config: %w", err)
+		}
+	}
+	cfg.SimpleBillingEnabled = saved.SimpleBillingEnabled == nil || *saved.SimpleBillingEnabled
+	if cfg.SimpleBillingEnabled {
+		cfg.BalanceRechargeMode = "cny_fixed"
+	}
+	return nil
+}
+
 // getStripePublishableKey finds the publishable key from the first enabled Stripe provider instance.
 func (s *PaymentConfigService) getStripePublishableKey(ctx context.Context) string {
 	if s.entClient == nil {
@@ -299,6 +338,12 @@ func (s *PaymentConfigService) getStripePublishableKey(ctx context.Context) stri
 // nil-check before serialisation — this is inherent to patch-style update patterns
 // and cannot be meaningfully decomposed without introducing unnecessary abstraction.
 func (s *PaymentConfigService) UpdatePaymentConfig(ctx context.Context, req UpdatePaymentConfigRequest) error {
+	if req.RechargeBonusMultiplier != nil {
+		v := *req.RechargeBonusMultiplier
+		if math.IsNaN(v) || math.IsInf(v, 0) || v <= 0 {
+			return infraerrors.BadRequest("INVALID_RECHARGE_BONUS_MULTIPLIER", "recharge gift multiplier must be greater than 0")
+		}
+	}
 	if req.BalanceRechargeMultiplier != nil {
 		if math.IsNaN(*req.BalanceRechargeMultiplier) || math.IsInf(*req.BalanceRechargeMultiplier, 0) || *req.BalanceRechargeMultiplier <= 0 {
 			return infraerrors.BadRequest("INVALID_BALANCE_RECHARGE_MULTIPLIER", "balance recharge multiplier must be greater than 0")
@@ -321,6 +366,7 @@ func (s *PaymentConfigService) UpdatePaymentConfig(ctx context.Context, req Upda
 		}
 	}
 	m := map[string]string{
+		SettingRechargeBonusMultiplier:           formatPositiveFloatExact(req.RechargeBonusMultiplier),
 		SettingPaymentEnabled:                    formatBoolOrEmpty(req.Enabled),
 		SettingMinRechargeAmount:                 formatPositiveFloat(req.MinAmount),
 		SettingMaxRechargeAmount:                 formatPositiveFloat(req.MaxAmount),
@@ -349,8 +395,43 @@ func (s *PaymentConfigService) UpdatePaymentConfig(ctx context.Context, req Upda
 	}
 	if req.EnabledTypes != nil {
 		m[SettingEnabledPaymentTypes] = strings.Join(req.EnabledTypes, ",")
-	} else {
-		m[SettingEnabledPaymentTypes] = ""
+	}
+	provided := map[string]bool{
+		SettingRechargeBonusMultiplier:           req.RechargeBonusMultiplier != nil,
+		SettingPaymentEnabled:                    req.Enabled != nil,
+		SettingMinRechargeAmount:                 req.MinAmount != nil,
+		SettingMaxRechargeAmount:                 req.MaxAmount != nil,
+		SettingDailyRechargeLimit:                req.DailyLimit != nil,
+		SettingOrderTimeoutMinutes:               req.OrderTimeoutMin != nil,
+		SettingMaxPendingOrders:                  req.MaxPendingOrders != nil,
+		SettingBalancePayDisabled:                req.BalanceDisabled != nil,
+		SettingBalanceRechargeMult:               req.BalanceRechargeMultiplier != nil,
+		SettingSubscriptionUSDToCNYRate:          req.SubscriptionUSDToCNYRate != nil,
+		SettingRechargeFeeRate:                   req.RechargeFeeRate != nil,
+		SettingLoadBalanceStrategy:               req.LoadBalanceStrategy != nil,
+		SettingProductNamePrefix:                 req.ProductNamePrefix != nil,
+		SettingProductNameSuffix:                 req.ProductNameSuffix != nil,
+		SettingHelpImageURL:                      req.HelpImageURL != nil,
+		SettingHelpText:                          req.HelpText != nil,
+		SettingCancelRateLimitOn:                 req.CancelRateLimitEnabled != nil,
+		SettingCancelRateLimitMax:                req.CancelRateLimitMax != nil,
+		SettingCancelWindowSize:                  req.CancelRateLimitWindow != nil,
+		SettingCancelWindowUnit:                  req.CancelRateLimitUnit != nil,
+		SettingCancelWindowMode:                  req.CancelRateLimitMode != nil,
+		SettingAlipayForceQRCode:                 req.AlipayForceQRCode != nil,
+		SettingPaymentVisibleMethodAlipaySource:  req.VisibleMethodAlipaySource != nil,
+		SettingPaymentVisibleMethodWxpaySource:   req.VisibleMethodWxpaySource != nil,
+		SettingPaymentVisibleMethodAlipayEnabled: req.VisibleMethodAlipayEnabled != nil,
+		SettingPaymentVisibleMethodWxpayEnabled:  req.VisibleMethodWxpayEnabled != nil,
+		SettingEnabledPaymentTypes:               req.EnabledTypes != nil,
+	}
+	for key := range m {
+		if !provided[key] {
+			delete(m, key)
+		}
+	}
+	if len(m) == 0 {
+		return nil
 	}
 	return s.settingRepo.SetMultiple(ctx, m)
 }

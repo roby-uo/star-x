@@ -300,9 +300,9 @@ export default {
       },
       platformQuota: {
         platform:    'Platform',
-        daily:       'Daily (USD)',
-        weekly:      'Weekly (USD)',
-        monthly:     'Monthly (USD, 30d rolling)',
+        daily:       'Daily (CNY)',
+        weekly:      'Weekly (CNY)',
+        monthly:     'Monthly (CNY, 30d rolling)',
         placeholder: 'Unlimited',
       },
       claudeCode: {
@@ -556,6 +556,10 @@ export default {
         minAmount: 'Minimum Amount',
         maxAmount: 'Maximum Amount',
         dailyLimit: 'Daily Limit',
+        cnyRechargeTitle: 'CNY recharge credits',
+        cnyRechargeHint: 'CNY payments credit the same CNY amount. USD payments use the fixed 6.2 rate. The bonus affects recharge credits only.',
+        rechargeBonusMultiplier: 'Recharge bonus multiplier',
+        cnyRechargePreview: 'Pay {payment}, receive {credit}',
         balanceRechargeMultiplier: 'Balance Recharge Multiplier',
         balanceRechargeMultiplierHint: 'How many USD balance the user receives for each 1 CNY paid',
         balanceRechargePreview: 'Preview: 1 CNY = {usd} USD',

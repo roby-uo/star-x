@@ -71,7 +71,7 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 	includeUsage bool,
 	startTime time.Time,
 	originalChatBody []byte,
-) (*ForwardResult, error) {
+) (forwardedResult *ForwardResult, forwardErr error) {
 	var req struct {
 		Model  string `json:"model"`
 		Stream bool   `json:"stream"`
@@ -87,6 +87,16 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 	if account.Type == AccountTypeAPIKey || account.Type == AccountTypeServiceAccount {
 		mappedModel = account.GetMappedModel(req.Model)
 	}
+	snapshot, pricingErr := prepareProtocolSimpleBilling(ctx, c, account, mappedModel, originalChatBody, "")
+	if pricingErr != nil {
+		writeSimpleBillingPreflightError(c)
+		return nil, pricingErr
+	}
+	defer func() {
+		if forwardedResult != nil {
+			forwardedResult.SimpleBilling = snapshot
+		}
+	}()
 
 	geminiReq, err := convertClaudeMessagesToGeminiGenerateContent(claudeBody)
 	if err != nil {

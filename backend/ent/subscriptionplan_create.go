@@ -82,6 +82,34 @@ func (_c *SubscriptionPlanCreate) SetNillableCurrency(v *string) *SubscriptionPl
 	return _c
 }
 
+// SetCashPriceCny sets the "cash_price_cny" field.
+func (_c *SubscriptionPlanCreate) SetCashPriceCny(v float64) *SubscriptionPlanCreate {
+	_c.mutation.SetCashPriceCny(v)
+	return _c
+}
+
+// SetNillableCashPriceCny sets the "cash_price_cny" field if the given value is not nil.
+func (_c *SubscriptionPlanCreate) SetNillableCashPriceCny(v *float64) *SubscriptionPlanCreate {
+	if v != nil {
+		_c.SetCashPriceCny(*v)
+	}
+	return _c
+}
+
+// SetCashOriginalPriceCny sets the "cash_original_price_cny" field.
+func (_c *SubscriptionPlanCreate) SetCashOriginalPriceCny(v float64) *SubscriptionPlanCreate {
+	_c.mutation.SetCashOriginalPriceCny(v)
+	return _c
+}
+
+// SetNillableCashOriginalPriceCny sets the "cash_original_price_cny" field if the given value is not nil.
+func (_c *SubscriptionPlanCreate) SetNillableCashOriginalPriceCny(v *float64) *SubscriptionPlanCreate {
+	if v != nil {
+		_c.SetCashOriginalPriceCny(*v)
+	}
+	return _c
+}
+
 // SetValidityDays sets the "validity_days" field.
 func (_c *SubscriptionPlanCreate) SetValidityDays(v int) *SubscriptionPlanCreate {
 	_c.mutation.SetValidityDays(v)
@@ -383,6 +411,14 @@ func (_c *SubscriptionPlanCreate) createSpec() (*SubscriptionPlan, *sqlgraph.Cre
 		_spec.SetField(subscriptionplan.FieldCurrency, field.TypeString, value)
 		_node.Currency = value
 	}
+	if value, ok := _c.mutation.CashPriceCny(); ok {
+		_spec.SetField(subscriptionplan.FieldCashPriceCny, field.TypeFloat64, value)
+		_node.CashPriceCny = &value
+	}
+	if value, ok := _c.mutation.CashOriginalPriceCny(); ok {
+		_spec.SetField(subscriptionplan.FieldCashOriginalPriceCny, field.TypeFloat64, value)
+		_node.CashOriginalPriceCny = &value
+	}
 	if value, ok := _c.mutation.ValidityDays(); ok {
 		_spec.SetField(subscriptionplan.FieldValidityDays, field.TypeInt, value)
 		_node.ValidityDays = value
@@ -560,6 +596,54 @@ func (u *SubscriptionPlanUpsert) SetCurrency(v string) *SubscriptionPlanUpsert {
 // UpdateCurrency sets the "currency" field to the value that was provided on create.
 func (u *SubscriptionPlanUpsert) UpdateCurrency() *SubscriptionPlanUpsert {
 	u.SetExcluded(subscriptionplan.FieldCurrency)
+	return u
+}
+
+// SetCashPriceCny sets the "cash_price_cny" field.
+func (u *SubscriptionPlanUpsert) SetCashPriceCny(v float64) *SubscriptionPlanUpsert {
+	u.Set(subscriptionplan.FieldCashPriceCny, v)
+	return u
+}
+
+// UpdateCashPriceCny sets the "cash_price_cny" field to the value that was provided on create.
+func (u *SubscriptionPlanUpsert) UpdateCashPriceCny() *SubscriptionPlanUpsert {
+	u.SetExcluded(subscriptionplan.FieldCashPriceCny)
+	return u
+}
+
+// AddCashPriceCny adds v to the "cash_price_cny" field.
+func (u *SubscriptionPlanUpsert) AddCashPriceCny(v float64) *SubscriptionPlanUpsert {
+	u.Add(subscriptionplan.FieldCashPriceCny, v)
+	return u
+}
+
+// ClearCashPriceCny clears the value of the "cash_price_cny" field.
+func (u *SubscriptionPlanUpsert) ClearCashPriceCny() *SubscriptionPlanUpsert {
+	u.SetNull(subscriptionplan.FieldCashPriceCny)
+	return u
+}
+
+// SetCashOriginalPriceCny sets the "cash_original_price_cny" field.
+func (u *SubscriptionPlanUpsert) SetCashOriginalPriceCny(v float64) *SubscriptionPlanUpsert {
+	u.Set(subscriptionplan.FieldCashOriginalPriceCny, v)
+	return u
+}
+
+// UpdateCashOriginalPriceCny sets the "cash_original_price_cny" field to the value that was provided on create.
+func (u *SubscriptionPlanUpsert) UpdateCashOriginalPriceCny() *SubscriptionPlanUpsert {
+	u.SetExcluded(subscriptionplan.FieldCashOriginalPriceCny)
+	return u
+}
+
+// AddCashOriginalPriceCny adds v to the "cash_original_price_cny" field.
+func (u *SubscriptionPlanUpsert) AddCashOriginalPriceCny(v float64) *SubscriptionPlanUpsert {
+	u.Add(subscriptionplan.FieldCashOriginalPriceCny, v)
+	return u
+}
+
+// ClearCashOriginalPriceCny clears the value of the "cash_original_price_cny" field.
+func (u *SubscriptionPlanUpsert) ClearCashOriginalPriceCny() *SubscriptionPlanUpsert {
+	u.SetNull(subscriptionplan.FieldCashOriginalPriceCny)
 	return u
 }
 
@@ -813,6 +897,62 @@ func (u *SubscriptionPlanUpsertOne) SetCurrency(v string) *SubscriptionPlanUpser
 func (u *SubscriptionPlanUpsertOne) UpdateCurrency() *SubscriptionPlanUpsertOne {
 	return u.Update(func(s *SubscriptionPlanUpsert) {
 		s.UpdateCurrency()
+	})
+}
+
+// SetCashPriceCny sets the "cash_price_cny" field.
+func (u *SubscriptionPlanUpsertOne) SetCashPriceCny(v float64) *SubscriptionPlanUpsertOne {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.SetCashPriceCny(v)
+	})
+}
+
+// AddCashPriceCny adds v to the "cash_price_cny" field.
+func (u *SubscriptionPlanUpsertOne) AddCashPriceCny(v float64) *SubscriptionPlanUpsertOne {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.AddCashPriceCny(v)
+	})
+}
+
+// UpdateCashPriceCny sets the "cash_price_cny" field to the value that was provided on create.
+func (u *SubscriptionPlanUpsertOne) UpdateCashPriceCny() *SubscriptionPlanUpsertOne {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.UpdateCashPriceCny()
+	})
+}
+
+// ClearCashPriceCny clears the value of the "cash_price_cny" field.
+func (u *SubscriptionPlanUpsertOne) ClearCashPriceCny() *SubscriptionPlanUpsertOne {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.ClearCashPriceCny()
+	})
+}
+
+// SetCashOriginalPriceCny sets the "cash_original_price_cny" field.
+func (u *SubscriptionPlanUpsertOne) SetCashOriginalPriceCny(v float64) *SubscriptionPlanUpsertOne {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.SetCashOriginalPriceCny(v)
+	})
+}
+
+// AddCashOriginalPriceCny adds v to the "cash_original_price_cny" field.
+func (u *SubscriptionPlanUpsertOne) AddCashOriginalPriceCny(v float64) *SubscriptionPlanUpsertOne {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.AddCashOriginalPriceCny(v)
+	})
+}
+
+// UpdateCashOriginalPriceCny sets the "cash_original_price_cny" field to the value that was provided on create.
+func (u *SubscriptionPlanUpsertOne) UpdateCashOriginalPriceCny() *SubscriptionPlanUpsertOne {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.UpdateCashOriginalPriceCny()
+	})
+}
+
+// ClearCashOriginalPriceCny clears the value of the "cash_original_price_cny" field.
+func (u *SubscriptionPlanUpsertOne) ClearCashOriginalPriceCny() *SubscriptionPlanUpsertOne {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.ClearCashOriginalPriceCny()
 	})
 }
 
@@ -1248,6 +1388,62 @@ func (u *SubscriptionPlanUpsertBulk) SetCurrency(v string) *SubscriptionPlanUpse
 func (u *SubscriptionPlanUpsertBulk) UpdateCurrency() *SubscriptionPlanUpsertBulk {
 	return u.Update(func(s *SubscriptionPlanUpsert) {
 		s.UpdateCurrency()
+	})
+}
+
+// SetCashPriceCny sets the "cash_price_cny" field.
+func (u *SubscriptionPlanUpsertBulk) SetCashPriceCny(v float64) *SubscriptionPlanUpsertBulk {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.SetCashPriceCny(v)
+	})
+}
+
+// AddCashPriceCny adds v to the "cash_price_cny" field.
+func (u *SubscriptionPlanUpsertBulk) AddCashPriceCny(v float64) *SubscriptionPlanUpsertBulk {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.AddCashPriceCny(v)
+	})
+}
+
+// UpdateCashPriceCny sets the "cash_price_cny" field to the value that was provided on create.
+func (u *SubscriptionPlanUpsertBulk) UpdateCashPriceCny() *SubscriptionPlanUpsertBulk {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.UpdateCashPriceCny()
+	})
+}
+
+// ClearCashPriceCny clears the value of the "cash_price_cny" field.
+func (u *SubscriptionPlanUpsertBulk) ClearCashPriceCny() *SubscriptionPlanUpsertBulk {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.ClearCashPriceCny()
+	})
+}
+
+// SetCashOriginalPriceCny sets the "cash_original_price_cny" field.
+func (u *SubscriptionPlanUpsertBulk) SetCashOriginalPriceCny(v float64) *SubscriptionPlanUpsertBulk {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.SetCashOriginalPriceCny(v)
+	})
+}
+
+// AddCashOriginalPriceCny adds v to the "cash_original_price_cny" field.
+func (u *SubscriptionPlanUpsertBulk) AddCashOriginalPriceCny(v float64) *SubscriptionPlanUpsertBulk {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.AddCashOriginalPriceCny(v)
+	})
+}
+
+// UpdateCashOriginalPriceCny sets the "cash_original_price_cny" field to the value that was provided on create.
+func (u *SubscriptionPlanUpsertBulk) UpdateCashOriginalPriceCny() *SubscriptionPlanUpsertBulk {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.UpdateCashOriginalPriceCny()
+	})
+}
+
+// ClearCashOriginalPriceCny clears the value of the "cash_original_price_cny" field.
+func (u *SubscriptionPlanUpsertBulk) ClearCashOriginalPriceCny() *SubscriptionPlanUpsertBulk {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.ClearCashOriginalPriceCny()
 	})
 }
 

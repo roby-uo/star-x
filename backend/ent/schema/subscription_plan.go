@@ -46,6 +46,15 @@ func (SubscriptionPlan) Fields() []ent.Field {
 		field.String("currency").
 			MaxLen(3).
 			Default(""),
+		// Explicit checkout price; nil keeps the legacy global conversion policy.
+		field.Float("cash_price_cny").
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,2)"}).
+			Optional().
+			Nillable(),
+		field.Float("cash_original_price_cny").
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,2)"}).
+			Optional().
+			Nillable(),
 		field.Int("validity_days").
 			Default(30),
 		field.String("validity_unit").

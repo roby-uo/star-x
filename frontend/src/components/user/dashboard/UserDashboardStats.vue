@@ -11,7 +11,7 @@
         </div>
         <div>
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.balance') }}</p>
-          <p class="text-xl font-bold text-emerald-600 dark:text-emerald-400">${{ formatBalance(balance) }}</p>
+          <p class="text-xl font-bold text-emerald-600 dark:text-emerald-400">{{ formatCnyFromLedger(balance, 2) }}</p>
           <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('common.available') }}</p>
         </div>
       </div>
@@ -196,6 +196,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatCnyFromLedger } from '@/utils/currency'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
@@ -333,11 +334,6 @@ function formatResetTime(iso: string | null | undefined): string {
   })
 }
 
-const formatBalance = (b: number) =>
-  new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(b)
 
 const formatNumber = (n: number) => n.toLocaleString()
 const formatTokens = (t: number) => {

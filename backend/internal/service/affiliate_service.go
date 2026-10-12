@@ -350,7 +350,7 @@ func (s *AffiliateService) AccrueInviteRebateForOrder(ctx context.Context, invit
 	}
 
 	rebateRatePercent := s.resolveRebateRatePercent(ctx, inviterSummary)
-	rebate := roundTo(baseRechargeAmount*(rebateRatePercent/100), 8)
+	rebate := roundTo(baseRechargeAmount*(rebateRatePercent/100), paymentLedgerPrecision)
 	if rebate <= 0 {
 		return 0, nil
 	}
@@ -366,7 +366,7 @@ func (s *AffiliateService) AccrueInviteRebateForOrder(ctx context.Context, invit
 				return 0, nil
 			}
 			if remaining := perInviteeCap - existing; rebate > remaining {
-				rebate = roundTo(remaining, 8)
+				rebate = roundTo(remaining, paymentLedgerPrecision)
 			}
 		}
 	}

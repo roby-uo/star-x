@@ -23,7 +23,7 @@ func (s *OpenAIGatewayService) ForwardEmbeddings(
 	account *Account,
 	body []byte,
 	defaultMappedModel string,
-) (*OpenAIForwardResult, error) {
+) (forwardedResult *OpenAIForwardResult, forwardErr error) {
 	startTime := time.Now()
 
 	originalModel := strings.TrimSpace(gjson.GetBytes(body, "model").String())
@@ -34,6 +34,16 @@ func (s *OpenAIGatewayService) ForwardEmbeddings(
 
 	billingModel := resolveOpenAIForwardModel(account, originalModel, defaultMappedModel)
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
+	snapshot, pricingErr := s.PrepareSimpleBilling(ctx, simpleBillingForwardInput(c, account, upstreamModel, "chat", "", "", ""))
+	if pricingErr != nil {
+		writeSimpleBillingPreflightError(c)
+		return nil, pricingErr
+	}
+	defer func() {
+		if forwardedResult != nil && forwardedResult.SimpleBilling == nil {
+			forwardedResult.SimpleBilling = snapshot
+		}
+	}()
 	upstreamBody := body
 	if upstreamModel != originalModel {
 		upstreamBody = ReplaceModelInBody(body, upstreamModel)

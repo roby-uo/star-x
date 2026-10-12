@@ -14,6 +14,7 @@ var ErrUsageBillingRequestConflict = errors.New("usage billing request fingerpri
 
 // UsageBillingCommand describes one billable request that must be applied at most once.
 type UsageBillingCommand struct {
+	PriceSnapshot      *SimpleBillingSnapshot
 	MediaTaskID        string
 	RequestID          string
 	APIKeyID           int64
@@ -84,6 +85,9 @@ func buildUsageBillingFingerprint(c *UsageBillingCommand) string {
 	}
 	if c.MediaTaskID != "" {
 		raw += "|media:" + c.MediaTaskID
+	}
+	if c.PriceSnapshot != nil {
+		raw += "|price:" + c.PriceSnapshot.Hash
 	}
 	sum := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(sum[:])

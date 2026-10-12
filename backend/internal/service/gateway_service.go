@@ -552,9 +552,10 @@ type ClaudeUsage struct {
 
 // ForwardResult 转发结果
 type ForwardResult struct {
-	RequestID string
-	Usage     ClaudeUsage
-	Model     string
+	SimpleBilling *SimpleBillingSnapshot
+	RequestID     string
+	Usage         ClaudeUsage
+	Model         string
 	// UpstreamModel is the actual upstream model after mapping.
 	// Prefer empty when it is identical to Model; persistence normalizes equal values away as no-op mappings.
 	UpstreamModel    string

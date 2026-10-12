@@ -35,7 +35,7 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 	reasoningEffort *string,
 	reqStream bool,
 	startTime time.Time,
-) (*OpenAIForwardResult, error) {
+) (forwardedResult *OpenAIForwardResult, forwardErr error) {
 	upstreamPassthroughModel := ""
 	if isOpenAIResponsesCompactPath(c) {
 		compactMappedModel := resolveOpenAICompactForwardModel(account, reqModel)
@@ -167,6 +167,18 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 			}
 		}
 	}
+
+	snapshot, pricingErr := s.prepareSimpleBillingTextForward(ctx, c, account, policyModel, body)
+	if pricingErr != nil {
+		writeSimpleBillingPreflightError(c)
+		return nil, pricingErr
+	}
+	defer func() {
+		if forwardedResult != nil {
+			forwardedResult.SimpleBilling = snapshot
+			forwardedResult.ServiceTier = extractOpenAIServiceTierFromBody(body)
+		}
+	}()
 
 	// Get access token
 	token, _, err := s.GetAccessToken(ctx, account)

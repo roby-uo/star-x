@@ -109,6 +109,7 @@ describe('admin UsageTable tooltip', () => {
   it('does not render monetary slots or tooltips in user mode even with legacy cost columns', () => {
     const wrapper = mount(UsageTable, { props: { data: [baseImageRow] as any, columns: [{ key: 'cost', label: 'Cost' }], showCosts: false }, global: { stubs: { DataTable: DataTableStub, Teleport: true } } })
     expect(wrapper.text()).not.toContain('$')
+    expect(wrapper.text()).not.toContain('¥')
     expect(wrapper.text()).not.toContain('Cost Breakdown')
     expect(wrapper.text()).not.toContain('Account rate')
   })
@@ -202,10 +203,11 @@ describe('admin UsageTable tooltip', () => {
     expect(text).toContain('Account rate')
     expect(text).toContain('User billed')
     expect(text).toContain('Account billed')
-    expect(text).toContain('$0.092883')
-    expect(text).toContain('$5.0000 / 1M tokens')
-    expect(text).toContain('$30.0000 / 1M tokens')
-    expect(text).toContain('$0.069568')
+    expect(text).toContain('¥0.575875')
+    expect(text).toContain('¥31.0000 / 1M tokens')
+    expect(text).toContain('¥186.0000 / 1M tokens')
+    expect(text).toContain('¥0.431322')
+    expect(text).not.toContain('$')
   })
 
   it('shows requested and upstream models separately for admin rows', () => {

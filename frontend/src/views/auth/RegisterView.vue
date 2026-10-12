@@ -176,7 +176,7 @@
             <div v-if="promoValidation.valid" class="mt-2 flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 dark:bg-green-900/20">
               <Icon name="gift" size="sm" class="text-green-600 dark:text-green-400" />
               <span class="text-sm text-green-700 dark:text-green-400">
-                {{ t('auth.promoCodeValid', { amount: promoValidation.bonusAmount?.toFixed(2) }) }}
+                {{ t('auth.promoCodeValid', { amount: formatCnyFromLedger(promoValidation.bonusAmount) }) }}
               </span>
             </div>
           </transition>
@@ -298,6 +298,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatCnyFromLedger } from '@/utils/currency'
 import { computed, ref, reactive, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'

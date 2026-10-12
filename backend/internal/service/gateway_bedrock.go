@@ -88,6 +88,11 @@ func (s *GatewayService) forwardBedrock(
 	if err != nil {
 		return nil, fmt.Errorf("prepare bedrock request body: %w", err)
 	}
+	snapshot, pricingErr := s.prepareSimpleBillingAnthropicForward(ctx, c, account, mappedModel, bedrockBody, nil)
+	if pricingErr != nil {
+		writeSimpleBillingPreflightError(c)
+		return nil, pricingErr
+	}
 
 	proxyURL := ""
 	if account.ProxyID != nil && account.Proxy != nil {
@@ -158,6 +163,7 @@ func (s *GatewayService) forwardBedrock(
 	}
 
 	return &ForwardResult{
+		SimpleBilling:    snapshot,
 		RequestID:        resp.Header.Get("x-amzn-requestid"),
 		Usage:            *usage,
 		Model:            reqModel,

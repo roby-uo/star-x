@@ -70,7 +70,7 @@
   <span>"usage"</span>: { <span>"input_tokens"</span>: 11, <span>"output_tokens"</span>: 18 }
 }</code></pre>
           </div>
-          <div class="api-footer"><span>156 MS · 29 TOKENS · COST $0.00007</span><span>STREAM · SSE</span></div>
+          <div class="api-footer"><span>156 MS · 29 TOKENS</span><span>STREAM · SSE</span></div>
         </div>
       </section>
 

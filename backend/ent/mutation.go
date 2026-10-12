@@ -38214,32 +38214,36 @@ func (m *SettingMutation) ResetEdge(name string) error {
 // SubscriptionPlanMutation represents an operation that mutates the SubscriptionPlan nodes in the graph.
 type SubscriptionPlanMutation struct {
 	config
-	op                Op
-	typ               string
-	id                *int64
-	group_id          *int64
-	addgroup_id       *int64
-	name              *string
-	description       *string
-	price             *float64
-	addprice          *float64
-	original_price    *float64
-	addoriginal_price *float64
-	currency          *string
-	validity_days     *int
-	addvalidity_days  *int
-	validity_unit     *string
-	features          *string
-	product_name      *string
-	for_sale          *bool
-	sort_order        *int
-	addsort_order     *int
-	created_at        *time.Time
-	updated_at        *time.Time
-	clearedFields     map[string]struct{}
-	done              bool
-	oldValue          func(context.Context) (*SubscriptionPlan, error)
-	predicates        []predicate.SubscriptionPlan
+	op                         Op
+	typ                        string
+	id                         *int64
+	group_id                   *int64
+	addgroup_id                *int64
+	name                       *string
+	description                *string
+	price                      *float64
+	addprice                   *float64
+	original_price             *float64
+	addoriginal_price          *float64
+	currency                   *string
+	cash_price_cny             *float64
+	addcash_price_cny          *float64
+	cash_original_price_cny    *float64
+	addcash_original_price_cny *float64
+	validity_days              *int
+	addvalidity_days           *int
+	validity_unit              *string
+	features                   *string
+	product_name               *string
+	for_sale                   *bool
+	sort_order                 *int
+	addsort_order              *int
+	created_at                 *time.Time
+	updated_at                 *time.Time
+	clearedFields              map[string]struct{}
+	done                       bool
+	oldValue                   func(context.Context) (*SubscriptionPlan, error)
+	predicates                 []predicate.SubscriptionPlan
 }
 
 var _ ent.Mutation = (*SubscriptionPlanMutation)(nil)
@@ -38630,6 +38634,146 @@ func (m *SubscriptionPlanMutation) ResetCurrency() {
 	m.currency = nil
 }
 
+// SetCashPriceCny sets the "cash_price_cny" field.
+func (m *SubscriptionPlanMutation) SetCashPriceCny(f float64) {
+	m.cash_price_cny = &f
+	m.addcash_price_cny = nil
+}
+
+// CashPriceCny returns the value of the "cash_price_cny" field in the mutation.
+func (m *SubscriptionPlanMutation) CashPriceCny() (r float64, exists bool) {
+	v := m.cash_price_cny
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCashPriceCny returns the old "cash_price_cny" field's value of the SubscriptionPlan entity.
+// If the SubscriptionPlan object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SubscriptionPlanMutation) OldCashPriceCny(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCashPriceCny is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCashPriceCny requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCashPriceCny: %w", err)
+	}
+	return oldValue.CashPriceCny, nil
+}
+
+// AddCashPriceCny adds f to the "cash_price_cny" field.
+func (m *SubscriptionPlanMutation) AddCashPriceCny(f float64) {
+	if m.addcash_price_cny != nil {
+		*m.addcash_price_cny += f
+	} else {
+		m.addcash_price_cny = &f
+	}
+}
+
+// AddedCashPriceCny returns the value that was added to the "cash_price_cny" field in this mutation.
+func (m *SubscriptionPlanMutation) AddedCashPriceCny() (r float64, exists bool) {
+	v := m.addcash_price_cny
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearCashPriceCny clears the value of the "cash_price_cny" field.
+func (m *SubscriptionPlanMutation) ClearCashPriceCny() {
+	m.cash_price_cny = nil
+	m.addcash_price_cny = nil
+	m.clearedFields[subscriptionplan.FieldCashPriceCny] = struct{}{}
+}
+
+// CashPriceCnyCleared returns if the "cash_price_cny" field was cleared in this mutation.
+func (m *SubscriptionPlanMutation) CashPriceCnyCleared() bool {
+	_, ok := m.clearedFields[subscriptionplan.FieldCashPriceCny]
+	return ok
+}
+
+// ResetCashPriceCny resets all changes to the "cash_price_cny" field.
+func (m *SubscriptionPlanMutation) ResetCashPriceCny() {
+	m.cash_price_cny = nil
+	m.addcash_price_cny = nil
+	delete(m.clearedFields, subscriptionplan.FieldCashPriceCny)
+}
+
+// SetCashOriginalPriceCny sets the "cash_original_price_cny" field.
+func (m *SubscriptionPlanMutation) SetCashOriginalPriceCny(f float64) {
+	m.cash_original_price_cny = &f
+	m.addcash_original_price_cny = nil
+}
+
+// CashOriginalPriceCny returns the value of the "cash_original_price_cny" field in the mutation.
+func (m *SubscriptionPlanMutation) CashOriginalPriceCny() (r float64, exists bool) {
+	v := m.cash_original_price_cny
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCashOriginalPriceCny returns the old "cash_original_price_cny" field's value of the SubscriptionPlan entity.
+// If the SubscriptionPlan object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SubscriptionPlanMutation) OldCashOriginalPriceCny(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCashOriginalPriceCny is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCashOriginalPriceCny requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCashOriginalPriceCny: %w", err)
+	}
+	return oldValue.CashOriginalPriceCny, nil
+}
+
+// AddCashOriginalPriceCny adds f to the "cash_original_price_cny" field.
+func (m *SubscriptionPlanMutation) AddCashOriginalPriceCny(f float64) {
+	if m.addcash_original_price_cny != nil {
+		*m.addcash_original_price_cny += f
+	} else {
+		m.addcash_original_price_cny = &f
+	}
+}
+
+// AddedCashOriginalPriceCny returns the value that was added to the "cash_original_price_cny" field in this mutation.
+func (m *SubscriptionPlanMutation) AddedCashOriginalPriceCny() (r float64, exists bool) {
+	v := m.addcash_original_price_cny
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearCashOriginalPriceCny clears the value of the "cash_original_price_cny" field.
+func (m *SubscriptionPlanMutation) ClearCashOriginalPriceCny() {
+	m.cash_original_price_cny = nil
+	m.addcash_original_price_cny = nil
+	m.clearedFields[subscriptionplan.FieldCashOriginalPriceCny] = struct{}{}
+}
+
+// CashOriginalPriceCnyCleared returns if the "cash_original_price_cny" field was cleared in this mutation.
+func (m *SubscriptionPlanMutation) CashOriginalPriceCnyCleared() bool {
+	_, ok := m.clearedFields[subscriptionplan.FieldCashOriginalPriceCny]
+	return ok
+}
+
+// ResetCashOriginalPriceCny resets all changes to the "cash_original_price_cny" field.
+func (m *SubscriptionPlanMutation) ResetCashOriginalPriceCny() {
+	m.cash_original_price_cny = nil
+	m.addcash_original_price_cny = nil
+	delete(m.clearedFields, subscriptionplan.FieldCashOriginalPriceCny)
+}
+
 // SetValidityDays sets the "validity_days" field.
 func (m *SubscriptionPlanMutation) SetValidityDays(i int) {
 	m.validity_days = &i
@@ -38992,7 +39136,7 @@ func (m *SubscriptionPlanMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SubscriptionPlanMutation) Fields() []string {
-	fields := make([]string, 0, 14)
+	fields := make([]string, 0, 16)
 	if m.group_id != nil {
 		fields = append(fields, subscriptionplan.FieldGroupID)
 	}
@@ -39010,6 +39154,12 @@ func (m *SubscriptionPlanMutation) Fields() []string {
 	}
 	if m.currency != nil {
 		fields = append(fields, subscriptionplan.FieldCurrency)
+	}
+	if m.cash_price_cny != nil {
+		fields = append(fields, subscriptionplan.FieldCashPriceCny)
+	}
+	if m.cash_original_price_cny != nil {
+		fields = append(fields, subscriptionplan.FieldCashOriginalPriceCny)
 	}
 	if m.validity_days != nil {
 		fields = append(fields, subscriptionplan.FieldValidityDays)
@@ -39055,6 +39205,10 @@ func (m *SubscriptionPlanMutation) Field(name string) (ent.Value, bool) {
 		return m.OriginalPrice()
 	case subscriptionplan.FieldCurrency:
 		return m.Currency()
+	case subscriptionplan.FieldCashPriceCny:
+		return m.CashPriceCny()
+	case subscriptionplan.FieldCashOriginalPriceCny:
+		return m.CashOriginalPriceCny()
 	case subscriptionplan.FieldValidityDays:
 		return m.ValidityDays()
 	case subscriptionplan.FieldValidityUnit:
@@ -39092,6 +39246,10 @@ func (m *SubscriptionPlanMutation) OldField(ctx context.Context, name string) (e
 		return m.OldOriginalPrice(ctx)
 	case subscriptionplan.FieldCurrency:
 		return m.OldCurrency(ctx)
+	case subscriptionplan.FieldCashPriceCny:
+		return m.OldCashPriceCny(ctx)
+	case subscriptionplan.FieldCashOriginalPriceCny:
+		return m.OldCashOriginalPriceCny(ctx)
 	case subscriptionplan.FieldValidityDays:
 		return m.OldValidityDays(ctx)
 	case subscriptionplan.FieldValidityUnit:
@@ -39158,6 +39316,20 @@ func (m *SubscriptionPlanMutation) SetField(name string, value ent.Value) error 
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCurrency(v)
+		return nil
+	case subscriptionplan.FieldCashPriceCny:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCashPriceCny(v)
+		return nil
+	case subscriptionplan.FieldCashOriginalPriceCny:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCashOriginalPriceCny(v)
 		return nil
 	case subscriptionplan.FieldValidityDays:
 		v, ok := value.(int)
@@ -39232,6 +39404,12 @@ func (m *SubscriptionPlanMutation) AddedFields() []string {
 	if m.addoriginal_price != nil {
 		fields = append(fields, subscriptionplan.FieldOriginalPrice)
 	}
+	if m.addcash_price_cny != nil {
+		fields = append(fields, subscriptionplan.FieldCashPriceCny)
+	}
+	if m.addcash_original_price_cny != nil {
+		fields = append(fields, subscriptionplan.FieldCashOriginalPriceCny)
+	}
 	if m.addvalidity_days != nil {
 		fields = append(fields, subscriptionplan.FieldValidityDays)
 	}
@@ -39252,6 +39430,10 @@ func (m *SubscriptionPlanMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedPrice()
 	case subscriptionplan.FieldOriginalPrice:
 		return m.AddedOriginalPrice()
+	case subscriptionplan.FieldCashPriceCny:
+		return m.AddedCashPriceCny()
+	case subscriptionplan.FieldCashOriginalPriceCny:
+		return m.AddedCashOriginalPriceCny()
 	case subscriptionplan.FieldValidityDays:
 		return m.AddedValidityDays()
 	case subscriptionplan.FieldSortOrder:
@@ -39286,6 +39468,20 @@ func (m *SubscriptionPlanMutation) AddField(name string, value ent.Value) error 
 		}
 		m.AddOriginalPrice(v)
 		return nil
+	case subscriptionplan.FieldCashPriceCny:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCashPriceCny(v)
+		return nil
+	case subscriptionplan.FieldCashOriginalPriceCny:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCashOriginalPriceCny(v)
+		return nil
 	case subscriptionplan.FieldValidityDays:
 		v, ok := value.(int)
 		if !ok {
@@ -39311,6 +39507,12 @@ func (m *SubscriptionPlanMutation) ClearedFields() []string {
 	if m.FieldCleared(subscriptionplan.FieldOriginalPrice) {
 		fields = append(fields, subscriptionplan.FieldOriginalPrice)
 	}
+	if m.FieldCleared(subscriptionplan.FieldCashPriceCny) {
+		fields = append(fields, subscriptionplan.FieldCashPriceCny)
+	}
+	if m.FieldCleared(subscriptionplan.FieldCashOriginalPriceCny) {
+		fields = append(fields, subscriptionplan.FieldCashOriginalPriceCny)
+	}
 	return fields
 }
 
@@ -39327,6 +39529,12 @@ func (m *SubscriptionPlanMutation) ClearField(name string) error {
 	switch name {
 	case subscriptionplan.FieldOriginalPrice:
 		m.ClearOriginalPrice()
+		return nil
+	case subscriptionplan.FieldCashPriceCny:
+		m.ClearCashPriceCny()
+		return nil
+	case subscriptionplan.FieldCashOriginalPriceCny:
+		m.ClearCashOriginalPriceCny()
 		return nil
 	}
 	return fmt.Errorf("unknown SubscriptionPlan nullable field %s", name)
@@ -39353,6 +39561,12 @@ func (m *SubscriptionPlanMutation) ResetField(name string) error {
 		return nil
 	case subscriptionplan.FieldCurrency:
 		m.ResetCurrency()
+		return nil
+	case subscriptionplan.FieldCashPriceCny:
+		m.ResetCashPriceCny()
+		return nil
+	case subscriptionplan.FieldCashOriginalPriceCny:
+		m.ResetCashOriginalPriceCny()
 		return nil
 	case subscriptionplan.FieldValidityDays:
 		m.ResetValidityDays()

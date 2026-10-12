@@ -93,7 +93,8 @@ type BillingCache interface {
 type ModelPricing struct {
 	InputPricePerToken                 float64 // 每token输入价格 (USD)
 	InputPricePerTokenPriority         float64 // priority service tier 下每token输入价格 (USD)
-	ImageInputPricePerToken            float64 // 图片输入 token 价格 (USD)，用于多模态 embedding 等图文不同价场景；为 0 时回退到 InputPricePerToken
+	ImageInputPricePerToken            float64 // 图片输入 token 价格 (USD)，未显式配置时为 0 则回退到 InputPricePerToken
+	ImageInputPriceExplicit            bool    // 显式 0 表示免费，区别于没有配置的价格
 	OutputPricePerToken                float64 // 每token输出价格 (USD)
 	OutputPricePerTokenPriority        float64 // priority service tier 下每token输出价格 (USD)
 	CacheCreationPricePerToken         float64 // 缓存创建每token价格 (USD)
@@ -175,6 +176,10 @@ type BillingService struct {
 	cfg            *config.Config
 	pricingService *PricingService
 	fallbackPrices map[string]*ModelPricing // 硬编码回退价格
+	simpleRepo     BillingManagementRepository
+	simpleMu       sync.Mutex
+	simpleConfig   *BillingManagementConfig
+	simpleConfigAt time.Time
 
 	// fallbackWarnSeen 记录已打过 fallback 警告日志的(已小写化)模型名,
 	// 让 "[Billing] Using fallback pricing" 每个模型每进程最多打一条,
@@ -1016,7 +1021,7 @@ func (s *BillingService) computeTokenBreakdown(
 			imageInputTokens = tokens.InputTokens
 		}
 		imageInputPrice := pricing.ImageInputPricePerToken
-		if imageInputPrice == 0 {
+		if imageInputPrice == 0 && !pricing.ImageInputPriceExplicit {
 			// 未配置图片输入档时回退到文本 input 价（已含 priority / 长上下文调整）
 			imageInputPrice = inputPrice
 		}

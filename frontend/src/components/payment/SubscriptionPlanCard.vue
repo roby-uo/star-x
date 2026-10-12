@@ -26,13 +26,13 @@
         </div>
         <div class="shrink-0 text-right">
           <div class="flex items-baseline gap-1">
-            <span class="text-xs text-gray-400 dark:text-dark-500">{{ planCurrencySymbol }}</span>
-            <span :class="['text-2xl font-extrabold tracking-tight', textClass]">{{ plan.price }}</span>
-            <span v-if="plan.currency" class="text-xs font-medium text-gray-400 dark:text-dark-500">{{ plan.currency }}</span>
+
+            <span :class="['text-2xl font-extrabold tracking-tight', textClass]">{{ formatCny(planPriceCny(plan)) }}</span>
+
           </div>
           <span class="text-[11px] text-gray-400 dark:text-dark-500">/ {{ validitySuffix }}</span>
           <div v-if="plan.original_price" class="mt-0.5 flex items-center justify-end gap-1.5">
-            <span class="text-xs text-gray-400 line-through dark:text-dark-500">{{ planCurrencySymbol }}{{ plan.original_price }}<template v-if="plan.currency"> {{ plan.currency }}</template></span>
+            <span class="text-xs text-gray-400 line-through dark:text-dark-500">{{ formatCny(planPriceCny(plan, true)) }}</span>
             <span :class="['rounded px-1 py-0.5 text-[10px] font-semibold', discountClass]">{{ discountText }}</span>
           </div>
         </div>
@@ -42,15 +42,15 @@
       <div class="mb-3 grid grid-cols-2 gap-x-3 gap-y-1 rounded-lg bg-gray-50 px-3 py-2 text-xs dark:bg-dark-700/50">
         <div v-if="plan.daily_limit_usd != null" class="flex items-center justify-between">
           <span class="text-gray-400 dark:text-dark-500">{{ t('payment.planCard.dailyLimit') }}</span>
-          <span class="font-medium text-gray-700 dark:text-gray-300">${{ plan.daily_limit_usd }}</span>
+          <span class="font-medium text-gray-700 dark:text-gray-300">{{ formatCnyFromLedger(plan.daily_limit_usd, 2) }}</span>
         </div>
         <div v-if="plan.weekly_limit_usd != null" class="flex items-center justify-between">
           <span class="text-gray-400 dark:text-dark-500">{{ t('payment.planCard.weeklyLimit') }}</span>
-          <span class="font-medium text-gray-700 dark:text-gray-300">${{ plan.weekly_limit_usd }}</span>
+          <span class="font-medium text-gray-700 dark:text-gray-300">{{ formatCnyFromLedger(plan.weekly_limit_usd, 2) }}</span>
         </div>
         <div v-if="plan.monthly_limit_usd != null" class="flex items-center justify-between">
           <span class="text-gray-400 dark:text-dark-500">{{ t('payment.planCard.monthlyLimit') }}</span>
-          <span class="font-medium text-gray-700 dark:text-gray-300">${{ plan.monthly_limit_usd }}</span>
+          <span class="font-medium text-gray-700 dark:text-gray-300">{{ formatCnyFromLedger(plan.monthly_limit_usd, 2) }}</span>
         </div>
         <div v-if="plan.daily_limit_usd == null && plan.weekly_limit_usd == null && plan.monthly_limit_usd == null" class="flex items-center justify-between">
           <span class="text-gray-400 dark:text-dark-500">{{ t('payment.planCard.quota') }}</span>
@@ -92,12 +92,14 @@
 </template>
 
 <script setup lang="ts">
+import { formatCnyFromLedger } from '@/utils/currency'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { SubscriptionPlan } from '@/types/payment'
 import type { UserSubscription } from '@/types'
 import { planValiditySuffix } from './validity'
-import { currencySymbol } from '@/components/payment/currency'
+import { planPriceCny } from '@/components/payment/planPricing'
+import { formatCny } from '@/utils/currency'
 import {
   platformAccentBarClass,
   platformBadgeLightClass,
@@ -134,7 +136,6 @@ const discountText = computed(() => {
   return pct > 0 ? `-${pct}%` : ''
 })
 
-const planCurrencySymbol = computed(() => currencySymbol(props.plan.currency || 'USD'))
 
 const MODEL_SCOPE_LABELS: Record<string, string> = {
   claude: 'Claude',

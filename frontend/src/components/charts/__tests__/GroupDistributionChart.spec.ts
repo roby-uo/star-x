@@ -59,6 +59,7 @@ describe('GroupDistributionChart', () => {
     expect(JSON.parse(wrapper.find('.chart-data').text()).datasets[0].data).toEqual([1200, 600])
     expect(wrapper.findAll('thead th')).toHaveLength(3)
     expect(wrapper.text()).not.toContain('$')
+    expect(wrapper.text()).not.toContain('¥')
     expect(wrapper.text()).not.toContain('Actual')
     expect(wrapper.text()).not.toContain('Standard')
   })
@@ -119,7 +120,7 @@ describe('GroupDistributionChart', () => {
       raw: 0.9,
       dataset: { data: [0.9, 0.1] },
     })
-    expect(label).toBe('group-b: $0.900 (90.0%)')
+    expect(label).toBe('group-b: ¥5.5800 (90.0%)')
   })
 
   it('can hide account cost for user usage stats without account_cost', () => {

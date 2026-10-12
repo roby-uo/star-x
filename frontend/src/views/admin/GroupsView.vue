@@ -200,11 +200,11 @@
                         )
                       "
                       >{{
-                        formatUsd(usageMap.get(row.id)?.today_cost ?? 0)
+                        formatQuotaAmount(usageMap.get(row.id)?.today_cost ?? 0)
                       }}</span
                     >
                     <span class="text-gray-400 dark:text-gray-500">
-                      / {{ formatUsd(row.daily_limit_usd) }}/{{
+                      / {{ formatQuotaAmount(row.daily_limit_usd) }}/{{
                         t("admin.groups.limitDay")
                       }}</span
                     >
@@ -218,7 +218,7 @@
                     >·</span
                   >
                   <span v-if="row.weekly_limit_usd" class="whitespace-nowrap"
-                    >{{ formatUsd(row.weekly_limit_usd) }}/{{
+                    >{{ formatQuotaAmount(row.weekly_limit_usd) }}/{{
                       t("admin.groups.limitWeek")
                     }}</span
                   >
@@ -228,7 +228,7 @@
                     >·</span
                   >
                   <span v-if="row.monthly_limit_usd" class="whitespace-nowrap"
-                    >{{ formatUsd(row.monthly_limit_usd) }}/{{
+                    >{{ formatQuotaAmount(row.monthly_limit_usd) }}/{{
                       t("admin.groups.limitMonth")
                     }}</span
                   >
@@ -242,7 +242,7 @@
                     >{{
                       usageLoading
                         ? "—"
-                        : formatUsd(usageMap.get(row.id)?.total_cost ?? 0)
+                        : formatQuotaAmount(usageMap.get(row.id)?.total_cost ?? 0)
                     }}</span
                   >
                 </div>
@@ -329,9 +329,7 @@
                   t("admin.groups.usageToday")
                 }}</span>
                 <span class="ml-1 font-medium text-gray-700 dark:text-gray-300"
-                  >${{
-                    formatCost(usageMap.get(row.id)?.today_cost ?? 0)
-                  }}</span
+                  >{{ formatCnyFromLedger(usageMap.get(row.id)?.today_cost ?? 0, 4) }}</span
                 >
               </div>
               <div class="text-gray-500 dark:text-gray-400">
@@ -339,9 +337,7 @@
                   t("admin.groups.usageTotal")
                 }}</span>
                 <span class="ml-1 font-medium text-gray-700 dark:text-gray-300"
-                  >${{
-                    formatCost(usageMap.get(row.id)?.total_cost ?? 0)
-                  }}</span
+                  >{{ formatCnyFromLedger(usageMap.get(row.id)?.total_cost ?? 0, 4) }}</span
                 >
               </div>
             </div>
@@ -699,8 +695,8 @@
               <label class="input-label">{{
                 t("admin.groups.subscription.dailyLimit")
               }}</label>
-              <input
-                v-model.number="createForm.daily_limit_usd"
+              <LedgerAmountInput
+                v-model="createForm.daily_limit_usd"
                 type="number"
                 step="0.01"
                 min="0"
@@ -712,8 +708,8 @@
               <label class="input-label">{{
                 t("admin.groups.subscription.weeklyLimit")
               }}</label>
-              <input
-                v-model.number="createForm.weekly_limit_usd"
+              <LedgerAmountInput
+                v-model="createForm.weekly_limit_usd"
                 type="number"
                 step="0.01"
                 min="0"
@@ -725,8 +721,8 @@
               <label class="input-label">{{
                 t("admin.groups.subscription.monthlyLimit")
               }}</label>
-              <input
-                v-model.number="createForm.monthly_limit_usd"
+              <LedgerAmountInput
+                v-model="createForm.monthly_limit_usd"
                 type="number"
                 step="0.01"
                 min="0"
@@ -893,9 +889,9 @@
           </div>
           <div class="grid grid-cols-3 gap-3">
             <div>
-              <label class="input-label">1K ($)</label>
-              <input
-                v-model.number="createForm.image_price_1k"
+              <label class="input-label">1K (¥)</label>
+              <LedgerAmountInput
+                v-model="createForm.image_price_1k"
                 type="number"
                 step="0.001"
                 min="0"
@@ -904,9 +900,9 @@
               />
             </div>
             <div>
-              <label class="input-label">2K ($)</label>
-              <input
-                v-model.number="createForm.image_price_2k"
+              <label class="input-label">2K (¥)</label>
+              <LedgerAmountInput
+                v-model="createForm.image_price_2k"
                 type="number"
                 step="0.001"
                 min="0"
@@ -915,9 +911,9 @@
               />
             </div>
             <div>
-              <label class="input-label">4K ($)</label>
-              <input
-                v-model.number="createForm.image_price_4k"
+              <label class="input-label">4K (¥)</label>
+              <LedgerAmountInput
+                v-model="createForm.image_price_4k"
                 type="number"
                 step="0.001"
                 min="0"
@@ -1037,9 +1033,9 @@
           </div>
           <div class="grid grid-cols-3 gap-3">
             <div>
-              <label class="input-label">480p ($/s)</label>
-              <input
-                v-model.number="createForm.video_price_480p"
+              <label class="input-label">480p (¥/s)</label>
+              <LedgerAmountInput
+                v-model="createForm.video_price_480p"
                 type="number"
                 step="0.001"
                 min="0"
@@ -1048,9 +1044,9 @@
               />
             </div>
             <div>
-              <label class="input-label">720p ($/s)</label>
-              <input
-                v-model.number="createForm.video_price_720p"
+              <label class="input-label">720p (¥/s)</label>
+              <LedgerAmountInput
+                v-model="createForm.video_price_720p"
                 type="number"
                 step="0.001"
                 min="0"
@@ -1059,9 +1055,9 @@
               />
             </div>
             <div>
-              <label class="input-label">1080p ($/s)</label>
-              <input
-                v-model.number="createForm.video_price_1080p"
+              <label class="input-label">1080p (¥/s)</label>
+              <LedgerAmountInput
+                v-model="createForm.video_price_1080p"
                 type="number"
                 step="0.001"
                 min="0"
@@ -1354,8 +1350,8 @@
             <label class="input-label">{{
               t("admin.groups.webSearchPricing.pricePerCall")
             }}</label>
-            <input
-              v-model.number="createForm.web_search_price_per_call"
+            <LedgerAmountInput
+              v-model="createForm.web_search_price_per_call"
               type="number"
               step="0.001"
               min="0"
@@ -2213,8 +2209,8 @@
               <label class="input-label">{{
                 t("admin.groups.subscription.dailyLimit")
               }}</label>
-              <input
-                v-model.number="editForm.daily_limit_usd"
+              <LedgerAmountInput
+                v-model="editForm.daily_limit_usd"
                 type="number"
                 step="0.01"
                 min="0"
@@ -2226,8 +2222,8 @@
               <label class="input-label">{{
                 t("admin.groups.subscription.weeklyLimit")
               }}</label>
-              <input
-                v-model.number="editForm.weekly_limit_usd"
+              <LedgerAmountInput
+                v-model="editForm.weekly_limit_usd"
                 type="number"
                 step="0.01"
                 min="0"
@@ -2239,8 +2235,8 @@
               <label class="input-label">{{
                 t("admin.groups.subscription.monthlyLimit")
               }}</label>
-              <input
-                v-model.number="editForm.monthly_limit_usd"
+              <LedgerAmountInput
+                v-model="editForm.monthly_limit_usd"
                 type="number"
                 step="0.01"
                 min="0"
@@ -2407,9 +2403,9 @@
           </div>
           <div class="grid grid-cols-3 gap-3">
             <div>
-              <label class="input-label">1K ($)</label>
-              <input
-                v-model.number="editForm.image_price_1k"
+              <label class="input-label">1K (¥)</label>
+              <LedgerAmountInput
+                v-model="editForm.image_price_1k"
                 type="number"
                 step="0.001"
                 min="0"
@@ -2418,9 +2414,9 @@
               />
             </div>
             <div>
-              <label class="input-label">2K ($)</label>
-              <input
-                v-model.number="editForm.image_price_2k"
+              <label class="input-label">2K (¥)</label>
+              <LedgerAmountInput
+                v-model="editForm.image_price_2k"
                 type="number"
                 step="0.001"
                 min="0"
@@ -2429,9 +2425,9 @@
               />
             </div>
             <div>
-              <label class="input-label">4K ($)</label>
-              <input
-                v-model.number="editForm.image_price_4k"
+              <label class="input-label">4K (¥)</label>
+              <LedgerAmountInput
+                v-model="editForm.image_price_4k"
                 type="number"
                 step="0.001"
                 min="0"
@@ -2551,9 +2547,9 @@
           </div>
           <div class="grid grid-cols-3 gap-3">
             <div>
-              <label class="input-label">480p ($/s)</label>
-              <input
-                v-model.number="editForm.video_price_480p"
+              <label class="input-label">480p (¥/s)</label>
+              <LedgerAmountInput
+                v-model="editForm.video_price_480p"
                 type="number"
                 step="0.001"
                 min="0"
@@ -2562,9 +2558,9 @@
               />
             </div>
             <div>
-              <label class="input-label">720p ($/s)</label>
-              <input
-                v-model.number="editForm.video_price_720p"
+              <label class="input-label">720p (¥/s)</label>
+              <LedgerAmountInput
+                v-model="editForm.video_price_720p"
                 type="number"
                 step="0.001"
                 min="0"
@@ -2573,9 +2569,9 @@
               />
             </div>
             <div>
-              <label class="input-label">1080p ($/s)</label>
-              <input
-                v-model.number="editForm.video_price_1080p"
+              <label class="input-label">1080p (¥/s)</label>
+              <LedgerAmountInput
+                v-model="editForm.video_price_1080p"
                 type="number"
                 step="0.001"
                 min="0"
@@ -2864,8 +2860,8 @@
             <label class="input-label">{{
               t("admin.groups.webSearchPricing.pricePerCall")
             }}</label>
-            <input
-              v-model.number="editForm.web_search_price_per_call"
+            <LedgerAmountInput
+              v-model="editForm.web_search_price_per_call"
               type="number"
               step="0.001"
               min="0"
@@ -3582,6 +3578,8 @@
 </template>
 
 <script setup lang="ts">
+import LedgerAmountInput from '@/components/common/LedgerAmountInput.vue'
+import { formatCnyFromLedger } from '@/utils/currency'
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
@@ -4480,7 +4478,7 @@ const formatImagePricePreview = (value: number | string | null | undefined) => {
   if (!Number.isFinite(price) || price < 0) {
     return t("admin.groups.imagePricing.notConfigured");
   }
-  return `$${price.toFixed(6).replace(/0+$/, "").replace(/\.$/, "")}`;
+  return formatCnyFromLedger(price, 6);
 };
 
 const formatVideoPricePreview = (value: number | string | null | undefined) => {
@@ -4491,7 +4489,7 @@ const formatVideoPricePreview = (value: number | string | null | undefined) => {
   if (!Number.isFinite(price) || price < 0) {
     return t("admin.groups.videoPricing.notConfigured");
   }
-  return `$${price.toFixed(6).replace(/0+$/, "").replace(/\.$/, "")}`;
+  return formatCnyFromLedger(price, 6);
 };
 
 const buildImageFinalPricePreview = (form: ImagePricingFormState) => {
@@ -4644,14 +4642,10 @@ const loadGroups = async () => {
   }
 };
 
-const formatCost = (cost: number): string => {
-  if (cost >= 1000) return cost.toFixed(0);
-  if (cost >= 100) return cost.toFixed(1);
-  return cost.toFixed(2);
-};
 
-const formatUsd = (cost: number | null | undefined): string =>
-  `$${formatCost(cost ?? 0)}`;
+
+const formatQuotaAmount = (cost: number | null | undefined): string =>
+  formatCnyFromLedger(cost ?? 0, 4);
 
 const getQuotaUsageClass = (
   used: number,

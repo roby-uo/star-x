@@ -12,14 +12,17 @@ describe('EndpointDistributionChart user privacy', () => {
     expect(JSON.parse(wrapper.find('.chart-data').text()).datasets[0].data).toEqual([120])
     expect(wrapper.findAll('th')).toHaveLength(3)
     expect(wrapper.text()).not.toContain('$')
+    expect(wrapper.text()).not.toContain('¥')
     expect(wrapper.text()).not.toContain('metricActualCost')
     expect(wrapper.text()).not.toContain('admin.dashboard.standard')
     const options = (wrapper.vm as any).$?.setupState.doughnutOptions
     expect(options.plugins.tooltip.callbacks.label({ label: 'chat', raw: 120, dataset: { data: [120] } })).toBe('chat: 120 (100.0%)')
   })
-  it('preserves monetary figures for administrator callers', () => {
+  it('converts administrator monetary figures to CNY at the fixed 6.2 rate', () => {
     const wrapper = mount(EndpointDistributionChart, { props: { endpointStats } })
     expect(wrapper.findAll('th')).toHaveLength(5)
-    expect(wrapper.text()).toContain('$')
+    expect(wrapper.text()).toContain('¥28.3204')
+    expect(wrapper.text()).toContain('¥35.2092')
+    expect(wrapper.text()).not.toContain('$')
   })
 })

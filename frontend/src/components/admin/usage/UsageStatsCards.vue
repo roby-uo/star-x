@@ -65,16 +65,16 @@
       <div class="min-w-0 flex-1">
         <p class="text-xs font-medium text-gray-500">{{ t('usage.totalCost') }}</p>
         <p class="text-xl font-bold text-green-600">
-          ${{ (stats?.total_actual_cost || 0).toFixed(4) }}
+          {{ formatCnyFromLedger((stats?.total_actual_cost || 0), 4) }}
         </p>
         <p class="text-xs text-gray-400">
           <template v-if="showAccountCost && totalAccountCost != null">
-            <span class="text-orange-500">{{ t('usage.accountCost') }} ${{ totalAccountCost.toFixed(4) }}</span>
+            <span class="text-orange-500">{{ t('usage.accountCost') }} {{ formatCnyFromLedger(totalAccountCost, 4) }}</span>
             <span> · </span>
           </template>
           <span>
             {{ t('usage.standardCost') }}
-            <span :class="{ 'line-through': strikeStandardCost }">${{ (stats?.total_cost || 0).toFixed(4) }}</span>
+            <span :class="{ 'line-through': strikeStandardCost }">{{ formatCnyFromLedger((stats?.total_cost || 0), 4) }}</span>
           </span>
         </p>
       </div>
@@ -89,6 +89,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatCnyFromLedger } from '@/utils/currency'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { AdminUsageStatsResponse } from '@/api/admin/usage'

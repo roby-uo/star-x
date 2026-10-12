@@ -201,7 +201,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	longContextBillingEnabled := billingAccount.IsOpenAILongContextBillingEnabled()
 	miniMaxPriority := miniMaxM3PriorityBilling(billingAccount, result, serviceTier)
 	billingServiceTier := serviceTier
-	if miniMaxPriority {
+	if result.SimpleBilling == nil && miniMaxPriority {
 		billingServiceTier = ""
 	}
 	cost, err = s.calculateOpenAIRecordUsageCost(
@@ -232,8 +232,11 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		).Warn("openai_usage.pricing_missing_record_zero_cost", zap.Error(err))
 		cost = &CostBreakdown{BillingMode: string(BillingModeToken)}
 	}
-	if miniMaxPriority {
+	if result.SimpleBilling == nil && miniMaxPriority {
 		applyMiniMaxM3PriorityCost(cost)
+	}
+	if result.SimpleBilling != nil {
+		multiplier, imageMultiplier, videoMultiplier = result.SimpleBilling.Multiplier, result.SimpleBilling.Multiplier, result.SimpleBilling.Multiplier
 	}
 
 	// Determine billing type
@@ -354,7 +357,14 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	}
 
 	// 计算账号统计定价费用（使用最终上游模型匹配自定义规则）
-	if apiKey.GroupID != nil {
+	if result.SimpleBilling != nil {
+		base := cost.TotalCost
+		usageLog.AccountStatsCost = &base
+		if result.SimpleBilling.Route == "api" {
+			accountRateMultiplier = 1
+		}
+		usageLog.AccountRateMultiplier = &accountRateMultiplier
+	} else if apiKey.GroupID != nil {
 		applyAccountStatsCost(ctx, usageLog, s.channelService, s.billingService,
 			account.ID, *apiKey.GroupID, result.UpstreamModel, result.Model,
 			tokens, cost.TotalCost,
@@ -386,6 +396,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 			RequestPayloadHash:    resolveUsageBillingPayloadFingerprint(ctx, input.RequestPayloadHash),
 			IsSubscriptionBill:    isSubscriptionBilling,
 			AccountRateMultiplier: accountRateMultiplier,
+			SimpleBilling:         result.SimpleBilling,
 			APIKeyService:         input.APIKeyService,
 			Platform:              quotaPlatform,
 		}, s.billingDeps(), s.usageBillingRepo)
@@ -413,6 +424,26 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 	serviceTier string,
 	longContextBillingEnabled bool,
 ) (*CostBreakdown, error) {
+	if result != nil && result.VideoQuote != nil {
+		if result.VideoQuote.SimpleBilling != nil {
+			result.SimpleBilling = result.VideoQuote.SimpleBilling
+		}
+		// Existing video tasks retain their accepted legacy quote even after
+		// administrators enable the new policy.
+		return &CostBreakdown{TotalCost: result.VideoQuote.UnitPrice * float64(result.VideoDurationSeconds) * float64(result.VideoCount), ActualCost: result.VideoQuote.Total, BillingMode: string(BillingModeVideo)}, nil
+	}
+	if result != nil && result.SimpleBilling != nil {
+		requests := 1
+		if result.SimpleBilling.Operation == "alpha_search" {
+			requests = result.WebSearchCalls
+		}
+		return s.billingService.CalculateSimpleBilling(result.SimpleBilling, BillingPreviewInput{Model: result.SimpleBilling.Model, InputTokens: tokens.InputTokens, OutputTokens: tokens.OutputTokens, ImageInputTokens: tokens.ImageInputTokens, ImageOutputTokens: tokens.ImageOutputTokens, CacheReadTokens: tokens.CacheReadTokens, CacheWriteTokens: tokens.CacheCreationTokens, ImageCount: result.ImageCount, ImageOutputSizes: result.ImageOutputSizes, DurationSeconds: float64(result.VideoDurationSeconds), Requests: requests})
+	}
+	if cfg, err := s.billingService.simpleBillingConfig(ctx); err != nil {
+		return nil, err
+	} else if cfg != nil && cfg.SimpleBillingEnabled {
+		return nil, simplePriceError("缺少请求前的计费快照，拒绝猜测扣费")
+	}
 	billingModel := firstUsageBillingModel(billingModels)
 	if result != nil && result.WebSearchCalls > 0 {
 		// Codex alpha/search 网页搜索按次计费：上游不返回 usage/token 字段，单价只取

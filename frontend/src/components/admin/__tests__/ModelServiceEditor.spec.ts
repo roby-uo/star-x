@@ -5,10 +5,12 @@ import type { Account, AdminGroup } from '@/types'
 import type { Channel } from '@/api/admin/channels'
 import channelsAPI from '@/api/admin/channels'
 import { getAllIncludingInactive } from '@/api/admin/groups'
+import { billingManagementAPI } from '@/api/admin/billingManagement'
 import ModelServiceEditor from '../ModelServiceEditor.vue'
 
 vi.mock('@/api/admin/channels', () => ({ default: { getById: vi.fn(), update: vi.fn(), create: vi.fn() } }))
 vi.mock('@/api/admin/groups', () => ({ getAllIncludingInactive: vi.fn() }))
+vi.mock('@/api/admin/billingManagement', () => ({ billingManagementAPI: { getConfig: vi.fn() } }))
 
 const channel = (id = 4, groupID = 1): Channel => ({
   id, name: `范围 ${id}`, status: 'active', group_ids: [groupID], model_mapping: {}, restrict_models: false,
@@ -29,6 +31,7 @@ async function editor(channels = [channel()]) {
 describe('model service publishing flow', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(billingManagementAPI.getConfig).mockResolvedValue({ version: 0, simple_billing_enabled: false, api_sale_multiplier: 1.4, usd_to_cny_rate: 6.2, exchange_rate_source: '', exchange_rate_effective_at: null, cost_profiles: [] })
     vi.mocked(getAllIncludingInactive).mockResolvedValue([{ id: 1, name: '普通用户', platform: 'openai', status: 'active', rate_multiplier: 1.4, allow_image_generation: true },
       { id: 2, name: 'VIP', platform: 'openai', status: 'active', rate_multiplier: 1, allow_image_generation: true }] as AdminGroup[])
     vi.mocked(channelsAPI.getById).mockResolvedValue(channel())
@@ -46,7 +49,7 @@ describe('model service publishing flow', () => {
     await flushPromises()
     expect(channelsAPI.update).toHaveBeenCalledWith(4, expect.objectContaining({
       features_config: expect.objectContaining({ other_feature: true, model_services: [expect.objectContaining({ state: 'published' })] }),
-      model_pricing: [expect.objectContaining({ models: ['beta'], input_price: 0.000001 }), expect.objectContaining({ models: ['alpha'], input_price: 0.000009 })]
+      model_pricing: [expect.objectContaining({ models: ['beta'], input_price: 0.000001 }), expect.objectContaining({ models: ['alpha'], input_price: 0.000001451612903 })]
     }))
     wrapper.unmount()
   })
@@ -115,6 +118,28 @@ describe('model service publishing flow', () => {
     await wrapper.findAll('button').find(button => button.text() === '确认')!.trigger('click')
     await flushPromises()
     expect(channelsAPI.update).toHaveBeenCalledWith(4, { features_config: { model_services: [h3, expect.objectContaining({ model: 'MiniMax-H3-Max', resolutions: ['480P', '768P'], min_duration: 5, prices: { '480P': 0.05, '768P': 0.08 }, state: 'published' })] } })
+    wrapper.unmount()
+  })
+
+  it('uses centralized billing in simple mode and preserves existing model prices when applying service permissions', async () => {
+    vi.mocked(billingManagementAPI.getConfig).mockResolvedValue({ version: 3, simple_billing_enabled: true, api_sale_multiplier: 1.4, usd_to_cny_rate: 6.2, exchange_rate_source: '', exchange_rate_effective_at: null, cost_profiles: [] })
+    const original = channel()
+    const pricesBefore = structuredClone(original.model_pricing)
+    const wrapper = await editor([original])
+
+    expect(wrapper.find('input[placeholder="沿用默认"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('基础售价（人民币 / 秒）')
+    expect(wrapper.text()).toContain('售价统一在')
+    expect(wrapper.find('a[to="/admin/billing-management"]').exists()).toBe(true)
+    await wrapper.findAll('button').find(button => button.text() === '预览并应用')!.trigger('click')
+    expect(channelsAPI.update).not.toHaveBeenCalled()
+    await wrapper.findAll('button').find(button => button.text() === '确认')!.trigger('click')
+    await flushPromises()
+
+    const request = vi.mocked(channelsAPI.update).mock.calls[0]?.[1]
+    expect(request).not.toHaveProperty('model_pricing')
+    expect(request?.features_config?.model_services).toEqual([expect.objectContaining({ model: 'alpha', state: 'published' })])
+    expect(original.model_pricing).toEqual(pricesBefore)
     wrapper.unmount()
   })
 })

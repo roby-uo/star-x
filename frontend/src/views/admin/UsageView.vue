@@ -182,6 +182,7 @@
 </template>
 
 <script setup lang="ts">
+import { ledgerFixed } from '@/utils/currency'
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { saveAs } from 'file-saver'
@@ -576,11 +577,11 @@ const exportToExcel = async () => {
         log.upstream_model || '', identifyAgentClient(log.user_agent) || '', formatUsageReasoning(log.reasoning_effort, locale.value), log.group?.name || '',
         log.inbound_endpoint || '', log.upstream_endpoint || '', getRequestTypeLabel(log),
         log.input_tokens, log.output_tokens, log.cache_read_tokens, log.cache_creation_tokens,
-        log.input_cost?.toFixed(6) || '0.000000', log.output_cost?.toFixed(6) || '0.000000',
-        log.cache_read_cost?.toFixed(6) || '0.000000', log.cache_creation_cost?.toFixed(6) || '0.000000',
+        ledgerFixed(log.input_cost, 6), ledgerFixed(log.output_cost, 6),
+        ledgerFixed(log.cache_read_cost, 6), ledgerFixed(log.cache_creation_cost, 6),
         log.rate_multiplier?.toPrecision(4) || '1.00', (log.account_rate_multiplier ?? 1).toPrecision(4),
-        log.total_cost?.toFixed(6) || '0.000000', log.actual_cost?.toFixed(6) || '0.000000',
-        ((log.account_stats_cost ?? log.total_cost) * (log.account_rate_multiplier ?? 1)).toFixed(6), log.first_token_ms ?? '', log.duration_ms,
+        ledgerFixed(log.total_cost, 6), ledgerFixed(log.actual_cost, 6),
+        ledgerFixed((log.account_stats_cost ?? log.total_cost) * (log.account_rate_multiplier ?? 1), 6), log.first_token_ms ?? '', log.duration_ms,
         log.request_id || '', log.user_agent || '', log.ip_address || ''
       ])
       if (rows.length) {

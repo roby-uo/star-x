@@ -99,37 +99,37 @@
           <!-- Default prices (fallback when no interval matches) -->
           <label class="mt-3 block text-xs font-medium text-gray-500 dark:text-gray-400">
             {{ t('admin.channels.form.defaultPrices') }}
-            <span class="ml-1 font-normal text-gray-400">$/MTok</span>
+            <span class="ml-1 font-normal text-gray-400">¥/MTok</span>
           </label>
           <div class="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-6">
             <div>
               <label class="text-xs text-gray-400">{{ t('admin.channels.form.inputPrice') }}</label>
-              <input :value="entry.input_price" @input="emitField('input_price', ($event.target as HTMLInputElement).value)"
+              <LedgerAmountInput :model-value="entry.input_price" @update:model-value="emitField('input_price', $event)"
                 type="number" step="any" min="0" class="input mt-0.5 text-sm" :placeholder="t('admin.channels.form.pricePlaceholder')" />
             </div>
             <div>
               <label class="text-xs text-gray-400">{{ t('admin.channels.form.outputPrice') }}</label>
-              <input :value="entry.output_price" @input="emitField('output_price', ($event.target as HTMLInputElement).value)"
+              <LedgerAmountInput :model-value="entry.output_price" @update:model-value="emitField('output_price', $event)"
                 type="number" step="any" min="0" class="input mt-0.5 text-sm" :placeholder="t('admin.channels.form.pricePlaceholder')" />
             </div>
             <div>
               <label class="text-xs text-gray-400">{{ t('admin.channels.form.cacheWritePrice') }}</label>
-              <input :value="entry.cache_write_price" @input="emitField('cache_write_price', ($event.target as HTMLInputElement).value)"
+              <LedgerAmountInput :model-value="entry.cache_write_price" @update:model-value="emitField('cache_write_price', $event)"
                 type="number" step="any" min="0" class="input mt-0.5 text-sm" :placeholder="t('admin.channels.form.pricePlaceholder')" />
             </div>
             <div>
               <label class="text-xs text-gray-400">{{ t('admin.channels.form.cacheReadPrice') }}</label>
-              <input :value="entry.cache_read_price" @input="emitField('cache_read_price', ($event.target as HTMLInputElement).value)"
+              <LedgerAmountInput :model-value="entry.cache_read_price" @update:model-value="emitField('cache_read_price', $event)"
                 type="number" step="any" min="0" class="input mt-0.5 text-sm" :placeholder="t('admin.channels.form.pricePlaceholder')" />
             </div>
             <div>
               <label class="text-xs text-gray-400">{{ t('admin.channels.form.imageInputPrice') }}</label>
-              <input :value="entry.image_input_price" @input="emitField('image_input_price', ($event.target as HTMLInputElement).value)"
+              <LedgerAmountInput :model-value="entry.image_input_price" @update:model-value="emitField('image_input_price', $event)"
                 type="number" step="any" min="0" class="input mt-0.5 text-sm" :placeholder="t('admin.channels.form.pricePlaceholder')" />
             </div>
             <div>
               <label class="text-xs text-gray-400">{{ t('admin.channels.form.imageTokenPrice') }}</label>
-              <input :value="entry.image_output_price" @input="emitField('image_output_price', ($event.target as HTMLInputElement).value)"
+              <LedgerAmountInput :model-value="entry.image_output_price" @update:model-value="emitField('image_output_price', $event)"
                 type="number" step="any" min="0" class="input mt-0.5 text-sm" :placeholder="t('admin.channels.form.pricePlaceholder')" />
             </div>
           </div>
@@ -163,10 +163,10 @@
           <!-- Default per-request price -->
           <label class="mt-3 block text-xs font-medium text-gray-500 dark:text-gray-400">
             {{ t('admin.channels.form.defaultPerRequestPrice') }}
-            <span class="ml-1 font-normal text-gray-400">$</span>
+            <span class="ml-1 font-normal text-gray-400">¥</span>
           </label>
           <div class="mt-1 w-48">
-            <input :value="entry.per_request_price" @input="emitField('per_request_price', ($event.target as HTMLInputElement).value)"
+            <LedgerAmountInput :model-value="entry.per_request_price" @update:model-value="emitField('per_request_price', $event)"
               type="number" step="any" min="0" class="input text-sm" :placeholder="t('admin.channels.form.pricePlaceholder')" />
           </div>
 
@@ -199,10 +199,10 @@
           <!-- Default image price (per-request, same as per_request mode) -->
           <label class="mt-3 block text-xs font-medium text-gray-500 dark:text-gray-400">
             {{ t('admin.channels.form.defaultImagePrice') }}
-            <span class="ml-1 font-normal text-gray-400">$</span>
+            <span class="ml-1 font-normal text-gray-400">¥</span>
           </label>
           <div class="mt-1 w-48">
-            <input :value="entry.per_request_price" @input="emitField('per_request_price', ($event.target as HTMLInputElement).value)"
+            <LedgerAmountInput :model-value="entry.per_request_price" @update:model-value="emitField('per_request_price', $event)"
               type="number" step="any" min="0" class="input text-sm" :placeholder="t('admin.channels.form.pricePlaceholder')" />
           </div>
 
@@ -232,6 +232,7 @@
 </template>
 
 <script setup lang="ts">
+import LedgerAmountInput from '@/components/common/LedgerAmountInput.vue'
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Select from '@/components/common/Select.vue'
@@ -269,7 +270,7 @@ const billingModeLabel = computed(() => {
   return opt ? opt.label : props.entry.billing_mode
 })
 
-function emitField(field: keyof PricingFormEntry, value: string) {
+function emitField(field: keyof PricingFormEntry, value: string | number | null) {
   emit('update', { ...props.entry, [field]: value === '' ? null : value })
 }
 

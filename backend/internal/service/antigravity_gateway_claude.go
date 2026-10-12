@@ -27,7 +27,7 @@ import (
 //	      └─ retryDelay <  7s → 等待后重试 1 次
 //	          ├─ 成功 → 正常返回
 //	          └─ 失败 → 设置模型限流 + 清除粘性绑定 → 切换账号
-func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context, account *Account, body []byte, isStickySession bool) (*ForwardResult, error) {
+func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context, account *Account, body []byte, isStickySession bool) (forwardedResult *ForwardResult, forwardErr error) {
 	// 上游透传账号直接转发，不走 OAuth token 刷新
 	if account.Type == AccountTypeUpstream {
 		return s.ForwardUpstream(ctx, c, account, body)
@@ -57,6 +57,16 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 	thinkingEnabled := claudeReq.Thinking != nil && (claudeReq.Thinking.Type == "enabled" || claudeReq.Thinking.Type == "adaptive")
 	mappedModel = applyThinkingModelSuffix(mappedModel, thinkingEnabled)
 	billingModel := mappedModel
+	snapshot, pricingErr := prepareProtocolSimpleBilling(ctx, c, account, billingModel, body, "")
+	if pricingErr != nil {
+		writeSimpleBillingPreflightError(c)
+		return nil, pricingErr
+	}
+	defer func() {
+		if forwardedResult != nil {
+			forwardedResult.SimpleBilling = snapshot
+		}
+	}()
 
 	// 获取 access_token
 	if s.tokenProvider == nil {

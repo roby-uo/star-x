@@ -237,6 +237,26 @@ async function mountSubscriptionConfirm(options: Parameters<typeof checkoutInfoW
 }
 
 describe('PaymentView subscription confirmation amounts', () => {
+  it('uses the new CNY cash price once instead of applying the legacy subscription exchange rate', async () => {
+    const wrapper = await mountSubscriptionConfirm({
+      checkout: { simple_billing_enabled: true, subscription_usd_to_cny_rate: 7.15 },
+      method: { currency: 'CNY' },
+      plan: { price: 100, currency: 'CNY', cash_price_cny: 100, price_cny: 100 },
+    })
+    expect(wrapper.text()).toContain('¥100.00')
+    expect(wrapper.text()).not.toContain('¥715.00')
+  })
+
+  it('preserves the old cash price of a legacy plan whose USD currency was display-only', async () => {
+    const wrapper = await mountSubscriptionConfirm({
+      checkout: { simple_billing_enabled: true, subscription_usd_to_cny_rate: 0 },
+      method: { currency: 'CNY' },
+      plan: { price: 100, currency: 'USD', price_cny: 100 },
+    })
+    expect(wrapper.text()).toContain('¥100.00')
+    expect(wrapper.text()).not.toContain('¥620.00')
+  })
+
   it('shows converted CNY pay amount using the subscription rate, not the balance multiplier', async () => {
     const wrapper = await mountSubscriptionConfirm({
       checkout: {

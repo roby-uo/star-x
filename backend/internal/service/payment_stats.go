@@ -36,7 +36,13 @@ func (s *PaymentService) GetDashboardStats(ctx context.Context, days int) (*Dash
 		return nil, err
 	}
 
-	st := &DashboardStats{}
+	// Stats represent received cash rather than wallet credit. Convert per order
+	// before aggregation, without rewriting any historical provider amount.
+	orders, err = paymentOrdersForCNYStats(orders)
+	if err != nil {
+		return nil, err
+	}
+	st := &DashboardStats{Currency: "CNY"}
 	computeBasicStats(st, orders, todayStart)
 
 	st.PendingOrders, err = s.entClient.PaymentOrder.Query().
@@ -51,6 +57,20 @@ func (s *PaymentService) GetDashboardStats(ctx context.Context, days int) (*Dash
 	st.TopUsers = buildTopUsers(orders)
 
 	return st, nil
+}
+
+func paymentOrdersForCNYStats(orders []*dbent.PaymentOrder) ([]*dbent.PaymentOrder, error) {
+	out := make([]*dbent.PaymentOrder, 0, len(orders))
+	for _, order := range orders {
+		amount, err := paymentCashAmountCNY(order.PayAmount, PaymentOrderCurrency(order))
+		if err != nil {
+			return nil, err
+		}
+		copyOrder := *order
+		copyOrder.PayAmount = amount
+		out = append(out, &copyOrder)
+	}
+	return out, nil
 }
 
 func computeBasicStats(st *DashboardStats, orders []*dbent.PaymentOrder, todayStart time.Time) {

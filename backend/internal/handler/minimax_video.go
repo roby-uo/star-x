@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"strings"
 	"time"
 
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/minimax"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
@@ -33,6 +35,10 @@ func (h *OpenAIGatewayHandler) MiniMaxVideoQuote(c *gin.Context) {
 	}
 	quote, err := h.gatewayService.QuoteMiniMaxVideo(c.Request.Context(), key, input)
 	if err != nil {
+		if infraerrors.Reason(err) == "PRICING_UNCONFIRMED" {
+			h.errorResponse(c, http.StatusServiceUnavailable, "pricing_unconfirmed", "视频计费配置待确认，请联系管理员")
+			return
+		}
 		h.errorResponse(c, http.StatusForbidden, "permission_error", err.Error())
 		return
 	}
@@ -103,6 +109,10 @@ func (h *OpenAIGatewayHandler) MiniMaxVideoGeneration(c *gin.Context) {
 	}
 	quote, err := h.gatewayService.QuoteMiniMaxVideo(c.Request.Context(), apiKey, input)
 	if err != nil {
+		if infraerrors.Reason(err) == "PRICING_UNCONFIRMED" {
+			h.errorResponse(c, http.StatusServiceUnavailable, "pricing_unconfirmed", "视频计费配置待确认，请联系管理员")
+			return
+		}
 		h.errorResponse(c, http.StatusForbidden, "permission_error", err.Error())
 		return
 	}
@@ -148,6 +158,19 @@ func (h *OpenAIGatewayHandler) MiniMaxVideoGeneration(c *gin.Context) {
 	if selection.ReleaseFunc != nil {
 		defer selection.ReleaseFunc()
 	}
+	selectedQuote, pricingErr := h.gatewayService.QuoteMiniMaxVideoForAccount(ctx, apiKey, account, input)
+	if pricingErr != nil {
+		h.errorResponse(c, http.StatusServiceUnavailable, "pricing_unconfirmed", "视频计费配置待确认，请联系管理员")
+		return
+	}
+	if !sameMiniMaxVideoCharge(quote, selectedQuote) {
+		h.errorResponse(c, http.StatusConflict, "quote_changed", "价格或开放规格已变化，请重新获取报价")
+		return
+	}
+	// The public version describes the whole eligible pool; persist the actual
+	// selected procurement snapshot while keeping that accepted opaque version.
+	selectedQuote.Version = quote.Version
+	quote = selectedQuote
 	client, err := minimax.NewVideoClient(baseURL, &http.Client{Timeout: 45 * time.Second})
 	if err != nil {
 		h.errorResponse(c, http.StatusBadGateway, "upstream_error", "MiniMax account URL is invalid")
@@ -199,6 +222,16 @@ func (h *OpenAIGatewayHandler) MiniMaxVideoGeneration(c *gin.Context) {
 	}
 	setOpsSelectedAccount(c, account.ID, account.Platform)
 	c.JSON(http.StatusOK, gin.H{"id": task.ID, "task_id": created.TaskID, "quote": userQuoteFromVideoQuote(quote), "state": "queued"})
+}
+
+func sameMiniMaxVideoCharge(quoted, selected *service.VideoQuote) bool {
+	if quoted == nil || selected == nil || quoted.Currency != selected.Currency || math.Abs(quoted.Total-selected.Total) > 1e-10 || math.Abs(quoted.UnitPrice-selected.UnitPrice) > 1e-10 || quoted.Multiplier != selected.Multiplier {
+		return false
+	}
+	if (quoted.SimpleBilling == nil) != (selected.SimpleBilling == nil) {
+		return false
+	}
+	return quoted.SimpleBilling == nil || quoted.SimpleBilling.Version == selected.SimpleBilling.Version
 }
 
 func miniMaxPublicContentAllowed(items []minimax.VideoContent) bool {

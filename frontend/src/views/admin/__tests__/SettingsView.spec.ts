@@ -58,6 +58,30 @@ const {
 }));
 
 const localeRef = vi.hoisted(() => ({ value: "zh-CN" }));
+const routeFixture = vi.hoisted(() => ({
+  current: null as { path: string; query: Record<string, unknown> } | null,
+}));
+
+vi.mock("vue-router", async () => {
+  const actual = await vi.importActual<typeof import("vue-router")>("vue-router");
+  const { reactive } = await vi.importActual<typeof import("vue")>("vue");
+  routeFixture.current = reactive({ path: "/admin/settings", query: {} });
+  return { ...actual, useRoute: () => routeFixture.current };
+});
+
+vi.mock("@/api/admin/payment", async () => {
+  const actual = await vi.importActual<typeof import("@/api/admin/payment")>("@/api/admin/payment");
+  const api = {
+    ...actual.adminPaymentAPI,
+    getConfig: vi.fn().mockResolvedValue({ data: { simple_billing_enabled: true, recharge_bonus_multiplier: 1 } }),
+    updateConfig: vi.fn().mockResolvedValue({}),
+  };
+  return { ...actual, adminPaymentAPI: api, default: api };
+});
+
+beforeEach(() => {
+  routeFixture.current!.query = {};
+});
 
 vi.mock("@/api", () => ({
   adminAPI: {
@@ -101,6 +125,10 @@ vi.mock("@/stores", () => ({
     showInfo: vi.fn(),
     fetchPublicSettings,
   }),
+}));
+
+vi.mock("@/stores/app", () => ({
+  useAppStore: () => ({ showError, showSuccess, fetchPublicSettings }),
 }));
 
 vi.mock("@/stores/adminSettings", () => ({
@@ -652,6 +680,24 @@ describe("admin SettingsView payment visible method controls", () => {
 
     expect(wrapper.text()).not.toContain("可见方式");
     expect(wrapper.text()).not.toContain("支付来源");
+  });
+
+  it("opens the payment tab directly from the billing management link", async () => {
+    routeFixture.current!.query = { tab: "payment" };
+    const wrapper = mountView();
+    await flushPromises();
+
+    const selected = wrapper.get('[role="tab"][aria-selected="true"]');
+    expect(selected.text()).toContain("admin.settings.tabs.payment");
+    expect(wrapper.text()).toContain("admin.settings.payment.cnyRechargeTitle");
+
+    routeFixture.current!.query = { tab: "gateway" };
+    await flushPromises();
+    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toContain("admin.settings.tabs.gateway");
+    routeFixture.current!.query = { tab: "unknown" };
+    await flushPromises();
+    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toContain("admin.settings.tabs.gateway");
+    wrapper.unmount();
   });
 
   it("loads, edits, validates, and saves forwarded client-IP headers", async () => {

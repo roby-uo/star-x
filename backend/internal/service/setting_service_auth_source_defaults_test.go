@@ -126,7 +126,7 @@ func TestSettingService_UpdateAuthSourceDefaultSettings_PersistsAllKeys(t *testi
 		ForceEmailOnThirdPartySignup: true,
 	})
 	require.NoError(t, err)
-	require.Equal(t, "1.25000000", repo.updates[SettingKeyAuthSourceDefaultEmailBalance])
+	require.Equal(t, "1.250000000000", repo.updates[SettingKeyAuthSourceDefaultEmailBalance])
 	require.Equal(t, "3", repo.updates[SettingKeyAuthSourceDefaultEmailConcurrency])
 	require.Equal(t, "false", repo.updates[SettingKeyAuthSourceDefaultEmailGrantOnSignup])
 	require.Equal(t, "true", repo.updates[SettingKeyAuthSourceDefaultEmailGrantOnFirstBind])
@@ -135,4 +135,16 @@ func TestSettingService_UpdateAuthSourceDefaultSettings_PersistsAllKeys(t *testi
 	var got []DefaultSubscriptionSetting
 	require.NoError(t, json.Unmarshal([]byte(repo.updates[SettingKeyAuthSourceDefaultWeChatSubscriptions]), &got))
 	require.Equal(t, []DefaultSubscriptionSetting{{GroupID: 24, ValidityDays: 90}}, got)
+}
+
+func TestSettingService_DefaultGrantRetainsCNYLedgerPrecision(t *testing.T) {
+	repo := &authSourceDefaultsRepoStub{}
+	svc := NewSettingService(repo, &config.Config{})
+	grant := paymentAmountToLedger(0.01, "CNY")
+	err := svc.UpdateAuthSourceDefaultSettings(context.Background(), &AuthSourceDefaultSettings{
+		Email: ProviderDefaultGrantSettings{Balance: grant, Concurrency: 5},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "0.001612903226", repo.updates[SettingKeyAuthSourceDefaultEmailBalance])
+	require.Equal(t, 0.01, paymentLedgerAmountCNY(grant))
 }

@@ -18,7 +18,7 @@ import (
 )
 
 // ForwardUpstream 使用 base_url + /v1/messages + 双 header 认证透传上游 Claude 请求
-func (s *AntigravityGatewayService) ForwardUpstream(ctx context.Context, c *gin.Context, account *Account, body []byte) (*ForwardResult, error) {
+func (s *AntigravityGatewayService) ForwardUpstream(ctx context.Context, c *gin.Context, account *Account, body []byte) (forwardedResult *ForwardResult, forwardErr error) {
 	startTime := time.Now()
 	sessionID := getSessionID(c)
 	prefix := logPrefix(sessionID, account.Name)
@@ -40,6 +40,16 @@ func (s *AntigravityGatewayService) ForwardUpstream(ctx context.Context, c *gin.
 		return nil, fmt.Errorf("missing model")
 	}
 	originalModel := claudeReq.Model
+	snapshot, pricingErr := prepareProtocolSimpleBilling(ctx, c, account, originalModel, body, "")
+	if pricingErr != nil {
+		writeSimpleBillingPreflightError(c)
+		return nil, pricingErr
+	}
+	defer func() {
+		if forwardedResult != nil {
+			forwardedResult.SimpleBilling = snapshot
+		}
+	}()
 
 	// 构建上游请求 URL
 	upstreamURL := baseURL + "/v1/messages"

@@ -1,3 +1,4 @@
+import { ledgerFixed } from '@/utils/currency'
 import type { RedeemCode } from '@/types'
 
 export function buildStoreCardPayload(codes: Pick<RedeemCode, 'code'>[]): string {
@@ -10,6 +11,6 @@ export function buildStoreCardFilename(
   date = new Date()
 ): string {
   const first = codes[0]
-  const amount = first?.type === 'balance' ? `-usd-${first.value.toFixed(2)}` : ''
+  const amount = first?.type === 'balance' ? `-cny-${ledgerFixed(first.value)}` : ''
   return `starx-store-cards${amount}-${date.toISOString().slice(0, 10)}.txt`
 }

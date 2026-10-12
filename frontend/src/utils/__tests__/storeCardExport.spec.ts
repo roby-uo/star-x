@@ -14,6 +14,6 @@ describe('store card export', () => {
         [{ type: 'balance', value: 10 }],
         new Date('2026-08-14T00:00:00.000Z')
       )
-    ).toBe('starx-store-cards-usd-10.00-2026-08-14.txt')
+    ).toBe('starx-store-cards-cny-62.00-2026-08-14.txt')
   })
 })

@@ -323,7 +323,7 @@ func (s *OpenAIGatewayService) ForwardGrokMedia(
 	requestID string,
 	body []byte,
 	contentType string,
-) (*OpenAIForwardResult, error) {
+) (forwardedResult *OpenAIForwardResult, forwardErr error) {
 	startTime := time.Now()
 	if account == nil {
 		return nil, fmt.Errorf("grok account is required")
@@ -368,6 +368,22 @@ func (s *OpenAIGatewayService) ForwardGrokMedia(
 	body, contentType, err = sanitizeGrokMediaForwardBody(endpoint, body, contentType)
 	if err != nil {
 		return nil, err
+	}
+	if endpoint.IsGenerationRequest() {
+		modality, resolution := "image", requestInfo.SizeTier
+		if endpoint == GrokMediaEndpointVideosGenerations || endpoint == GrokMediaEndpointVideosEdits || endpoint == GrokMediaEndpointVideosExtensions {
+			modality, resolution = "video", requestInfo.Resolution
+		}
+		snapshot, pricingErr := s.PrepareSimpleBilling(ctx, simpleBillingForwardInput(c, account, upstreamModel, modality, resolution, "", ""))
+		if pricingErr != nil {
+			writeSimpleBillingPreflightError(c)
+			return nil, pricingErr
+		}
+		defer func() {
+			if forwardedResult != nil && forwardedResult.SimpleBilling == nil {
+				forwardedResult.SimpleBilling = snapshot
+			}
+		}()
 	}
 
 	var bodyReader io.Reader

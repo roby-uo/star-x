@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"strings"
 
@@ -172,6 +173,15 @@ func (r *usageBillingRepository) applyBatchImageBalanceHold(
 }
 
 func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, tx *sql.Tx, cmd *service.UsageBillingCommand, result *service.UsageBillingApplyResult) error {
+	if cmd.PriceSnapshot != nil {
+		data, err := json.Marshal(cmd.PriceSnapshot)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO usage_billing_price_snapshots (request_id,api_key_id,user_id,config_version,snapshot) VALUES ($1,$2,$3,$4,$5::jsonb)`, cmd.RequestID, cmd.APIKeyID, cmd.UserID, cmd.PriceSnapshot.Version, string(data)); err != nil {
+			return err
+		}
+	}
 	if cmd.SubscriptionCost > 0 && cmd.SubscriptionID != nil {
 		if err := incrementUsageBillingSubscription(ctx, tx, *cmd.SubscriptionID, cmd.SubscriptionCost); err != nil {
 			return err

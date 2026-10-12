@@ -579,7 +579,7 @@ func (s *GeminiMessagesCompatService) SelectAccountForAIStudioEndpoints(ctx cont
 	return s.hydrateSelectedAccount(ctx, selected)
 }
 
-func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Context, account *Account, body []byte) (*ForwardResult, error) {
+func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Context, account *Account, body []byte) (forwardedResult *ForwardResult, forwardErr error) {
 	startTime := time.Now()
 
 	var req struct {
@@ -598,6 +598,16 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 	if account.Type == AccountTypeAPIKey || account.Type == AccountTypeServiceAccount {
 		mappedModel = account.GetMappedModel(req.Model)
 	}
+	snapshot, pricingErr := prepareProtocolSimpleBilling(ctx, c, account, mappedModel, body, "")
+	if pricingErr != nil {
+		writeSimpleBillingPreflightError(c)
+		return nil, pricingErr
+	}
+	defer func() {
+		if forwardedResult != nil {
+			forwardedResult.SimpleBilling = snapshot
+		}
+	}()
 
 	geminiReq, err := convertClaudeMessagesToGeminiGenerateContent(body)
 	if err != nil {
@@ -1112,7 +1122,7 @@ func isGeminiSignatureRelatedError(respBody []byte) bool {
 	return strings.Contains(msg, "thought_signature") || strings.Contains(msg, "signature")
 }
 
-func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.Context, account *Account, originalModel string, action string, stream bool, body []byte) (*ForwardResult, error) {
+func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.Context, account *Account, originalModel string, action string, stream bool, body []byte) (forwardedResult *ForwardResult, forwardErr error) {
 	startTime := time.Now()
 
 	if strings.TrimSpace(originalModel) == "" {
@@ -1145,6 +1155,21 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 	if account.Type == AccountTypeAPIKey || account.Type == AccountTypeServiceAccount {
 		mappedModel = account.GetMappedModel(originalModel)
 	}
+	var snapshot *SimpleBillingSnapshot
+	if action != "countTokens" {
+		var pricingErr error
+		imageSize := normalizeOpenAIImageSizeTier(s.extractImageInputSize(body))
+		snapshot, pricingErr = prepareProtocolSimpleBilling(ctx, c, account, mappedModel, body, imageSize)
+		if pricingErr != nil {
+			writeSimpleBillingPreflightError(c)
+			return nil, pricingErr
+		}
+	}
+	defer func() {
+		if forwardedResult != nil {
+			forwardedResult.SimpleBilling = snapshot
+		}
+	}()
 
 	proxyURL := ""
 	if account.ProxyID != nil && account.Proxy != nil {

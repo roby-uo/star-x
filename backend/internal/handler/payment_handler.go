@@ -44,6 +44,11 @@ func (h *PaymentHandler) GetPaymentConfig(c *gin.Context) {
 // GetPlans returns subscription plans available for sale.
 // GET /api/v1/payment/plans
 func (h *PaymentHandler) GetPlans(c *gin.Context) {
+	cfg, err := h.configService.GetPaymentConfig(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
 	plans, err := h.configService.ListPlansForSale(c.Request.Context())
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -51,31 +56,38 @@ func (h *PaymentHandler) GetPlans(c *gin.Context) {
 	}
 	// Enrich plans with group platform for frontend color coding
 	type planWithPlatform struct {
-		ID            int64    `json:"id"`
-		GroupID       int64    `json:"group_id"`
-		GroupPlatform string   `json:"group_platform"`
-		GroupName     string   `json:"group_name"`
-		Name          string   `json:"name"`
-		Description   string   `json:"description"`
-		Price         float64  `json:"price"`
-		OriginalPrice *float64 `json:"original_price,omitempty"`
-		Currency      string   `json:"currency,omitempty"`
-		ValidityDays  int      `json:"validity_days"`
-		ValidityUnit  string   `json:"validity_unit"`
-		Features      string   `json:"features"`
-		ProductName   string   `json:"product_name"`
-		ForSale       bool     `json:"for_sale"`
-		SortOrder     int      `json:"sort_order"`
+		ID                   int64    `json:"id"`
+		GroupID              int64    `json:"group_id"`
+		GroupPlatform        string   `json:"group_platform"`
+		GroupName            string   `json:"group_name"`
+		Name                 string   `json:"name"`
+		Description          string   `json:"description"`
+		Price                float64  `json:"price"`
+		OriginalPrice        *float64 `json:"original_price,omitempty"`
+		Currency             string   `json:"currency,omitempty"`
+		PriceCNY             *float64 `json:"price_cny,omitempty"`
+		OriginalPriceCNY     *float64 `json:"original_price_cny,omitempty"`
+		CashPriceCNY         *float64 `json:"cash_price_cny,omitempty"`
+		CashOriginalPriceCNY *float64 `json:"cash_original_price_cny,omitempty"`
+		ValidityDays         int      `json:"validity_days"`
+		ValidityUnit         string   `json:"validity_unit"`
+		Features             string   `json:"features"`
+		ProductName          string   `json:"product_name"`
+		ForSale              bool     `json:"for_sale"`
+		SortOrder            int      `json:"sort_order"`
 	}
 	groupInfo := h.configService.GetGroupInfoMap(c.Request.Context(), plans)
 	result := make([]planWithPlatform, 0, len(plans))
 	for _, p := range plans {
 		gi := groupInfo[p.GroupID]
+		priceCNY, originalPriceCNY := service.SubscriptionPlanPriceCNY(p, cfg)
 		result = append(result, planWithPlatform{
 			ID: int64(p.ID), GroupID: p.GroupID,
 			GroupPlatform: gi.Platform, GroupName: gi.Name,
 			Name: p.Name, Description: p.Description, Price: p.Price, OriginalPrice: p.OriginalPrice,
-			Currency:     p.Currency,
+			Currency: p.Currency,
+			PriceCNY: priceCNY, OriginalPriceCNY: originalPriceCNY,
+			CashPriceCNY: p.CashPriceCny, CashOriginalPriceCNY: p.CashOriginalPriceCny,
 			ValidityDays: p.ValidityDays, ValidityUnit: p.ValidityUnit, Features: p.Features,
 			ProductName: p.ProductName, ForSale: p.ForSale, SortOrder: p.SortOrder,
 		})
@@ -109,6 +121,7 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 	planList := make([]checkoutPlan, 0, len(plans))
 	for _, p := range plans {
 		gi := groupInfo[p.GroupID]
+		priceCNY, originalPriceCNY := service.SubscriptionPlanPriceCNY(p, cfg)
 		planList = append(planList, checkoutPlan{
 			ID: int64(p.ID), GroupID: p.GroupID,
 			GroupPlatform: gi.Platform, GroupName: gi.Name,
@@ -116,13 +129,21 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 			WeeklyLimitUSD: gi.WeeklyLimitUSD, MonthlyLimitUSD: gi.MonthlyLimitUSD,
 			ModelScopes: gi.ModelScopes,
 			Name:        p.Name, Description: p.Description, Price: p.Price, OriginalPrice: p.OriginalPrice,
-			Currency:     p.Currency,
+			Currency: p.Currency,
+			PriceCNY: priceCNY, OriginalPriceCNY: originalPriceCNY,
+			CashPriceCNY: p.CashPriceCny, CashOriginalPriceCNY: p.CashOriginalPriceCny,
 			ValidityDays: p.ValidityDays, ValidityUnit: p.ValidityUnit, Features: parseFeatures(p.Features),
 			ProductName: p.ProductName,
 		})
 	}
 
 	response.Success(c, checkoutInfoResponse{
+		SimpleBillingEnabled:      cfg.SimpleBillingEnabled,
+		BalanceRechargeMode:       cfg.BalanceRechargeMode,
+		RechargeBonusMultiplier:   cfg.RechargeBonusMultiplier,
+		USDToCNYRate:              cfg.USDToCNYRate,
+		LedgerCurrency:            cfg.LedgerCurrency,
+		DisplayCurrency:           cfg.DisplayCurrency,
 		Methods:                   limitsResp.Methods,
 		GlobalMin:                 limitsResp.GlobalMin,
 		GlobalMax:                 limitsResp.GlobalMax,
@@ -139,6 +160,12 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 }
 
 type checkoutInfoResponse struct {
+	SimpleBillingEnabled      bool                            `json:"simple_billing_enabled"`
+	BalanceRechargeMode       string                          `json:"balance_recharge_mode"`
+	RechargeBonusMultiplier   float64                         `json:"recharge_bonus_multiplier"`
+	USDToCNYRate              float64                         `json:"usd_to_cny_rate"`
+	LedgerCurrency            string                          `json:"ledger_currency"`
+	DisplayCurrency           string                          `json:"display_currency"`
 	Methods                   map[string]service.MethodLimits `json:"methods"`
 	GlobalMin                 float64                         `json:"global_min"`
 	GlobalMax                 float64                         `json:"global_max"`
@@ -154,23 +181,27 @@ type checkoutInfoResponse struct {
 }
 
 type checkoutPlan struct {
-	ID              int64    `json:"id"`
-	GroupID         int64    `json:"group_id"`
-	GroupPlatform   string   `json:"group_platform"`
-	GroupName       string   `json:"group_name"`
-	DailyLimitUSD   *float64 `json:"daily_limit_usd"`
-	WeeklyLimitUSD  *float64 `json:"weekly_limit_usd"`
-	MonthlyLimitUSD *float64 `json:"monthly_limit_usd"`
-	ModelScopes     []string `json:"supported_model_scopes"`
-	Name            string   `json:"name"`
-	Description     string   `json:"description"`
-	Price           float64  `json:"price"`
-	OriginalPrice   *float64 `json:"original_price,omitempty"`
-	Currency        string   `json:"currency,omitempty"`
-	ValidityDays    int      `json:"validity_days"`
-	ValidityUnit    string   `json:"validity_unit"`
-	Features        []string `json:"features"`
-	ProductName     string   `json:"product_name"`
+	ID                   int64    `json:"id"`
+	GroupID              int64    `json:"group_id"`
+	GroupPlatform        string   `json:"group_platform"`
+	GroupName            string   `json:"group_name"`
+	DailyLimitUSD        *float64 `json:"daily_limit_usd"`
+	WeeklyLimitUSD       *float64 `json:"weekly_limit_usd"`
+	MonthlyLimitUSD      *float64 `json:"monthly_limit_usd"`
+	ModelScopes          []string `json:"supported_model_scopes"`
+	Name                 string   `json:"name"`
+	Description          string   `json:"description"`
+	Price                float64  `json:"price"`
+	OriginalPrice        *float64 `json:"original_price,omitempty"`
+	Currency             string   `json:"currency,omitempty"`
+	PriceCNY             *float64 `json:"price_cny,omitempty"`
+	OriginalPriceCNY     *float64 `json:"original_price_cny,omitempty"`
+	CashPriceCNY         *float64 `json:"cash_price_cny,omitempty"`
+	CashOriginalPriceCNY *float64 `json:"cash_original_price_cny,omitempty"`
+	ValidityDays         int      `json:"validity_days"`
+	ValidityUnit         string   `json:"validity_unit"`
+	Features             []string `json:"features"`
+	ProductName          string   `json:"product_name"`
 }
 
 // parseFeatures splits a newline-separated features string into a string slice.

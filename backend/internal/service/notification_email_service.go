@@ -274,7 +274,7 @@ func (s *NotificationEmailService) GetTemplate(ctx context.Context, event, local
 		return NotificationEmailTemplate{}, err
 	}
 	tmpl.Subject = stored.Subject
-	tmpl.HTML = stored.HTML
+	tmpl.HTML = normalizeNotificationMoneyLabels(normalizedEvent, stored.HTML)
 	tmpl.IsCustom = true
 	updatedAt := stored.UpdatedAt
 	tmpl.UpdatedAt = &updatedAt
@@ -658,6 +658,8 @@ func validateNotificationEmailTemplate(event, subject, htmlBody string) error {
 }
 
 func renderNotificationEmail(event, subject, htmlBody string, variables map[string]string, rawHTMLVariables map[string]string) (NotificationEmailPreview, error) {
+	subject = normalizeNotificationMoneyLabels(event, subject)
+	htmlBody = normalizeNotificationMoneyLabels(event, htmlBody)
 	if err := validateNotificationEmailTemplate(event, subject, htmlBody); err != nil {
 		return NotificationEmailPreview{}, err
 	}
@@ -670,6 +672,25 @@ func renderNotificationEmail(event, subject, htmlBody string, variables map[stri
 		return NotificationEmailPreview{}, err
 	}
 	return NotificationEmailPreview{Subject: sanitizeEmailHeader(renderedSubject), HTML: renderedHTML}, nil
+}
+
+// Old saved templates commonly used a literal dollar sign immediately before
+// ledger placeholders. Only those known money labels are updated; custom
+// content and stored delivery history are preserved.
+func normalizeNotificationMoneyLabels(event, raw string) string {
+	var fields []string
+	switch event {
+	case NotificationEmailEventBalanceLow:
+		fields = []string{"current_balance", "threshold"}
+	case NotificationEmailEventBalanceRechargeSuccess:
+		fields = []string{"current_balance", "recharge_amount"}
+	default:
+		return raw
+	}
+	for _, field := range fields {
+		raw = strings.ReplaceAll(raw, "${{"+field+"}}", "¥{{"+field+"}}")
+	}
+	return raw
 }
 
 func renderNotificationEmailString(event, raw string, variables map[string]string, rawHTMLVariables map[string]string, escapeHTML bool) (string, error) {
@@ -1171,7 +1192,7 @@ var notificationEmailOfficialTemplates = map[string]map[string]notificationEmail
 			Subject: "[{{site_name}}] Low balance alert",
 			HTML: notificationEmailCard("#d97706", "Low balance alert", `
 <p>Hello {{recipient_name}},</p>
-<p>Your current balance is <strong>${{current_balance}}</strong>, below the configured alert threshold of <strong>${{threshold}}</strong>.</p>
+<p>Your current balance is <strong>¥{{current_balance}}</strong>, below the configured alert threshold of <strong>¥{{threshold}}</strong>.</p>
 <p>Please recharge in time to avoid service interruption.</p>
 <p><a class="button" href="{{recharge_url}}">Recharge now</a></p>
 <p class="muted"><a href="{{unsubscribe_url}}">Unsubscribe from optional balance alerts</a></p>`),
@@ -1180,7 +1201,7 @@ var notificationEmailOfficialTemplates = map[string]map[string]notificationEmail
 			Subject: "[{{site_name}}] 余额不足提醒",
 			HTML: notificationEmailCard("#d97706", "余额不足提醒", `
 <p>{{recipient_name}}，您好：</p>
-<p>您当前余额为 <strong>${{current_balance}}</strong>，已低于提醒阈值 <strong>${{threshold}}</strong>。</p>
+<p>您当前余额为 <strong>¥{{current_balance}}</strong>，已低于提醒阈值 <strong>¥{{threshold}}</strong>。</p>
 <p>请及时充值以免服务中断。</p>
 <p><a class="button" href="{{recharge_url}}">立即充值</a></p>
 <p class="muted"><a href="{{unsubscribe_url}}">退订此类余额提醒</a></p>`),
@@ -1191,16 +1212,16 @@ var notificationEmailOfficialTemplates = map[string]map[string]notificationEmail
 			Subject: "[{{site_name}}] Balance recharge successful",
 			HTML: notificationEmailCard("#16a34a", "Recharge successful", `
 <p>Hello {{recipient_name}},</p>
-<p>Your balance recharge of <strong>${{recharge_amount}}</strong> has been completed.</p>
-<p>Current balance: <strong>${{current_balance}}</strong></p>
+<p>Your balance recharge of <strong>¥{{recharge_amount}}</strong> has been completed.</p>
+<p>Current balance: <strong>¥{{current_balance}}</strong></p>
 <p>Order ID: {{order_id}}</p>`),
 		},
 		notificationEmailLocaleChinese: {
 			Subject: "[{{site_name}}] 余额充值成功",
 			HTML: notificationEmailCard("#16a34a", "余额充值成功", `
 <p>{{recipient_name}}，您好：</p>
-<p>您的余额充值 <strong>${{recharge_amount}}</strong> 已完成。</p>
-<p>当前余额：<strong>${{current_balance}}</strong></p>
+<p>您的余额充值 <strong>¥{{recharge_amount}}</strong> 已完成。</p>
+<p>当前余额：<strong>¥{{current_balance}}</strong></p>
 			<p>订单号：{{order_id}}</p>`),
 		},
 	},

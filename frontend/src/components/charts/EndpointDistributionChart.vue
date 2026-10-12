@@ -107,10 +107,10 @@
                   {{ formatTokens(item.total_tokens) }}
                 </td>
                 <td v-if="showCosts" class="py-1.5 text-right text-green-600 dark:text-green-400">
-                  ${{ formatCost(item.actual_cost) }}
+                  {{ formatCnyFromLedger(item.actual_cost, 4) }}
                 </td>
                 <td v-if="showCosts" class="py-1.5 text-right text-gray-400 dark:text-gray-500">
-                  ${{ formatCost(item.cost) }}
+                  {{ formatCnyFromLedger(item.cost, 4) }}
                 </td>
               </tr>
               <tr v-if="showCosts && expandedKey === item.endpoint">
@@ -133,6 +133,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatCnyFromLedger } from '@/utils/currency'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
@@ -273,7 +274,7 @@ const doughnutOptions = computed(() => ({
           const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0)
           const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0'
           const formattedValue = effectiveMetric.value === 'actual_cost'
-            ? `$${formatCost(value)}`
+            ? `${formatCnyFromLedger(value, 4)}`
             : formatTokens(value)
           return `${context.label}: ${formattedValue} (${percentage}%)`
         }
@@ -297,14 +298,5 @@ const formatNumber = (value: number): string => {
   return value.toLocaleString()
 }
 
-const formatCost = (value: number): string => {
-  if (value >= 1000) {
-    return (value / 1000).toFixed(2) + 'K'
-  } else if (value >= 1) {
-    return value.toFixed(2)
-  } else if (value >= 0.01) {
-    return value.toFixed(3)
-  }
-  return value.toFixed(4)
-}
+
 </script>

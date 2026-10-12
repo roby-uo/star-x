@@ -58,7 +58,13 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 	c *gin.Context,
 	account *Account,
 	input anthropicPassthroughForwardInput,
-) (*ForwardResult, error) {
+) (forwardedResult *ForwardResult, forwardErr error) {
+	var snapshot *SimpleBillingSnapshot
+	defer func() {
+		if forwardedResult != nil {
+			forwardedResult.SimpleBilling = snapshot
+		}
+	}()
 	token, tokenType, err := s.GetAccessToken(ctx, account)
 	if err != nil {
 		return nil, err
@@ -99,6 +105,11 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 		upstreamReq, wireBody, err := s.buildUpstreamRequestAnthropicAPIKeyPassthrough(upstreamCtx, c, account, input.Body, token)
 		releaseUpstreamCtx()
 		if err != nil {
+			return nil, err
+		}
+		snapshot, err = s.prepareSimpleBillingAnthropicForward(ctx, c, account, input.RequestModel, wireBody, upstreamReq.Header)
+		if err != nil {
+			writeSimpleBillingPreflightError(c)
 			return nil, err
 		}
 		if input.Parsed != nil && !bytes.Equal(wireBody, input.Body) {

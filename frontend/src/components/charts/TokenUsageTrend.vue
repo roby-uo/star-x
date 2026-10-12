@@ -19,6 +19,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatCnyFromLedger } from '@/utils/currency'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
@@ -160,7 +161,7 @@ const lineOptions = computed(() => ({
           if (dataIndex !== undefined && props.trendData[dataIndex]) {
             const data = props.trendData[dataIndex]
             if (!Number.isFinite(data.actual_cost) || !Number.isFinite(data.cost)) return ''
-            return `Actual: $${formatCost(data.actual_cost)} | Standard: $${formatCost(data.cost)}`
+            return `Actual: ${formatCnyFromLedger(data.actual_cost, 4)} | Standard: ${formatCnyFromLedger(data.cost, 4)}`
           }
           return ''
         }
@@ -220,14 +221,5 @@ const formatTokens = (value: number): string => {
   return value.toLocaleString()
 }
 
-const formatCost = (value: number): string => {
-  if (value >= 1000) {
-    return (value / 1000).toFixed(2) + 'K'
-  } else if (value >= 1) {
-    return value.toFixed(2)
-  } else if (value >= 0.01) {
-    return value.toFixed(3)
-  }
-  return value.toFixed(4)
-}
+
 </script>

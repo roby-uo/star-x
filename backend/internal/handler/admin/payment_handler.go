@@ -278,12 +278,27 @@ func (h *PaymentHandler) QueryAndFinalizeRefund(c *gin.Context) {
 // ListPlans returns all subscription plans.
 // GET /api/v1/admin/payment/plans
 func (h *PaymentHandler) ListPlans(c *gin.Context) {
+	cfg, err := h.configService.GetPaymentConfig(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
 	plans, err := h.configService.ListPlans(c.Request.Context())
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
-	response.Success(c, plans)
+	type planWithCashQuote struct {
+		*dbent.SubscriptionPlan
+		PriceCNY         *float64 `json:"price_cny,omitempty"`
+		OriginalPriceCNY *float64 `json:"original_price_cny,omitempty"`
+	}
+	quoted := make([]planWithCashQuote, 0, len(plans))
+	for _, plan := range plans {
+		price, original := service.SubscriptionPlanPriceCNY(plan, cfg)
+		quoted = append(quoted, planWithCashQuote{SubscriptionPlan: plan, PriceCNY: price, OriginalPriceCNY: original})
+	}
+	response.Success(c, quoted)
 }
 
 // CreatePlan creates a new subscription plan.

@@ -53,14 +53,6 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	if s.notificationEmailService != nil {
 		s.notificationEmailService.RememberRecipientLocale(ctx, req.UserID, user.Email, req.Locale)
 	}
-	orderAmount := req.Amount
-	limitAmount := req.Amount
-	if plan != nil {
-		orderAmount = plan.Price
-		limitAmount = plan.Price
-	} else if req.OrderType == payment.OrderTypeBalance {
-		orderAmount = calculateCreditedBalance(req.Amount, cfg.BalanceRechargeMultiplier)
-	}
 	feeRate := cfg.RechargeFeeRate
 	methodCurrency := payment.DefaultPaymentCurrency
 	if s.configService != nil {
@@ -69,7 +61,11 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 			return nil, err
 		}
 	}
-	payAmountStr, payAmount, err := calculateCreateOrderPayAmountForOrderType(limitAmount, feeRate, methodCurrency, req.OrderType, cfg.SubscriptionUSDToCNYRate)
+	orderAmount, limitAmount, err := calculatePaymentOrderAmounts(req, plan, cfg, methodCurrency)
+	if err != nil {
+		return nil, infraerrors.BadRequest("UNSUPPORTED_PAYMENT_CURRENCY", err.Error())
+	}
+	payAmountStr, payAmount, err := calculateCreateOrderPayAmount(limitAmount, feeRate, methodCurrency)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +81,11 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 		selectedCurrency = paymentProviderConfigCurrency(sel.ProviderKey, sel.Config)
 	}
 	if selectedCurrency != methodCurrency {
-		payAmountStr, payAmount, err = calculateCreateOrderPayAmountForOrderType(limitAmount, feeRate, selectedCurrency, req.OrderType, cfg.SubscriptionUSDToCNYRate)
+		orderAmount, limitAmount, err = calculatePaymentOrderAmounts(req, plan, cfg, selectedCurrency)
+		if err != nil {
+			return nil, infraerrors.BadRequest("UNSUPPORTED_PAYMENT_CURRENCY", err.Error())
+		}
+		payAmountStr, payAmount, err = calculateCreateOrderPayAmount(limitAmount, feeRate, selectedCurrency)
 		if err != nil {
 			return nil, err
 		}
@@ -93,7 +93,13 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	if err := validateSelectedCreateOrderAmountCurrency(payAmountStr, sel); err != nil {
 		return nil, err
 	}
-	oauthResp, err := s.maybeBuildWeChatOAuthRequiredResponseForSelection(ctx, req, limitAmount, payAmount, feeRate, sel)
+	oauthAmount := limitAmount
+	if cfg.SimpleBillingEnabled {
+		oauthAmount = orderAmount
+	} else if plan != nil {
+		oauthAmount = plan.Price
+	}
+	oauthResp, err := s.maybeBuildWeChatOAuthRequiredResponseForSelection(ctx, req, oauthAmount, payAmount, feeRate, sel)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +130,17 @@ func (s *PaymentService) validateOrderInput(ctx context.Context, req CreateOrder
 	if math.IsNaN(req.Amount) || math.IsInf(req.Amount, 0) || req.Amount <= 0 {
 		return nil, infraerrors.BadRequest("INVALID_AMOUNT", "amount must be a positive number")
 	}
-	if (cfg.MinAmount > 0 && req.Amount < cfg.MinAmount) || (cfg.MaxAmount > 0 && req.Amount > cfg.MaxAmount) {
+	limitAmount := req.Amount
+	if cfg.SimpleBillingEnabled {
+		currency, currencyErr := s.configService.ValidateMethodCurrencyConsistency(ctx, req.PaymentType)
+		if currencyErr != nil {
+			return nil, currencyErr
+		}
+		if currency == "USD" {
+			limitAmount = paymentLedgerAmountCNY(req.Amount)
+		}
+	}
+	if (cfg.MinAmount > 0 && limitAmount < cfg.MinAmount) || (cfg.MaxAmount > 0 && limitAmount > cfg.MaxAmount) {
 		return nil, infraerrors.BadRequest("INVALID_AMOUNT", "amount out of range").
 			WithMetadata(map[string]string{"min": fmt.Sprintf("%.2f", cfg.MinAmount), "max": fmt.Sprintf("%.2f", cfg.MaxAmount)})
 	}
@@ -158,8 +174,22 @@ func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderReq
 	if err := s.checkPendingLimit(ctx, tx, req.UserID, cfg.MaxPendingOrders); err != nil {
 		return nil, err
 	}
-	if err := s.checkDailyLimit(ctx, tx, req.UserID, limitAmount, cfg.DailyLimit); err != nil {
-		return nil, err
+	dailyLimitAmount := limitAmount
+	if plan != nil && !cfg.SimpleBillingEnabled {
+		dailyLimitAmount = plan.Price
+	}
+	var dailyLimitErr error
+	if cfg.SimpleBillingEnabled {
+		currency := payment.DefaultPaymentCurrency
+		if sel != nil {
+			currency = paymentProviderConfigCurrency(sel.ProviderKey, sel.Config)
+		}
+		dailyLimitErr = s.checkDailyLimitCNY(ctx, tx, req.UserID, payAmount, cfg.DailyLimit, currency)
+	} else {
+		dailyLimitErr = s.checkDailyLimit(ctx, tx, req.UserID, dailyLimitAmount, cfg.DailyLimit)
+	}
+	if dailyLimitErr != nil {
+		return nil, dailyLimitErr
 	}
 	tm := cfg.OrderTimeoutMin
 	if tm <= 0 {
@@ -171,6 +201,17 @@ func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderReq
 		return nil, err
 	}
 	providerSnapshot := buildPaymentOrderProviderSnapshot(sel, req)
+	if cfg.SimpleBillingEnabled || (plan != nil && plan.CashPriceCny != nil) {
+		providerSnapshot["ledger_currency"] = "USD"
+		providerSnapshot["display_currency"] = "CNY"
+		providerSnapshot["usd_to_cny_rate"] = FixedUSDToCNYRate
+		providerSnapshot["balance_recharge_mode"] = "cny_fixed"
+		providerSnapshot["recharge_bonus_multiplier"] = cfg.RechargeBonusMultiplier
+		if plan != nil {
+			providerSnapshot["plan_price"] = plan.Price
+			providerSnapshot["plan_price_currency"] = plan.Currency
+		}
+	}
 	selectedInstanceID := ""
 	selectedProviderKey := ""
 	if sel != nil {

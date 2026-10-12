@@ -33,6 +33,10 @@ export interface PaymentConfig {
   max_pending_orders: number
   order_timeout_minutes: number
   balance_disabled: boolean
+  simple_billing_enabled?: boolean
+  balance_recharge_mode?: 'cny_fixed' | 'legacy'
+  recharge_bonus_multiplier?: number
+  usd_to_cny_rate?: number
   balance_recharge_multiplier: number
   subscription_usd_to_cny_rate: number
   enabled_payment_types: PaymentType[]
@@ -67,6 +71,10 @@ export interface CheckoutInfoResponse {
   global_max: number
   plans: SubscriptionPlan[]
   balance_disabled: boolean
+  simple_billing_enabled?: boolean
+  balance_recharge_mode?: 'cny_fixed' | 'legacy'
+  recharge_bonus_multiplier?: number
+  usd_to_cny_rate?: number
   balance_recharge_multiplier: number
   /** Subscription CNY conversion rate (1 USD = X CNY); 0 = disabled, plan price is charged as-is */
   subscription_usd_to_cny_rate: number
@@ -124,7 +132,11 @@ export interface SubscriptionPlan {
   description: string
   price: number
   original_price?: number
-  /** Display-only ISO 4217 currency label (e.g. "NZD"); empty means no label */
+  price_cny?: number
+  original_price_cny?: number
+  cash_price_cny?: number | null
+  cash_original_price_cny?: number | null
+  /** Price currency; empty preserves legacy checkout rules. New plans use CNY. */
   currency?: string
   validity_days: number
   validity_unit: string

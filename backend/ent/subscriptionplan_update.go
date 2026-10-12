@@ -139,6 +139,60 @@ func (_u *SubscriptionPlanUpdate) SetNillableCurrency(v *string) *SubscriptionPl
 	return _u
 }
 
+// SetCashPriceCny sets the "cash_price_cny" field.
+func (_u *SubscriptionPlanUpdate) SetCashPriceCny(v float64) *SubscriptionPlanUpdate {
+	_u.mutation.ResetCashPriceCny()
+	_u.mutation.SetCashPriceCny(v)
+	return _u
+}
+
+// SetNillableCashPriceCny sets the "cash_price_cny" field if the given value is not nil.
+func (_u *SubscriptionPlanUpdate) SetNillableCashPriceCny(v *float64) *SubscriptionPlanUpdate {
+	if v != nil {
+		_u.SetCashPriceCny(*v)
+	}
+	return _u
+}
+
+// AddCashPriceCny adds value to the "cash_price_cny" field.
+func (_u *SubscriptionPlanUpdate) AddCashPriceCny(v float64) *SubscriptionPlanUpdate {
+	_u.mutation.AddCashPriceCny(v)
+	return _u
+}
+
+// ClearCashPriceCny clears the value of the "cash_price_cny" field.
+func (_u *SubscriptionPlanUpdate) ClearCashPriceCny() *SubscriptionPlanUpdate {
+	_u.mutation.ClearCashPriceCny()
+	return _u
+}
+
+// SetCashOriginalPriceCny sets the "cash_original_price_cny" field.
+func (_u *SubscriptionPlanUpdate) SetCashOriginalPriceCny(v float64) *SubscriptionPlanUpdate {
+	_u.mutation.ResetCashOriginalPriceCny()
+	_u.mutation.SetCashOriginalPriceCny(v)
+	return _u
+}
+
+// SetNillableCashOriginalPriceCny sets the "cash_original_price_cny" field if the given value is not nil.
+func (_u *SubscriptionPlanUpdate) SetNillableCashOriginalPriceCny(v *float64) *SubscriptionPlanUpdate {
+	if v != nil {
+		_u.SetCashOriginalPriceCny(*v)
+	}
+	return _u
+}
+
+// AddCashOriginalPriceCny adds value to the "cash_original_price_cny" field.
+func (_u *SubscriptionPlanUpdate) AddCashOriginalPriceCny(v float64) *SubscriptionPlanUpdate {
+	_u.mutation.AddCashOriginalPriceCny(v)
+	return _u
+}
+
+// ClearCashOriginalPriceCny clears the value of the "cash_original_price_cny" field.
+func (_u *SubscriptionPlanUpdate) ClearCashOriginalPriceCny() *SubscriptionPlanUpdate {
+	_u.mutation.ClearCashOriginalPriceCny()
+	return _u
+}
+
 // SetValidityDays sets the "validity_days" field.
 func (_u *SubscriptionPlanUpdate) SetValidityDays(v int) *SubscriptionPlanUpdate {
 	_u.mutation.ResetValidityDays()
@@ -351,6 +405,24 @@ func (_u *SubscriptionPlanUpdate) sqlSave(ctx context.Context) (_node int, err e
 	if value, ok := _u.mutation.Currency(); ok {
 		_spec.SetField(subscriptionplan.FieldCurrency, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.CashPriceCny(); ok {
+		_spec.SetField(subscriptionplan.FieldCashPriceCny, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedCashPriceCny(); ok {
+		_spec.AddField(subscriptionplan.FieldCashPriceCny, field.TypeFloat64, value)
+	}
+	if _u.mutation.CashPriceCnyCleared() {
+		_spec.ClearField(subscriptionplan.FieldCashPriceCny, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.CashOriginalPriceCny(); ok {
+		_spec.SetField(subscriptionplan.FieldCashOriginalPriceCny, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedCashOriginalPriceCny(); ok {
+		_spec.AddField(subscriptionplan.FieldCashOriginalPriceCny, field.TypeFloat64, value)
+	}
+	if _u.mutation.CashOriginalPriceCnyCleared() {
+		_spec.ClearField(subscriptionplan.FieldCashOriginalPriceCny, field.TypeFloat64)
+	}
 	if value, ok := _u.mutation.ValidityDays(); ok {
 		_spec.SetField(subscriptionplan.FieldValidityDays, field.TypeInt, value)
 	}
@@ -506,6 +578,60 @@ func (_u *SubscriptionPlanUpdateOne) SetNillableCurrency(v *string) *Subscriptio
 	if v != nil {
 		_u.SetCurrency(*v)
 	}
+	return _u
+}
+
+// SetCashPriceCny sets the "cash_price_cny" field.
+func (_u *SubscriptionPlanUpdateOne) SetCashPriceCny(v float64) *SubscriptionPlanUpdateOne {
+	_u.mutation.ResetCashPriceCny()
+	_u.mutation.SetCashPriceCny(v)
+	return _u
+}
+
+// SetNillableCashPriceCny sets the "cash_price_cny" field if the given value is not nil.
+func (_u *SubscriptionPlanUpdateOne) SetNillableCashPriceCny(v *float64) *SubscriptionPlanUpdateOne {
+	if v != nil {
+		_u.SetCashPriceCny(*v)
+	}
+	return _u
+}
+
+// AddCashPriceCny adds value to the "cash_price_cny" field.
+func (_u *SubscriptionPlanUpdateOne) AddCashPriceCny(v float64) *SubscriptionPlanUpdateOne {
+	_u.mutation.AddCashPriceCny(v)
+	return _u
+}
+
+// ClearCashPriceCny clears the value of the "cash_price_cny" field.
+func (_u *SubscriptionPlanUpdateOne) ClearCashPriceCny() *SubscriptionPlanUpdateOne {
+	_u.mutation.ClearCashPriceCny()
+	return _u
+}
+
+// SetCashOriginalPriceCny sets the "cash_original_price_cny" field.
+func (_u *SubscriptionPlanUpdateOne) SetCashOriginalPriceCny(v float64) *SubscriptionPlanUpdateOne {
+	_u.mutation.ResetCashOriginalPriceCny()
+	_u.mutation.SetCashOriginalPriceCny(v)
+	return _u
+}
+
+// SetNillableCashOriginalPriceCny sets the "cash_original_price_cny" field if the given value is not nil.
+func (_u *SubscriptionPlanUpdateOne) SetNillableCashOriginalPriceCny(v *float64) *SubscriptionPlanUpdateOne {
+	if v != nil {
+		_u.SetCashOriginalPriceCny(*v)
+	}
+	return _u
+}
+
+// AddCashOriginalPriceCny adds value to the "cash_original_price_cny" field.
+func (_u *SubscriptionPlanUpdateOne) AddCashOriginalPriceCny(v float64) *SubscriptionPlanUpdateOne {
+	_u.mutation.AddCashOriginalPriceCny(v)
+	return _u
+}
+
+// ClearCashOriginalPriceCny clears the value of the "cash_original_price_cny" field.
+func (_u *SubscriptionPlanUpdateOne) ClearCashOriginalPriceCny() *SubscriptionPlanUpdateOne {
+	_u.mutation.ClearCashOriginalPriceCny()
 	return _u
 }
 
@@ -750,6 +876,24 @@ func (_u *SubscriptionPlanUpdateOne) sqlSave(ctx context.Context) (_node *Subscr
 	}
 	if value, ok := _u.mutation.Currency(); ok {
 		_spec.SetField(subscriptionplan.FieldCurrency, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CashPriceCny(); ok {
+		_spec.SetField(subscriptionplan.FieldCashPriceCny, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedCashPriceCny(); ok {
+		_spec.AddField(subscriptionplan.FieldCashPriceCny, field.TypeFloat64, value)
+	}
+	if _u.mutation.CashPriceCnyCleared() {
+		_spec.ClearField(subscriptionplan.FieldCashPriceCny, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.CashOriginalPriceCny(); ok {
+		_spec.SetField(subscriptionplan.FieldCashOriginalPriceCny, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedCashOriginalPriceCny(); ok {
+		_spec.AddField(subscriptionplan.FieldCashOriginalPriceCny, field.TypeFloat64, value)
+	}
+	if _u.mutation.CashOriginalPriceCnyCleared() {
+		_spec.ClearField(subscriptionplan.FieldCashOriginalPriceCny, field.TypeFloat64)
 	}
 	if value, ok := _u.mutation.ValidityDays(); ok {
 		_spec.SetField(subscriptionplan.FieldValidityDays, field.TypeInt, value)

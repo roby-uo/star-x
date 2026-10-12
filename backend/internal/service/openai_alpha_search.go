@@ -26,7 +26,7 @@ const (
 // 返回值约定：仅当上游返回 2xx（一次真实成功的搜索）时返回非 nil 的
 // *OpenAIForwardResult（WebSearchCalls=1，供按次计费）；上游错误被原样透传
 // 给客户端时返回 (nil, nil)，不产生计费。
-func (s *OpenAIGatewayService) ForwardAlphaSearch(ctx context.Context, c *gin.Context, account *Account, body []byte) (*OpenAIForwardResult, error) {
+func (s *OpenAIGatewayService) ForwardAlphaSearch(ctx context.Context, c *gin.Context, account *Account, body []byte) (result *OpenAIForwardResult, err error) {
 	if s == nil || c == nil || account == nil {
 		return nil, fmt.Errorf("service, context, and account are required")
 	}
@@ -45,6 +45,19 @@ func (s *OpenAIGatewayService) ForwardAlphaSearch(ctx context.Context, c *gin.Co
 		return nil, fmt.Errorf("sanitize alpha search request body: %w", err)
 	}
 	body = sanitizedBody
+	var snapshot *SimpleBillingSnapshot
+	if s.billingService != nil {
+		snapshot, err = s.billingService.PrepareSimpleBillingSearch(ctx, simpleBillingForwardInput(c, account, upstreamModel, "chat", "", "", ""))
+		if err != nil {
+			writeSimpleBillingPreflightError(c)
+			return nil, err
+		}
+	}
+	defer func() {
+		if result != nil {
+			result.SimpleBilling = snapshot
+		}
+	}()
 
 	token, _, err := s.GetAccessToken(ctx, account)
 	if err != nil {

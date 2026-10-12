@@ -2122,9 +2122,9 @@
             <div>
               <label class="input-label">{{ t('admin.accounts.quotaControl.windowCost.limit') }}</label>
               <div class="relative">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">$</span>
-                <input
-                  v-model.number="windowCostLimit"
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">¥</span>
+                <LedgerAmountInput
+                  v-model="windowCostLimit"
                   type="number"
                   min="0"
                   step="1"
@@ -2137,9 +2137,9 @@
             <div>
               <label class="input-label">{{ t('admin.accounts.quotaControl.windowCost.stickyReserve') }}</label>
               <div class="relative">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">$</span>
-                <input
-                  v-model.number="windowCostStickyReserve"
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">¥</span>
+                <LedgerAmountInput
+                  v-model="windowCostStickyReserve"
                   type="number"
                   min="0"
                   step="1"
@@ -2589,6 +2589,7 @@
 </template>
 
 <script setup lang="ts">
+import LedgerAmountInput from '@/components/common/LedgerAmountInput.vue'
 import { ref, reactive, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'

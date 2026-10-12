@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/Wei-Shaw/sub2api/internal/payment"
@@ -28,8 +29,26 @@ func normalizeSubscriptionUSDToCNYRate(rate float64) float64 {
 func calculateCreditedBalance(paymentAmount, multiplier float64) float64 {
 	return decimal.NewFromFloat(paymentAmount).
 		Mul(decimal.NewFromFloat(normalizeBalanceRechargeMultiplier(multiplier))).
-		Round(2).
+		Round(paymentLedgerPrecision).
 		InexactFloat64()
+}
+
+// The legacy multiplier measures ledger units per payment unit. In simple mode
+// the separately configured multiplier is only a gift ratio; CNY is first
+// converted to the existing USD ledger and USD is already in that ledger.
+func calculateCreditedBalanceForCurrency(paymentAmount float64, currency string, cfg *PaymentConfig) (float64, error) {
+	if !cfg.SimpleBillingEnabled {
+		return calculateCreditedBalance(paymentAmount, cfg.BalanceRechargeMultiplier), nil
+	}
+	if currency != "CNY" && currency != "USD" {
+		return 0, fmt.Errorf("simple billing does not support recharge currency %s", currency)
+	}
+	value := decimal.NewFromFloat(paymentAmount).
+		Mul(decimal.NewFromFloat(normalizeBalanceRechargeMultiplier(cfg.RechargeBonusMultiplier)))
+	if currency == "CNY" {
+		value = value.Div(decimal.NewFromFloat(FixedUSDToCNYRate))
+	}
+	return value.Round(paymentLedgerPrecision).InexactFloat64(), nil
 }
 
 func calculateGatewayRefundAmount(orderAmount, payAmount, refundAmount float64, currency string) float64 {
@@ -37,7 +56,7 @@ func calculateGatewayRefundAmount(orderAmount, payAmount, refundAmount float64, 
 		return 0
 	}
 	fractionDigits := int32(payment.CurrencyMaxFractionDigits(currency))
-	if math.Abs(refundAmount-orderAmount) <= paymentAmountToleranceForCurrency(currency) {
+	if math.Abs(refundAmount-orderAmount) <= math.Pow10(-paymentLedgerPrecision)/2 {
 		return decimal.NewFromFloat(payAmount).Round(fractionDigits).InexactFloat64()
 	}
 	return decimal.NewFromFloat(payAmount).

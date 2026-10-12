@@ -224,13 +224,13 @@ func TestBillingManagementVersionAndReferenceValidation(t *testing.T) {
 
 func TestBillingManagementRejectsInvalidMoneyAndSpecifications(t *testing.T) {
 	for name, mutate := range map[string]func(*BillingManagementConfig){
-		"nan":                         func(c *BillingManagementConfig) { c.USDToCNYRate = math.NaN() },
-		"negative":                    func(c *BillingManagementConfig) { c.CostProfiles[0].Prices[0].UnitPrice = costNumber(-1) },
-		"missing subscription amount": func(c *BillingManagementConfig) { c.CostProfiles[0].PurchaseMode = "subscription" },
-		"bad currency":                func(c *BillingManagementConfig) { c.CostProfiles[0].Currency = "EUR" },
-		"bad wildcard":                func(c *BillingManagementConfig) { c.CostProfiles[0].Prices[0].Models = []string{"Mini*H3"} },
-		"bad unit":                    func(c *BillingManagementConfig) { c.CostProfiles[0].Prices[0].BillingUnit = "per_image" },
-		"duplicate account":           func(c *BillingManagementConfig) { c.CostProfiles[0].AccountIDs = []int64{8, 8} },
+		"nan":                              func(c *BillingManagementConfig) { c.USDToCNYRate = math.NaN() },
+		"negative":                         func(c *BillingManagementConfig) { c.CostProfiles[0].Prices[0].UnitPrice = costNumber(-1) },
+		"missing mixed procurement amount": func(c *BillingManagementConfig) { c.CostProfiles[0].PurchaseMode = "hybrid" },
+		"bad currency":                     func(c *BillingManagementConfig) { c.CostProfiles[0].Currency = "EUR" },
+		"bad wildcard":                     func(c *BillingManagementConfig) { c.CostProfiles[0].Prices[0].Models = []string{"Mini*H3"} },
+		"bad unit":                         func(c *BillingManagementConfig) { c.CostProfiles[0].Prices[0].BillingUnit = "per_image" },
+		"duplicate account":                func(c *BillingManagementConfig) { c.CostProfiles[0].AccountIDs = []int64{8, 8} },
 	} {
 		t.Run(name, func(t *testing.T) {
 			cfg := exampleCostBook()

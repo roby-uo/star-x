@@ -29,6 +29,7 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 		h.chatCompletionsErrorResponse(c, http.StatusUnauthorized, "authentication_error", "Invalid API key")
 		return
 	}
+	c.Request = c.Request.WithContext(h.gatewayService.WithSimpleBillingContext(c.Request.Context(), apiKey.Group))
 
 	subject, ok := middleware2.GetAuthSubjectFromContext(c)
 	if !ok {

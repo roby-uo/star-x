@@ -34,7 +34,7 @@ func (s *GatewayService) ForwardAsResponses(
 	account *Account,
 	body []byte,
 	parsed *ParsedRequest,
-) (*ForwardResult, error) {
+) (forwardedResult *ForwardResult, forwardErr error) {
 	startTime := time.Now()
 
 	// 1. Parse Responses request
@@ -75,6 +75,12 @@ func (s *GatewayService) ForwardAsResponses(
 	// 国产模型默认 effort 补充：需要 mappedModel 判定，推迟到 mapping 完成之后。
 	reasoningEffort = ApplyThinkingEnabledFallback(reasoningEffort, body, mappedModel)
 	anthropicReq.Model = mappedModel
+	var snapshot *SimpleBillingSnapshot
+	defer func() {
+		if forwardedResult != nil && forwardedResult.SimpleBilling == nil {
+			forwardedResult.SimpleBilling = snapshot
+		}
+	}()
 
 	logger.L().Debug("gateway forward_as_responses: model mapping applied",
 		zap.Int64("account_id", account.ID),
@@ -118,10 +124,15 @@ func (s *GatewayService) ForwardAsResponses(
 
 	// 10. Build upstream request
 	upstreamCtx, releaseUpstreamCtx := detachStreamUpstreamContext(ctx, reqStream)
-	upstreamReq, _, err := s.buildUpstreamRequest(upstreamCtx, c, account, anthropicBody, token, tokenType, mappedModel, reqStream, shouldMimicClaudeCode)
+	upstreamReq, wireBody, err := s.buildUpstreamRequest(upstreamCtx, c, account, anthropicBody, token, tokenType, mappedModel, reqStream, shouldMimicClaudeCode)
 	releaseUpstreamCtx()
 	if err != nil {
 		return nil, fmt.Errorf("build upstream request: %w", err)
+	}
+	snapshot, err = s.prepareSimpleBillingAnthropicForward(ctx, c, account, mappedModel, wireBody, upstreamReq.Header)
+	if err != nil {
+		writeSimpleBillingPreflightError(c)
+		return nil, err
 	}
 
 	// 11. Send request

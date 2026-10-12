@@ -70,6 +70,7 @@ type usageLogBestEffortWriter interface {
 
 // postUsageBillingParams 统一扣费所需的参数
 type postUsageBillingParams struct {
+	SimpleBilling         *SimpleBillingSnapshot
 	MediaTaskID           string
 	Cost                  *CostBreakdown
 	User                  *User
@@ -278,6 +279,12 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 	}
 
 	cmd.Normalize()
+	cmd.PriceSnapshot = p.SimpleBilling
+	// Include the frozen policy in the deduplication fingerprint. Retrying the
+	// same usage with a different price is a conflict, not a second deduction.
+	if cmd.PriceSnapshot != nil {
+		cmd.RequestFingerprint = buildUsageBillingFingerprint(cmd)
+	}
 	return cmd
 }
 
@@ -691,7 +698,22 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	}
 
 	// 计算费用
-	cost := s.calculateRecordUsageCost(ctx, result, apiKey, billingModel, multiplier, imageMultiplier, opts)
+	var cost *CostBreakdown
+	if result.SimpleBilling != nil {
+		var err error
+		cost, err = s.billingService.CalculateSimpleBilling(result.SimpleBilling, BillingPreviewInput{Model: result.SimpleBilling.Model, InputTokens: result.Usage.InputTokens, OutputTokens: result.Usage.OutputTokens, CacheReadTokens: result.Usage.CacheReadInputTokens, CacheWriteTokens: result.Usage.CacheCreationInputTokens, CacheWrite5mTokens: result.Usage.CacheCreation5mTokens, CacheWrite1hTokens: result.Usage.CacheCreation1hTokens, ImageOutputTokens: result.Usage.ImageOutputTokens, ImageCount: result.ImageCount, Requests: 1})
+		if err != nil {
+			return err
+		}
+		multiplier, imageMultiplier = result.SimpleBilling.Multiplier, result.SimpleBilling.Multiplier
+	} else {
+		if cfg, err := s.billingService.simpleBillingConfig(ctx); err != nil {
+			return err
+		} else if cfg != nil && cfg.SimpleBillingEnabled {
+			return simplePriceError("缺少请求前的计费快照，拒绝猜测扣费")
+		}
+		cost = s.calculateRecordUsageCost(ctx, result, apiKey, billingModel, multiplier, imageMultiplier, opts)
+	}
 
 	// 判断计费方式：订阅模式 vs 余额模式
 	isSubscriptionBilling := subscription != nil && apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
@@ -706,7 +728,14 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 		requestedModel, multiplier, imageMultiplier, accountRateMultiplier, billingType, cacheTTLOverridden, cost, opts)
 
 	// 计算账号统计定价费用（使用最终上游模型匹配自定义规则）
-	if apiKey.GroupID != nil {
+	if result.SimpleBilling != nil {
+		base := cost.TotalCost
+		usageLog.AccountStatsCost = &base
+		if result.SimpleBilling.Route == "api" {
+			accountRateMultiplier = 1
+		}
+		usageLog.AccountRateMultiplier = &accountRateMultiplier
+	} else if apiKey.GroupID != nil {
 		applyAccountStatsCost(ctx, usageLog, s.channelService, s.billingService,
 			account.ID, *apiKey.GroupID, result.UpstreamModel, result.Model,
 			// Anthropic's input_tokens excludes cache_read and cache_creation (billed separately);
@@ -746,6 +775,7 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 		RequestPayloadHash:    resolveUsageBillingPayloadFingerprint(ctx, input.RequestPayloadHash),
 		IsSubscriptionBill:    isSubscriptionBilling,
 		AccountRateMultiplier: accountRateMultiplier,
+		SimpleBilling:         result.SimpleBilling,
 		APIKeyService:         input.APIKeyService,
 		Platform:              quotaPlatform,
 	}, s.billingDeps(), s.usageBillingRepo)

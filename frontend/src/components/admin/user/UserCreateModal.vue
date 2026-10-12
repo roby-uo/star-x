@@ -35,7 +35,7 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label class="input-label">{{ t('admin.users.columns.balance') }}</label>
-          <input v-model="form.balance" type="number" step="any" class="input" />
+          <LedgerAmountInput v-model="form.balance" type="number" step="any" class="input" />
         </div>
         <div>
           <label class="input-label">{{ t('admin.users.columns.concurrency') }}</label>
@@ -70,6 +70,7 @@
 </template>
 
 <script setup lang="ts">
+import LedgerAmountInput from '@/components/common/LedgerAmountInput.vue'
 import { reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'; import { adminAPI } from '@/api/admin'
 import { useAppStore } from '@/stores/app'

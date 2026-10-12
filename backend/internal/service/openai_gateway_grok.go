@@ -40,7 +40,7 @@ func (s *OpenAIGatewayService) forwardGrokResponses(
 	originalModel string,
 	reqStream bool,
 	startTime time.Time,
-) (*OpenAIForwardResult, error) {
+) (forwardedResult *OpenAIForwardResult, forwardErr error) {
 	if account.Type != AccountTypeOAuth && account.Type != AccountTypeAPIKey {
 		return nil, fmt.Errorf("grok account type %s is not supported by Responses forwarding", account.Type)
 	}
@@ -84,6 +84,18 @@ func (s *OpenAIGatewayService) forwardGrokResponses(
 	if err != nil {
 		return nil, fmt.Errorf("apply grok Free function-tool cache route: %w", err)
 	}
+
+	snapshot, pricingErr := s.prepareSimpleBillingTextForward(ctx, c, account, upstreamModel, patchedBody)
+	if pricingErr != nil {
+		writeSimpleBillingPreflightError(c)
+		return nil, pricingErr
+	}
+	defer func() {
+		if forwardedResult != nil {
+			forwardedResult.SimpleBilling = snapshot
+			forwardedResult.ServiceTier = extractOpenAIServiceTierFromBody(patchedBody)
+		}
+	}()
 
 	token, _, err := s.getRequestCredential(ctx, c, account)
 	if err != nil {

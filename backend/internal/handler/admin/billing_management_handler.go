@@ -28,6 +28,15 @@ func (h *BillingManagementHandler) GetConfig(c *gin.Context) {
 	response.Success(c, cfg)
 }
 
+func (h *BillingManagementHandler) Catalog(c *gin.Context) {
+	items, err := h.service.Catalog(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, items)
+}
+
 // Unknown properties are rejected to prevent credentials or unrelated wallet
 // settings from accidentally being persisted in the administrator cost book.
 func decodeBillingManagementBody(c *gin.Context, target any) error {
@@ -44,7 +53,7 @@ func decodeBillingManagementBody(c *gin.Context, target any) error {
 }
 
 func (h *BillingManagementHandler) UpdateConfig(c *gin.Context) {
-	var req service.BillingManagementConfig
+	req := service.DefaultBillingManagementConfig()
 	if err := decodeBillingManagementBody(c, &req); err != nil {
 		response.ErrorFrom(c, err)
 		return

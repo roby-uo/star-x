@@ -14,14 +14,14 @@
           {{ formatTokens }}
         </span>
         <span class="rounded bg-gray-100 px-1.5 py-0.5 dark:bg-gray-800" :title="t('usage.accountBilled')">
-          A ${{ formatAccountCost }}
+          A {{ formatCnyFromLedger(formatAccountCost, 2) }}
         </span>
         <span
           v-if="windowStats?.user_cost != null"
           class="rounded bg-gray-100 px-1.5 py-0.5 dark:bg-gray-800"
           :title="t('usage.userBilled')"
         >
-          U ${{ formatUserCost }}
+          U {{ formatCnyFromLedger(formatUserCost, 2) }}
         </span>
       </div>
     </div>
@@ -57,6 +57,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatCnyFromLedger } from '@/utils/currency'
 import { computed, ref, watch } from 'vue'
 import { useIntervalFn } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
@@ -213,12 +214,12 @@ const formatTokens = computed(() => {
 
 const formatAccountCost = computed(() => {
   if (!props.windowStats) return '0.00'
-  return props.windowStats.cost.toFixed(2)
+  return props.windowStats.cost
 })
 
 const formatUserCost = computed(() => {
   if (!props.windowStats || props.windowStats.user_cost == null) return '0.00'
-  return props.windowStats.user_cost.toFixed(2)
+  return props.windowStats.user_cost
 })
 
 </script>

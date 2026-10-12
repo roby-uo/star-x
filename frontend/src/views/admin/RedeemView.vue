@@ -130,7 +130,7 @@
 
           <template #cell-value="{ value, row }">
             <span class="text-sm font-medium text-gray-900 dark:text-white">
-              <template v-if="row.type === 'balance'">${{ value.toFixed(2) }}</template>
+              <template v-if="row.type === 'balance'">{{ formatCnyFromLedger(value, 2) }}</template>
               <template v-else-if="row.type === 'subscription'">
                 {{ row.validity_days || 30 }} {{ t('admin.redeem.days') }}
                 <span v-if="row.group" class="ml-1 text-xs text-gray-500 dark:text-gray-400"
@@ -296,8 +296,8 @@
                     : t('admin.redeem.columns.value')
                 }}
               </label>
-              <input
-                v-model.number="generateForm.value"
+              <LedgerAmountInput :convert="generateForm.type === 'balance'"
+                v-model="generateForm.value"
                 type="number"
                 :step="generateForm.type === 'balance' ? '0.01' : '1'"
                 :min="generateForm.type === 'balance' ? '0.01' : '1'"
@@ -615,6 +615,8 @@
 </template>
 
 <script setup lang="ts">
+import LedgerAmountInput from '@/components/common/LedgerAmountInput.vue'
+import { formatCnyFromLedger } from '@/utils/currency'
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'

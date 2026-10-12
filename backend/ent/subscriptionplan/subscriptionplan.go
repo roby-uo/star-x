@@ -25,6 +25,10 @@ const (
 	FieldOriginalPrice = "original_price"
 	// FieldCurrency holds the string denoting the currency field in the database.
 	FieldCurrency = "currency"
+	// FieldCashPriceCny holds the string denoting the cash_price_cny field in the database.
+	FieldCashPriceCny = "cash_price_cny"
+	// FieldCashOriginalPriceCny holds the string denoting the cash_original_price_cny field in the database.
+	FieldCashOriginalPriceCny = "cash_original_price_cny"
 	// FieldValidityDays holds the string denoting the validity_days field in the database.
 	FieldValidityDays = "validity_days"
 	// FieldValidityUnit holds the string denoting the validity_unit field in the database.
@@ -54,6 +58,8 @@ var Columns = []string{
 	FieldPrice,
 	FieldOriginalPrice,
 	FieldCurrency,
+	FieldCashPriceCny,
+	FieldCashOriginalPriceCny,
 	FieldValidityDays,
 	FieldValidityUnit,
 	FieldFeatures,
@@ -143,6 +149,16 @@ func ByOriginalPrice(opts ...sql.OrderTermOption) OrderOption {
 // ByCurrency orders the results by the currency field.
 func ByCurrency(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCurrency, opts...).ToFunc()
+}
+
+// ByCashPriceCny orders the results by the cash_price_cny field.
+func ByCashPriceCny(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCashPriceCny, opts...).ToFunc()
+}
+
+// ByCashOriginalPriceCny orders the results by the cash_original_price_cny field.
+func ByCashOriginalPriceCny(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCashOriginalPriceCny, opts...).ToFunc()
 }
 
 // ByValidityDays orders the results by the validity_days field.

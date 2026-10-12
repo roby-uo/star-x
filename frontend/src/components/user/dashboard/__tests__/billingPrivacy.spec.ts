@@ -18,7 +18,9 @@ describe('user dashboard billing privacy', () => {
       by_platform: [{ platform: 'openai', total_tokens: 340, today_tokens: 30, total_requests: 8, today_requests: 2, total_actual_cost: 8.7654, today_actual_cost: 1.1111 }],
     }
     const wrapper = mount(UserDashboardStats, { props: { stats, balance: 100, isSimple: false }, global: { stubs: { Icon: true } } })
-    expect(wrapper.text()).toContain('$100.00')
+    expect(wrapper.text()).toContain('¥620.00')
+    expect(wrapper.text().match(/¥[\d,.]+/g)).toEqual(['¥620.00'])
+    expect(wrapper.text()).not.toContain('$')
     expect(wrapper.text()).toContain('340 tokens')
     expect(wrapper.text()).not.toContain('dashboard.todayCost')
     expect(wrapper.text()).not.toContain('dashboard.standard')
@@ -31,6 +33,7 @@ describe('user dashboard billing privacy', () => {
     expect(wrapper.text()).toContain('50 tokens')
     expect(wrapper.text()).toContain('0.25s')
     expect(wrapper.text()).not.toContain('$')
+    expect(wrapper.text()).not.toContain('¥')
     expect(wrapper.text()).not.toContain('9.8765')
   })
 
@@ -40,6 +43,7 @@ describe('user dashboard billing privacy', () => {
     expect(wrapper.findAll('th')).toHaveLength(3)
     expect(wrapper.text()).toContain('example-model')
     expect(wrapper.text()).not.toContain('$')
+    expect(wrapper.text()).not.toContain('¥')
     expect(wrapper.text()).not.toContain('dashboard.actual')
     expect(wrapper.findComponent({ name: 'TokenUsageTrend' }).props('showCosts')).toBe(false)
   })

@@ -83,15 +83,15 @@ func (Group) Fields() []ent.Field {
 		field.Float("daily_limit_usd").
 			Optional().
 			Nillable().
-			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+			SchemaType(map[string]string{dialect.Postgres: "decimal(24,12)"}),
 		field.Float("weekly_limit_usd").
 			Optional().
 			Nillable().
-			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+			SchemaType(map[string]string{dialect.Postgres: "decimal(24,12)"}),
 		field.Float("monthly_limit_usd").
 			Optional().
 			Nillable().
-			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+			SchemaType(map[string]string{dialect.Postgres: "decimal(24,12)"}),
 		field.Int("default_validity_days").
 			Default(30),
 
@@ -112,15 +112,15 @@ func (Group) Fields() []ent.Field {
 		field.Float("image_price_1k").
 			Optional().
 			Nillable().
-			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+			SchemaType(map[string]string{dialect.Postgres: "decimal(24,12)"}),
 		field.Float("image_price_2k").
 			Optional().
 			Nillable().
-			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+			SchemaType(map[string]string{dialect.Postgres: "decimal(24,12)"}),
 		field.Float("image_price_4k").
 			Optional().
 			Nillable().
-			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+			SchemaType(map[string]string{dialect.Postgres: "decimal(24,12)"}),
 		field.Float("batch_image_discount_multiplier").
 			SchemaType(map[string]string{dialect.Postgres: "decimal(10,4)"}).
 			Default(0.5).
@@ -139,19 +139,19 @@ func (Group) Fields() []ent.Field {
 		field.Float("video_price_480p").
 			Optional().
 			Nillable().
-			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+			SchemaType(map[string]string{dialect.Postgres: "decimal(24,12)"}),
 		field.Float("video_price_720p").
 			Optional().
 			Nillable().
-			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+			SchemaType(map[string]string{dialect.Postgres: "decimal(24,12)"}),
 		field.Float("video_price_1080p").
 			Optional().
 			Nillable().
-			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+			SchemaType(map[string]string{dialect.Postgres: "decimal(24,12)"}),
 		field.Float("web_search_price_per_call").
 			Optional().
 			Nillable().
-			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}).
+			SchemaType(map[string]string{dialect.Postgres: "decimal(24,12)"}).
 			Comment("Codex alpha/search 网页搜索单次价格（USD/次）；nil 表示使用默认价 0.01（官方 $10/1000 次）"),
 
 		// Claude Code 客户端限制 (added by migration 029)

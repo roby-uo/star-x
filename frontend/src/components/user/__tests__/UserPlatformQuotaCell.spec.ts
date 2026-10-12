@@ -52,9 +52,9 @@ describe('UserPlatformQuotaCell', () => {
     })
     const html = w.html()
     expect(html).toContain('anthropic')
-    expect(html).toContain('30/100')
-    expect(html).toContain('0/—')
-    expect(html).toContain('90.5/2000')
+    expect(html).toContain('¥186.00/¥620.00')
+    expect(html).toContain('¥0.00/—')
+    expect(html).toContain('¥561.10/¥12,400.00')
   })
 
   it('多平台按 anthropic→openai→gemini→antigravity 顺序，仅展示有限额的', () => {

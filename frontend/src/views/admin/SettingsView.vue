@@ -3207,8 +3207,8 @@
                   >
                     {{ t("admin.settings.defaults.defaultBalance") }}
                   </label>
-                  <input
-                    v-model.number="form.default_balance"
+                  <LedgerAmountInput
+                    v-model="form.default_balance"
                     type="number"
                     step="0.01"
                     min="0"
@@ -3423,8 +3423,8 @@
                           <span class="font-mono text-xs text-gray-700 dark:text-gray-300">{{ p }}</span>
                         </td>
                         <td class="pr-4 py-1">
-                          <input
-                            v-model.number="form.default_platform_quotas[p]!.daily"
+                          <LedgerAmountInput
+                            v-model="form.default_platform_quotas[p]!.daily"
                             type="number"
                             step="0.01"
                             min="0"
@@ -3433,8 +3433,8 @@
                           />
                         </td>
                         <td class="pr-4 py-1">
-                          <input
-                            v-model.number="form.default_platform_quotas[p]!.weekly"
+                          <LedgerAmountInput
+                            v-model="form.default_platform_quotas[p]!.weekly"
                             type="number"
                             step="0.01"
                             min="0"
@@ -3443,8 +3443,8 @@
                           />
                         </td>
                         <td class="py-1">
-                          <input
-                            v-model.number="form.default_platform_quotas[p]!.monthly"
+                          <LedgerAmountInput
+                            v-model="form.default_platform_quotas[p]!.monthly"
                             type="number"
                             step="0.01"
                             min="0"
@@ -3758,8 +3758,8 @@
                                 <span class="font-mono text-xs text-gray-700 dark:text-gray-300">{{ p }}</span>
                               </td>
                               <td class="pr-4 py-1">
-                                <input
-                                  v-model.number="authSourceDefaults[authSource.source].platform_quotas[p]!.daily"
+                                <LedgerAmountInput
+                                  v-model="authSourceDefaults[authSource.source].platform_quotas[p]!.daily"
                                   type="number"
                                   step="0.01"
                                   min="0"
@@ -3768,8 +3768,8 @@
                                 />
                               </td>
                               <td class="pr-4 py-1">
-                                <input
-                                  v-model.number="authSourceDefaults[authSource.source].platform_quotas[p]!.weekly"
+                                <LedgerAmountInput
+                                  v-model="authSourceDefaults[authSource.source].platform_quotas[p]!.weekly"
                                   type="number"
                                   step="0.01"
                                   min="0"
@@ -3778,8 +3778,8 @@
                                 />
                               </td>
                               <td class="py-1">
-                                <input
-                                  v-model.number="authSourceDefaults[authSource.source].platform_quotas[p]!.monthly"
+                                <LedgerAmountInput
+                                  v-model="authSourceDefaults[authSource.source].platform_quotas[p]!.monthly"
                                   type="number"
                                   step="0.01"
                                   min="0"
@@ -6702,6 +6702,7 @@
                     </div>
                   </div>
                 </div>
+                <RechargePolicySettings @mode="simpleBillingEnabled = $event" />
                 <!-- Row 2: Balance toggle + amounts -->
                 <div class="grid grid-cols-2 gap-3 sm:grid-cols-5">
                   <div>
@@ -6761,7 +6762,7 @@
                       :placeholder="t('admin.settings.payment.noLimit')"
                     />
                   </div>
-                  <div>
+                  <div v-if="!simpleBillingEnabled">
                     <label class="input-label">{{
                       t("admin.settings.payment.balanceRechargeMultiplier")
                     }}</label>
@@ -6798,7 +6799,7 @@
                       }}
                     </p>
                   </div>
-                  <div>
+                  <div v-if="!simpleBillingEnabled">
                     <label class="input-label">{{
                       t("admin.settings.payment.subscriptionUsdToCnyRate")
                     }}</label>
@@ -7445,10 +7446,10 @@
                 <div class="relative">
                   <span
                     class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                    >$</span
+                    >¥</span
                   >
-                  <input
-                    v-model.number="form.balance_low_notify_threshold"
+                  <LedgerAmountInput
+                    v-model="form.balance_low_notify_threshold"
                     type="number"
                     min="0"
                     step="0.01"
@@ -7634,8 +7635,11 @@
 </template>
 
 <script setup lang="ts">
+import LedgerAmountInput from '@/components/common/LedgerAmountInput.vue'
+import RechargePolicySettings from '@/components/admin/payment/RechargePolicySettings.vue'
 import { ref, reactive, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
 import { adminAPI } from "@/api";
 import {
   appendAuthSourceDefaultsToUpdateRequest,
@@ -7709,6 +7713,7 @@ import {
 
 const { t, locale } = useI18n();
 const appStore = useAppStore();
+const simpleBillingEnabled = ref(true);
 // 关闭 step-up 开关是敏感操作：后端返回 STEP_UP_REQUIRED 时弹 TOTP 码重试
 const settingsStepUp = useStepUp();
 const adminSettingsStore = useAdminSettingsStore();
@@ -7752,6 +7757,12 @@ const settingsTabs = [
   { key: "email" as SettingsTab, icon: "mail" as const },
   { key: "backup" as SettingsTab, icon: "database" as const },
 ];
+
+const route = useRoute();
+watch(() => route.query.tab, (value) => {
+  const tab = settingsTabs.find((item) => item.key === value);
+  if (tab) activeTab.value = tab.key;
+}, { immediate: true });
 
 const settingsTabKeyboardActions = {
   ArrowLeft: -1,

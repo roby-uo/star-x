@@ -87,14 +87,25 @@ func sleepWithContext(ctx context.Context, d time.Duration) error {
 }
 
 // Forward 转发请求到Claude API
-func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *Account, parsed *ParsedRequest) (*ForwardResult, error) {
+func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *Account, parsed *ParsedRequest) (forwardedResult *ForwardResult, forwardErr error) {
 	startTime := time.Now()
 	if parsed == nil {
 		return nil, fmt.Errorf("parse request: empty request")
 	}
+	var snapshot *SimpleBillingSnapshot
+	defer func() {
+		if forwardedResult != nil && forwardedResult.SimpleBilling == nil {
+			forwardedResult.SimpleBilling = snapshot
+		}
+	}()
 
 	// Web Search 模拟：纯 web_search 请求时，直接调用搜索 API 构造响应
 	if account != nil && s.shouldEmulateWebSearch(ctx, account, parsed.GroupID, parsed.Body.Bytes()) {
+		cfg, err := s.billingService.simpleBillingConfig(ctx)
+		if err != nil || (cfg != nil && cfg.SimpleBillingEnabled) {
+			writeSimpleBillingPreflightError(c)
+			return nil, simplePriceError("搜索模拟的独立采购与计费基准尚未确认")
+		}
 		return s.handleWebSearchEmulation(ctx, c, account, parsed)
 	}
 
@@ -360,6 +371,11 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		if err != nil {
 			return nil, err
 		}
+		snapshot, err = s.prepareSimpleBillingAnthropicForward(ctx, c, account, reqModel, wireBody, upstreamReq.Header)
+		if err != nil {
+			writeSimpleBillingPreflightError(c)
+			return nil, err
+		}
 		// 记录本次实际发送的 wire body；只有请求成功后才写回 ParsedRequest，避免 400 retry 基于已签名 CCH 再改写。
 		lastWireBody = wireBody
 
@@ -442,6 +458,11 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 					retryReq, retryWireBody, buildErr := s.buildUpstreamRequest(retryCtx, c, account, filteredBody, token, tokenType, reqModel, reqStream, shouldMimicClaudeCode)
 					releaseRetryCtx()
 					if buildErr == nil {
+						snapshot, buildErr = s.prepareSimpleBillingAnthropicForward(ctx, c, account, reqModel, retryWireBody, retryReq.Header)
+						if buildErr != nil {
+							writeSimpleBillingPreflightError(c)
+							return nil, buildErr
+						}
 						retryResp, retryErr := s.httpUpstream.DoWithTLS(retryReq, proxyURL, account.ID, account.Concurrency, tlsProfile)
 						if retryErr == nil {
 							if retryResp.StatusCode < 400 {
@@ -483,6 +504,11 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 									retryReq2, retryWireBody2, buildErr2 := s.buildUpstreamRequest(retryCtx2, c, account, filteredBody2, token, tokenType, reqModel, reqStream, shouldMimicClaudeCode)
 									releaseRetryCtx2()
 									if buildErr2 == nil {
+										snapshot, buildErr2 = s.prepareSimpleBillingAnthropicForward(ctx, c, account, reqModel, retryWireBody2, retryReq2.Header)
+										if buildErr2 != nil {
+											writeSimpleBillingPreflightError(c)
+											return nil, buildErr2
+										}
 										retryResp2, retryErr2 := s.httpUpstream.DoWithTLS(retryReq2, proxyURL, account.ID, account.Concurrency, tlsProfile)
 										if retryErr2 == nil {
 											if retryResp2.StatusCode < 400 {
@@ -562,6 +588,11 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 						budgetRetryReq, budgetWireBody, buildErr := s.buildUpstreamRequest(budgetRetryCtx, c, account, rectifiedBody, token, tokenType, reqModel, reqStream, shouldMimicClaudeCode)
 						releaseBudgetRetryCtx()
 						if buildErr == nil {
+							snapshot, buildErr = s.prepareSimpleBillingAnthropicForward(ctx, c, account, reqModel, budgetWireBody, budgetRetryReq.Header)
+							if buildErr != nil {
+								writeSimpleBillingPreflightError(c)
+								return nil, buildErr
+							}
 							budgetRetryResp, retryErr := s.httpUpstream.DoWithTLS(budgetRetryReq, proxyURL, account.ID, account.Concurrency, tlsProfile)
 							if retryErr == nil {
 								if budgetRetryResp.StatusCode < 400 {

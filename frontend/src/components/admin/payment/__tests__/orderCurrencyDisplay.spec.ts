@@ -52,7 +52,7 @@ function orderFactory(overrides: Partial<PaymentOrder> = {}): PaymentOrder {
 }
 
 describe('admin order currency display', () => {
-  it('uses order currency for paid/base/fee amounts and USD for credited/refund amounts', () => {
+  it('uses order currency for paid/base/fee amounts and converts ledger credits/refunds to CNY', () => {
     const wrapper = mount(AdminOrderDetail, {
       props: {
         show: true,
@@ -69,11 +69,11 @@ describe('admin order currency display', () => {
     expect(text).toContain('¥100.00')
     expect(text).toContain('¥8.00')
     expect(text).toContain('¥108.00')
-    expect(text).toContain('$100.00')
-    expect(text).toContain('$25.00')
+    expect(text).toContain('¥620.00')
+    expect(text).toContain('¥155.00')
   })
 
-  it('uses order currency for pay_amount and USD for refundable balance amounts', () => {
+  it('uses order currency for pay_amount and converts refundable ledger balances to CNY', () => {
     const wrapper = mount(AdminRefundDialog, {
       props: {
         show: true,
@@ -92,11 +92,11 @@ describe('admin order currency display', () => {
     })
 
     const text = wrapper.text()
-    expect(text).toContain('$108.00')
-    expect(text).toContain('$100.00')
-    expect(text).toContain('$20.00')
-    expect(text).toContain('$80.00')
-    expect(text).toContain('$200.00')
+    expect(text).toContain('¥669.60')
+    expect(text).toContain('¥620.00')
+    expect(text).toContain('¥124.00')
+    expect(text).toContain('¥496.00')
+    expect(text).toContain('¥1,240.00')
   })
 
   it('renders payment currency consistently in the shared order table', () => {
@@ -118,9 +118,9 @@ describe('admin order currency display', () => {
     })
 
     const text = wrapper.text()
-    expect(text).toContain('$108.00')
+    expect(text).toContain('¥669.60')
     expect(text).toContain('¥108.00')
-    expect(text).toContain('$100.00')
+    expect(text).toContain('¥620.00')
   })
 
   it('renders payment currency consistently in the admin order table', () => {
@@ -146,8 +146,8 @@ describe('admin order currency display', () => {
     })
 
     const text = wrapper.text()
-    expect(text).toContain('$108.00')
+    expect(text).toContain('¥669.60')
     expect(text).toContain('¥108.00')
-    expect(text).toContain('$100.00')
+    expect(text).toContain('¥620.00')
   })
 })

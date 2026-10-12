@@ -81,6 +81,7 @@ type BatchImageOwner struct {
 }
 
 type BatchImagePublicService struct {
+	SimpleBilling     *BillingService
 	Repo              BatchImageRepository
 	AccountRepo       BatchImageAccountSelectionRepository
 	GroupRepo         BatchImageGroupPricingRepository
@@ -94,6 +95,7 @@ type BatchImagePublicService struct {
 }
 
 type BatchImagePricingSnapshot struct {
+	ConfigVersion           int64
 	BaseUnitPrice           float64
 	GroupRateMultiplier     float64
 	AccountRateMultiplier   float64
@@ -196,6 +198,12 @@ func NewBatchImagePublicService(repo BatchImageRepository, accountRepo AccountRe
 	}
 }
 
+func ProvideBatchImagePublicService(repo BatchImageRepository, accountRepo AccountRepository, groupRepo GroupRepository, userGroupRateRepo UserGroupRateRepository, queue BatchImageQueue, pricing *BatchImageModelPricingResolver, billingRepo UsageBillingRepository, authCache APIKeyAuthCacheInvalidator, cfg *config.Config, billing *BillingService) *BatchImagePublicService {
+	s := NewBatchImagePublicService(repo, accountRepo, groupRepo, userGroupRateRepo, queue, pricing, billingRepo, authCache, cfg)
+	s.SimpleBilling = billing
+	return s
+}
+
 func (s *BatchImagePublicService) Submit(ctx context.Context, owner BatchImageOwner, req BatchImageSubmitRequest, idempotencyKey string) (*BatchImagePublicBatch, error) {
 	if !s.enabled() {
 		return nil, ErrBatchImageDisabled
@@ -276,7 +284,7 @@ func (s *BatchImagePublicService) Submit(ctx context.Context, owner BatchImageOw
 		HoldMultiplier:          pricingSnapshot.HoldMultiplier,
 		BillableUnitPrice:       pricingSnapshot.BillableUnitPrice,
 		HoldUnitPrice:           pricingSnapshot.HoldUnitPrice,
-		PricingSnapshotVersion:  1,
+		PricingSnapshotVersion:  max(1, int(pricingSnapshot.ConfigVersion)),
 		Currency:                "USD",
 		HoldID:                  &holdID,
 		IdempotencyKey:          batchImageOptionalStringPtr(idempotencyKey),
@@ -995,6 +1003,55 @@ func (s *BatchImagePublicService) ensureGroupAllowsBatchImage(ctx context.Contex
 }
 
 func (s *BatchImagePublicService) resolvePricingSnapshot(ctx context.Context, owner BatchImageOwner, req BatchImageSubmitRequest, provider string, account *Account) (*BatchImagePricingSnapshot, error) {
+	if s.SimpleBilling != nil {
+		cfg, err := s.SimpleBilling.simpleBillingConfig(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if cfg != nil && cfg.SimpleBillingEnabled {
+			if owner.GroupID == nil || s.GroupRepo == nil {
+				return nil, ErrBatchImageSettlementPricingMissing
+			}
+			group, err := s.GroupRepo.GetByIDLite(ctx, *owner.GroupID)
+			if err != nil || group == nil {
+				return nil, ErrBatchImageSettlementPricingMissing
+			}
+			if !group.AllowBatchImageGeneration {
+				return nil, ErrBatchImageGroupDisabled
+			}
+			q, err := s.SimpleBilling.resolveSimpleBilling(cfg, SimpleBillingInput{Account: account, Group: group, Model: account.GetMappedModel(req.Model), Modality: "image", Resolution: req.ImageSize}, time.Now())
+			if err != nil {
+				return nil, err
+			}
+			if q.BillingUnit != "per_image" {
+				return nil, simplePriceError("批量图像需要已确认的按张价格，不能由token价猜算")
+			}
+			// Batch jobs persist one unit quote. Variable pixel/input-reference
+			// surcharges cannot be silently discarded by that uniform snapshot.
+			if q.LowPixelUnitPrice != nil || q.HighPixelUnitPrice != nil {
+				return nil, simplePriceError("按输出像素分档的图像暂不支持统一批量单价，请使用单次图像接口")
+			}
+			for _, row := range q.Rows {
+				if row.InputImageUnitPrice == nil || *row.InputImageUnitPrice == 0 {
+					continue
+				}
+				for _, item := range req.Items {
+					if len(item.ReferenceImages) > 1 {
+						return nil, simplePriceError("批量图像的参考输入图附加费须使用独立逐项报价")
+					}
+				}
+			}
+			cost, err := s.SimpleBilling.CalculateSimpleBilling(q, BillingPreviewInput{Model: q.Model, ImageCount: 1, Requests: 1})
+			if err != nil {
+				return nil, err
+			}
+			accountRate := 1.0
+			if q.Route == "account" {
+				accountRate = account.BillingRateMultiplier()
+			}
+			return &BatchImagePricingSnapshot{ConfigVersion: q.Version, BaseUnitPrice: cost.TotalCost, GroupRateMultiplier: q.Multiplier, AccountRateMultiplier: accountRate, BatchDiscountMultiplier: 1, HoldMultiplier: 1, BillableUnitPrice: cost.ActualCost, HoldUnitPrice: cost.ActualCost, EstimatedCost: cost.ActualCost * float64(len(req.Items)), HoldAmount: cost.ActualCost * float64(len(req.Items))}, nil
+		}
+	}
 	unit := -1.0
 	groupMultiplier := 1.0
 	discountMultiplier := defaultBatchImageDiscountMultiplier

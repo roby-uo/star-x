@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ledgerToCny, cnyToLedger } from '@/utils/currency'
 import { QUOTA_THRESHOLD_TYPE_FIXED, QUOTA_THRESHOLD_TYPE_PERCENTAGE, type QuotaThresholdType } from '@/constants/account'
 
 defineProps<{
@@ -33,8 +34,8 @@ const emit = defineEmits<{
     </button>
     <template v-if="enabled">
       <input
-        :value="threshold"
-        @input="emit('update:threshold', parseFloat(($event.target as HTMLInputElement).value) || null)"
+        :value="threshold == null ? '' : thresholdType === QUOTA_THRESHOLD_TYPE_PERCENTAGE ? threshold : ledgerToCny(threshold)"
+        @input="emit('update:threshold', (($event.target as HTMLInputElement).value === '' ? null : thresholdType === QUOTA_THRESHOLD_TYPE_PERCENTAGE ? Number(($event.target as HTMLInputElement).value) : cnyToLedger(($event.target as HTMLInputElement).value)))"
         type="number"
         min="0"
         :max="thresholdType === QUOTA_THRESHOLD_TYPE_PERCENTAGE ? 100 : undefined"
@@ -46,7 +47,7 @@ const emit = defineEmits<{
         @change="emit('update:thresholdType', ($event.target as HTMLSelectElement).value as QuotaThresholdType)"
         class="input py-1 text-xs w-[4.5rem] flex-shrink-0 text-center"
       >
-        <option :value="QUOTA_THRESHOLD_TYPE_FIXED">$</option>
+        <option :value="QUOTA_THRESHOLD_TYPE_FIXED">¥</option>
         <option :value="QUOTA_THRESHOLD_TYPE_PERCENTAGE">%</option>
       </select>
     </template>

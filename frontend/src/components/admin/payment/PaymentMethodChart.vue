@@ -20,7 +20,7 @@
           </div>
           <div class="text-right">
             <span class="text-sm font-medium text-gray-900 dark:text-white">
-              ${{ method.amount.toFixed(2) }}
+              {{ formatCny(method.amount, 2) }}
             </span>
             <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">
               ({{ method.count }})
@@ -39,6 +39,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatCny } from '@/utils/currency'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 

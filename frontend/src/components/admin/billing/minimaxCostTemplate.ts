@@ -2,7 +2,7 @@ import type { ProcurementPrice } from '@/api/admin/billingManagement'
 import { emptyPrice } from './billingManagement'
 
 // Dated reference only; saving and future price updates remain explicit.
-export const MINIMAX_COST_TEMPLATE_SOURCE = 'https://platform.minimax.cn/docs/guides/pricing-paygo · 2026-10-12 参考'
+export const MINIMAX_COST_TEMPLATE_SOURCE = 'https://platform.minimax.cn/docs/pricing/overview · 2026-10-12 参考'
 export function minimaxChinaCostTemplate(): ProcurementPrice[] {
   const token = (models: string[], input: number, output: number, read: number, write: number, min = 0, max: number | null = null, tier = ''): ProcurementPrice => ({ ...emptyPrice(), models, input_price: input, output_price: output, cache_read_price: read, cache_write_price: write, min_tokens: min, max_tokens: max, service_tier: tier })
   const video = (model: string, resolution: string, price: number): ProcurementPrice => ({ ...emptyPrice(), models: [model], modality: 'video', billing_unit: 'per_second', resolution, unit_price: price })

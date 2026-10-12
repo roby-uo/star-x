@@ -708,6 +708,7 @@ func registerBillingManagementRoutes(admin *gin.RouterGroup, h *handler.Handlers
 	}
 	billing := admin.Group("/billing-management")
 	billing.GET("/config", h.Admin.BillingManagement.GetConfig)
+	billing.GET("/catalog", h.Admin.BillingManagement.Catalog)
 	billing.PUT("/config", h.Admin.BillingManagement.UpdateConfig)
 	billing.POST("/preview", h.Admin.BillingManagement.Preview)
 }

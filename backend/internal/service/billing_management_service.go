@@ -25,6 +25,8 @@ type BillingManagementRepository interface {
 
 type BillingManagementConfig struct {
 	Version                 int64         `json:"version"`
+	SimpleBillingEnabled    bool          `json:"simple_billing_enabled"`
+	APISaleMultiplier       float64       `json:"api_sale_multiplier"`
 	USDToCNYRate            float64       `json:"usd_to_cny_rate"`
 	ExchangeRateSource      string        `json:"exchange_rate_source"`
 	ExchangeRateEffectiveAt *time.Time    `json:"exchange_rate_effective_at"`
@@ -35,6 +37,7 @@ type CostProfile struct {
 	ID                 string         `json:"id"`
 	Name               string         `json:"name"`
 	Provider           string         `json:"provider"`
+	Region             string         `json:"region,omitempty"`
 	Enabled            bool           `json:"enabled"`
 	AccountIDs         []int64        `json:"account_ids"`
 	PurchaseMode       string         `json:"purchase_mode"`
@@ -52,42 +55,50 @@ type CostProfile struct {
 // Text prices are in the profile's original currency per million tokens.
 // A nil price means unknown; an explicit zero is a confirmed free item.
 type CostPriceRow struct {
-	ID               string   `json:"id"`
-	Models           []string `json:"models"`
-	Modality         string   `json:"modality"`
-	BillingUnit      string   `json:"billing_unit"`
-	Resolution       string   `json:"resolution"`
-	Quality          string   `json:"quality"`
-	ServiceTier      string   `json:"service_tier"`
-	MinTokens        int      `json:"min_tokens"`
-	MaxTokens        *int     `json:"max_tokens"`
-	InputPrice       *float64 `json:"input_price"`
-	OutputPrice      *float64 `json:"output_price"`
-	ImageInputPrice  *float64 `json:"image_input_price"`
-	ImageOutputPrice *float64 `json:"image_output_price"`
-	CacheReadPrice   *float64 `json:"cache_read_price"`
-	CacheWritePrice  *float64 `json:"cache_write_price"`
-	UnitPrice        *float64 `json:"unit_price"`
+	ID                  string   `json:"id"`
+	Models              []string `json:"models"`
+	Modality            string   `json:"modality"`
+	BillingUnit         string   `json:"billing_unit"`
+	Resolution          string   `json:"resolution"`
+	Quality             string   `json:"quality"`
+	ServiceTier         string   `json:"service_tier"`
+	MinTokens           int      `json:"min_tokens"`
+	MaxTokens           *int     `json:"max_tokens"`
+	InputPrice          *float64 `json:"input_price"`
+	OutputPrice         *float64 `json:"output_price"`
+	ImageInputPrice     *float64 `json:"image_input_price"`
+	ImageOutputPrice    *float64 `json:"image_output_price"`
+	CacheReadPrice      *float64 `json:"cache_read_price"`
+	CacheWritePrice     *float64 `json:"cache_write_price"`
+	UnitPrice           *float64 `json:"unit_price"`
+	InputImageUnitPrice *float64 `json:"input_image_unit_price,omitempty"`
+	Operation           string   `json:"operation,omitempty"`
 }
 
 type BillingPreviewInput struct {
-	ProfileID         string  `json:"profile_id"`
-	AccountID         int64   `json:"account_id"`
-	GroupID           int64   `json:"group_id"`
-	Model             string  `json:"model"`
-	Modality          string  `json:"modality"`
-	Resolution        string  `json:"resolution"`
-	Quality           string  `json:"quality"`
-	ServiceTier       string  `json:"service_tier"`
-	InputTokens       int     `json:"input_tokens"`
-	OutputTokens      int     `json:"output_tokens"`
-	ImageInputTokens  int     `json:"image_input_tokens"`
-	ImageOutputTokens int     `json:"image_output_tokens"`
-	CacheReadTokens   int     `json:"cache_read_tokens"`
-	CacheWriteTokens  int     `json:"cache_write_tokens"`
-	ImageCount        int     `json:"image_count"`
-	DurationSeconds   float64 `json:"duration_seconds"`
-	Requests          int     `json:"requests"`
+	Operation          string   `json:"operation,omitempty"`
+	ProfileID          string   `json:"profile_id"`
+	AccountID          int64    `json:"account_id"`
+	GroupID            int64    `json:"group_id"`
+	Model              string   `json:"model"`
+	Modality           string   `json:"modality"`
+	Resolution         string   `json:"resolution"`
+	Quality            string   `json:"quality"`
+	ServiceTier        string   `json:"service_tier"`
+	InputTokens        int      `json:"input_tokens"`
+	OutputTokens       int      `json:"output_tokens"`
+	ImageInputTokens   int      `json:"image_input_tokens"`
+	ImageOutputTokens  int      `json:"image_output_tokens"`
+	CacheReadTokens    int      `json:"cache_read_tokens"`
+	CacheWriteTokens   int      `json:"cache_write_tokens"`
+	CacheWrite5mTokens int      `json:"cache_write_5m_tokens,omitempty"`
+	CacheWrite1hTokens int      `json:"cache_write_1h_tokens,omitempty"`
+	ImageCount         int      `json:"image_count"`
+	ImageOutputSizes   []string `json:"image_output_sizes,omitempty"`
+	DurationSeconds    float64  `json:"duration_seconds"`
+	Requests           int      `json:"requests"`
+	InputImageCount    int      `json:"input_image_count,omitempty"`
+	ImageScene         string   `json:"image_scene,omitempty"`
 }
 
 type PurchaseCostEstimate struct {
@@ -106,6 +117,7 @@ type SaleChargeEstimate struct {
 	Status     string   `json:"status"`
 	Currency   string   `json:"currency"`
 	Amount     *float64 `json:"amount"`
+	AmountCNY  *float64 `json:"amount_cny,omitempty"`
 	Multiplier *float64 `json:"multiplier"`
 	Source     string   `json:"source"`
 	Reason     string   `json:"reason"`
@@ -142,14 +154,9 @@ func (s *BillingManagementService) load(ctx context.Context) (*BillingManagement
 	if err != nil {
 		return nil, "", err
 	}
-	cfg := &BillingManagementConfig{CostProfiles: []CostProfile{}}
-	if raw != "" {
-		if err := json.Unmarshal([]byte(raw), cfg); err != nil {
-			return nil, "", fmt.Errorf("invalid persisted billing management config: %w", err)
-		}
-	}
-	if cfg.CostProfiles == nil {
-		cfg.CostProfiles = []CostProfile{}
+	cfg, err := decodeBillingManagementConfig(raw)
+	if err != nil {
+		return nil, "", err
 	}
 	return cfg, raw, nil
 }
@@ -160,6 +167,10 @@ func (s *BillingManagementService) GetConfig(ctx context.Context) (*BillingManag
 }
 
 func (s *BillingManagementService) UpdateConfig(ctx context.Context, next BillingManagementConfig) (*BillingManagementConfig, error) {
+	next.USDToCNYRate = FixedUSDToCNYRate
+	if next.APISaleMultiplier == 0 {
+		next.APISaleMultiplier = 1.4
+	}
 	if err := ValidateBillingManagementConfig(&next); err != nil {
 		return nil, err
 	}
@@ -197,6 +208,9 @@ func (s *BillingManagementService) UpdateConfig(ctx context.Context, next Billin
 	if !ok {
 		return nil, infraerrors.Conflict("BILLING_CONFIG_CHANGED", "费率配置已被修改，请刷新后重新保存")
 	}
+	if s.billing != nil {
+		s.billing.invalidateSimpleBillingConfig()
+	}
 	return &next, nil
 }
 
@@ -210,12 +224,15 @@ func ValidateBillingManagementConfig(cfg *BillingManagementConfig) error {
 	if len(cfg.ExchangeRateSource) > 500 || len(cfg.CostProfiles) > 200 {
 		return bad("汇率来源最多500字，采购方案最多200个")
 	}
+	if !finiteNonnegative(cfg.APISaleMultiplier) || cfg.APISaleMultiplier > 1000000 {
+		return bad("API售价倍率须为有效非负数")
+	}
 	profileIDs := map[string]bool{}
 	for i := range cfg.CostProfiles {
 		p := &cfg.CostProfiles[i]
 		p.Name = strings.TrimSpace(p.Name)
 		p.ID = strings.TrimSpace(p.ID)
-		if p.ID == "" || len(p.ID) > 100 || profileIDs[p.ID] || p.Name == "" || len(p.Name) > 100 || len(p.Provider) > 100 {
+		if p.ID == "" || len(p.ID) > 100 || profileIDs[p.ID] || p.Name == "" || len(p.Name) > 100 || len(p.Provider) > 100 || len(p.Region) > 100 {
 			return bad("采购方案须有唯一编号和名称，名称及供应商最多100字")
 		}
 		profileIDs[p.ID] = true
@@ -228,8 +245,8 @@ func ValidateBillingManagementConfig(cfg *BillingManagementConfig) error {
 		if p.PeriodCost != nil && !finiteNonnegative(*p.PeriodCost) || p.CreditAmount != nil && (!finiteNonnegative(*p.CreditAmount) || *p.CreditAmount == 0) {
 			return bad("采购实付须为非负数，额度包的标称额度须大于0")
 		}
-		if p.PurchaseMode != "payg" && p.PeriodCost == nil {
-			return bad("包月、额度包和混合采购须填写本期实付")
+		if (p.PurchaseMode == "credit_pack" || p.PurchaseMode == "hybrid") && p.PeriodCost == nil {
+			return bad("额度包和混合采购须填写本期实付")
 		}
 		if p.PurchaseMode == "credit_pack" && p.CreditAmount == nil {
 			return bad("额度包须填写供应商原币标称额度")
@@ -269,13 +286,19 @@ func ValidateBillingManagementConfig(cfg *BillingManagementConfig) error {
 			if !slices.Contains([]string{"chat", "image", "video"}, r.Modality) || !slices.Contains([]string{"per_million_tokens", "per_image", "per_second", "per_request"}, r.BillingUnit) {
 				return bad("模型类型或计费单位无效")
 			}
+			if !slices.Contains([]string{"", "alpha_search"}, r.Operation) || r.Operation == "alpha_search" && (r.Modality != "chat" || r.BillingUnit != "per_request") {
+				return bad("独立搜索只能配置按次计费，并须标记 alpha_search")
+			}
 			if (r.BillingUnit == "per_image" && r.Modality != "image") || (r.BillingUnit == "per_second" && r.Modality != "video") {
 				return bad("按张仅用于图像，按秒仅用于视频")
+			}
+			if r.InputImageUnitPrice != nil && r.BillingUnit != "per_image" {
+				return bad("参考输入图单价仅用于按张计费")
 			}
 			if len(r.Resolution) > 30 || len(r.Quality) > 50 || !slices.Contains([]string{"", "priority", "flex"}, r.ServiceTier) || r.MinTokens < 0 || (r.MaxTokens != nil && *r.MaxTokens <= r.MinTokens) {
 				return bad("规格或上下文区间无效；上限包含在区间内")
 			}
-			for _, price := range []*float64{r.InputPrice, r.OutputPrice, r.ImageInputPrice, r.ImageOutputPrice, r.CacheReadPrice, r.CacheWritePrice, r.UnitPrice} {
+			for _, price := range []*float64{r.InputPrice, r.OutputPrice, r.ImageInputPrice, r.ImageOutputPrice, r.CacheReadPrice, r.CacheWritePrice, r.UnitPrice, r.InputImageUnitPrice} {
 				if price != nil && (!finiteNonnegative(*price) || *price > 1e12) {
 					return bad("单价须为有效非负数，空单价表示待核对")
 				}
@@ -289,19 +312,25 @@ func ValidateBillingManagementConfig(cfg *BillingManagementConfig) error {
 }
 
 func (s *BillingManagementService) Preview(ctx context.Context, in BillingPreviewInput) (*BillingPreviewResult, error) {
+	if !slices.Contains([]string{"", "alpha_search"}, in.Operation) || in.Operation == "alpha_search" && in.Modality != "chat" {
+		return nil, infraerrors.BadRequest("INVALID_BILLING_PREVIEW", "独立搜索须选择文本类型，并标记 alpha_search")
+	}
 	if strings.TrimSpace(in.Model) == "" || len(in.Model) > 200 || !slices.Contains([]string{"chat", "image", "video"}, in.Modality) || in.AccountID < 0 || in.GroupID < 0 {
 		return nil, infraerrors.BadRequest("INVALID_BILLING_PREVIEW", "请选择有效模型、类型及账号/分组")
 	}
 	if len(in.Resolution) > 30 || len(in.Quality) > 50 || len(in.ProfileID) > 100 || !slices.Contains([]string{"", "auto", "default", "priority", "flex"}, in.ServiceTier) {
 		return nil, infraerrors.BadRequest("INVALID_BILLING_PREVIEW", "模型规格或服务档位无效")
 	}
-	for _, qty := range []int{in.InputTokens, in.OutputTokens, in.ImageInputTokens, in.ImageOutputTokens, in.CacheReadTokens, in.CacheWriteTokens, in.ImageCount, in.Requests} {
+	for _, qty := range []int{in.InputTokens, in.OutputTokens, in.ImageInputTokens, in.ImageOutputTokens, in.CacheReadTokens, in.CacheWriteTokens, in.CacheWrite5mTokens, in.CacheWrite1hTokens, in.ImageCount, in.Requests, in.InputImageCount} {
 		if qty < 0 || qty > 1000000000 {
 			return nil, infraerrors.BadRequest("INVALID_BILLING_PREVIEW", "用量须在0至十亿之间")
 		}
 	}
 	if in.ImageInputTokens > in.InputTokens || in.ImageOutputTokens > in.OutputTokens {
 		return nil, infraerrors.BadRequest("INVALID_BILLING_PREVIEW", "图片输入/输出tokens为对应输入/输出总量的子集，不能超过总量")
+	}
+	if in.CacheWrite5mTokens+in.CacheWrite1hTokens > in.CacheWriteTokens {
+		return nil, infraerrors.BadRequest("INVALID_BILLING_PREVIEW", "缓存时长细分不能超过缓存写入总量")
 	}
 	if !finiteNonnegative(in.DurationSeconds) || in.DurationSeconds > 86400 {
 		return nil, infraerrors.BadRequest("INVALID_BILLING_PREVIEW", "视频时长无效")
@@ -314,6 +343,9 @@ func (s *BillingManagementService) Preview(ctx context.Context, in BillingPrevie
 		return nil, err
 	}
 	out := &BillingPreviewResult{Warnings: []string{}, Cost: estimatePurchaseCost(cfg, in, s.now()), Sale: SaleChargeEstimate{Status: "unknown", Currency: "USD"}}
+	if cfg.SimpleBillingEnabled {
+		return s.simplePreview(ctx, cfg, in)
+	}
 	out.Comparison.Reason = "未绑定具体充值订单和赠送比例，扣费额度不等于现金收入；成本汇率不用于推算充值实收"
 	out.Warnings = append(out.Warnings, "采购成本为价表估算，需与供应商账单核对；预览不会调用上游或扣费")
 	out.Sale = s.estimateSale(ctx, in, &out.Warnings)
@@ -365,6 +397,9 @@ func estimatePurchaseCost(cfg *BillingManagementConfig, in BillingPreviewInput, 
 	contextTokens := in.InputTokens + in.CacheReadTokens + in.CacheWriteTokens
 	for i := range selected.Prices {
 		r := &selected.Prices[i]
+		if r.Operation != in.Operation {
+			continue
+		}
 		tier := in.ServiceTier
 		if tier == "auto" || tier == "default" {
 			tier = ""

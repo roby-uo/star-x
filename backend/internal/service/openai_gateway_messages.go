@@ -32,7 +32,13 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	body []byte,
 	promptCacheKey string,
 	defaultMappedModel string,
-) (*OpenAIForwardResult, error) {
+) (forwardedResult *OpenAIForwardResult, forwardErr error) {
+	var snapshot *SimpleBillingSnapshot
+	defer func() {
+		if forwardedResult != nil && forwardedResult.SimpleBilling == nil {
+			forwardedResult.SimpleBilling = snapshot
+		}
+	}()
 	// 入口分流：APIKey 账号 + 上游不支持 Responses API → 走 CC 直转（与
 	// ForwardAsChatCompletions 对称）。缺少此分流时，/v1/messages 入站请求
 	// 会被无条件转为 Responses 格式发往上游 /v1/responses，导致只支持
@@ -275,6 +281,12 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 		}
 	}
 
+	snapshot, err = s.prepareSimpleBillingTextForward(ctx, c, account, upstreamModel, responsesBody)
+	if err != nil {
+		writeSimpleBillingPreflightError(c)
+		return nil, err
+	}
+
 	// 5. Get access token
 	token, _, err := s.getRequestCredential(ctx, c, account)
 	if err != nil {
@@ -466,10 +478,7 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 		if promptCacheKey != "" && anthropicDigestChain != "" {
 			s.bindOpenAICompatAnthropicDigestPromptCacheKey(account, apiKeyID, anthropicDigestChain, promptCacheKey, anthropicMatchedDigestChain)
 		}
-		if responsesReq.ServiceTier != "" {
-			st := responsesReq.ServiceTier
-			result.ServiceTier = &st
-		}
+		result.ServiceTier = extractOpenAIServiceTierFromBody(responsesBody)
 		if responsesReq.Reasoning != nil && responsesReq.Reasoning.Effort != "" {
 			re := responsesReq.Reasoning.Effort
 			result.ReasoningEffort = &re

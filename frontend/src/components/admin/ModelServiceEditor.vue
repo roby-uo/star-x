@@ -12,7 +12,7 @@
             <option value="">先选择范围，再编辑配置</option><option v-for="channel in candidateChannels" :key="channel.id" :value="channel.id">{{ scopeLabel(channel) }}</option>
           </select>
           <p v-else class="font-medium text-gray-900 dark:text-white">{{ selectedScopeLabel }}</p>
-          <p v-if="selectedChannel" class="mt-2 text-xs text-gray-500">这些分组共用本页基础售价和服务规格；分组倍率保留各自设置。当前状态：{{ currentStateLabel }}。</p>
+          <p v-if="selectedChannel" class="mt-2 text-xs text-gray-500">这些分组共用服务规格与开放配置。当前状态：{{ currentStateLabel }}。</p>
           <details v-if="unassignedGroups.length" class="mt-3 text-sm"><summary class="cursor-pointer text-primary-600">为其他分组创建开放范围</summary><div class="mt-3 space-y-3"><input v-model="newName" class="input" placeholder="范围名称，例如普通用户服务" aria-label="新开放范围名称" /><div class="flex flex-wrap gap-3"><label v-for="group in unassignedGroups" :key="group.id" class="inline-flex items-center gap-2"><input v-model="newGroups" type="checkbox" :value="group.id" />{{ group.name }}</label></div><button class="btn btn-secondary text-xs" type="button" :disabled="saving || !newName.trim() || !newGroups.length" @click="createChannel">创建并配置</button></div></details>
         </section>
         <template v-if="selectedChannel">
@@ -21,33 +21,33 @@
           </nav>
           <form id="service-form" @submit.prevent="prepare('apply')">
             <section v-if="activeTab === 'specs'" class="space-y-5">
-              <div><h3 class="font-semibold text-gray-900 dark:text-white">规格与基础售价</h3><p class="mt-1 text-xs text-gray-500">统一使用美元。这里只维护基础售价，倍率在“分组与倍率”中管理。</p></div>
+              <div><h3 class="font-semibold text-gray-900 dark:text-white">{{ simpleBillingEnabled ? '服务规格' : '规格与基础售价' }}</h3><p v-if="simpleBillingEnabled" class="mt-1 text-xs text-gray-500">这里只管理可用规格与开放权限，售价统一在 <router-link to="/admin/billing-management" class="text-primary-600 underline">计费管理</router-link> 中调整。</p><p v-else class="mt-1 text-xs text-gray-500">统一使用人民币。这里只维护基础售价，倍率在“分组与倍率”中管理。</p></div>
               <template v-if="kind === 'video' && videoSpec">
-                <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-dark-600"><table class="w-full text-sm"><thead class="bg-gray-50 text-left text-gray-500 dark:bg-dark-900/30"><tr><th class="px-4 py-3">开放规格</th><th class="px-4 py-3">基础售价（USD / 秒）</th></tr></thead><tbody><tr v-for="resolution in videoSpec.resolutions" :key="resolution" class="border-t border-gray-100 dark:border-dark-700"><td class="px-4 py-3"><label class="inline-flex items-center gap-2"><input v-model="policy.resolutions" type="checkbox" :value="resolution" />{{ resolution }}</label></td><td class="px-4 py-3"><input v-model.number="prices[resolution]" class="input max-w-48" type="number" min="0" step="any" :disabled="!policy.resolutions?.includes(resolution)" :aria-label="`${resolution} 每秒基础售价`" /></td></tr></tbody></table></div>
+                <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-dark-600"><table class="w-full text-sm"><thead class="bg-gray-50 text-left text-gray-500 dark:bg-dark-900/30"><tr><th class="px-4 py-3">开放规格</th><th v-if="!simpleBillingEnabled" class="px-4 py-3">基础售价（人民币 / 秒）</th></tr></thead><tbody><tr v-for="resolution in videoSpec.resolutions" :key="resolution" class="border-t border-gray-100 dark:border-dark-700"><td class="px-4 py-3"><label class="inline-flex items-center gap-2"><input v-model="policy.resolutions" type="checkbox" :value="resolution" />{{ resolution }}</label></td><td v-if="!simpleBillingEnabled" class="px-4 py-3"><LedgerAmountInput v-model="prices[resolution]" class="input max-w-48" type="number" min="0" step="any" :disabled="!policy.resolutions?.includes(resolution)" :aria-label="`${resolution} 每秒基础售价`" /></td></tr></tbody></table></div>
                 <div class="grid grid-cols-2 gap-4"><label class="text-sm">最短时长（秒）<input v-model.number="policy.min_duration" type="number" :min="videoSpec.minDuration" :max="videoSpec.maxDuration" class="input mt-1" /></label><label class="text-sm">最长时长（秒）<input v-model.number="policy.max_duration" type="number" :min="videoSpec.minDuration" :max="videoSpec.maxDuration" class="input mt-1" /></label></div>
                 <div><p class="input-label">生成方式</p><div class="flex flex-wrap gap-4"><label v-for="mode in videoModes" :key="mode.value" class="inline-flex items-center gap-2 text-sm"><input v-model="policy.modes" type="checkbox" :value="mode.value" />{{ mode.label }}</label></div></div>
-                <p class="text-xs text-gray-500">以上为对外售价，不是采购成本。未配置服务规则时沿用系统默认规格与定价。</p>
+                <p v-if="!simpleBillingEnabled" class="text-xs text-gray-500">以上为对外售价，不是采购成本。未配置服务规则时沿用系统默认规格与定价。</p>
               </template>
               <p v-else-if="kind === 'video'" class="rounded-lg bg-amber-50 p-4 text-sm text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">此模型尚未适配规格管理，保留当前调用配置。请在高级渠道配置中管理已有路由。</p>
               <template v-else>
                 <div v-if="kind === 'image'" class="grid gap-4 sm:grid-cols-2"><label class="text-sm">允许尺寸<input v-model="imageSizes" class="input mt-1" placeholder="2K,4K 或 1024x1024" /><span class="mt-1 block text-xs text-gray-400">逗号分隔，留空沿用上游支持范围。</span></label><label class="text-sm">单次图片数量上限<input v-model.number="policy.max_images" type="number" min="0" max="15" class="input mt-1" /><span class="mt-1 block text-xs text-gray-400">0 表示沿用上游限制。</span></label></div>
-                <div v-if="hasWildcardPrice" class="rounded-lg bg-amber-50 p-4 text-sm text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">当前价格由通配规则覆盖多个模型。为避免改变其他模型的费用，请在 <router-link to="/admin/channels/pricing" class="underline">高级渠道配置</router-link> 中调整该价格规则；本页仍可管理规格与开放。</div>
-                <template v-else>
+                <div v-if="!simpleBillingEnabled && hasWildcardPrice" class="rounded-lg bg-amber-50 p-4 text-sm text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">当前价格由通配规则覆盖多个模型。为避免改变其他模型的费用，请在 <router-link to="/admin/channels/pricing" class="underline">高级渠道配置</router-link> 中调整该价格规则；本页仍可管理规格与开放。</div>
+                <template v-else-if="!simpleBillingEnabled">
                   <label class="flex items-center gap-2 text-sm font-medium"><input v-model="customPricing" type="checkbox" />为这个模型设置基础售价</label>
                   <p v-if="!customPricing" class="text-sm text-gray-500">沿用现有系统与分组定价。</p>
                   <div v-if="customPricing" class="space-y-4 rounded-xl border border-gray-200 p-4 dark:border-dark-600">
-                    <label class="block text-sm">计费方式<select v-model="pricing.billing_mode" class="input mt-1" @change="pricing.intervals = []"><option value="token">按用量（美元 / 百万词元）</option><option value="per_request">按次（美元 / 次）</option><option v-if="kind === 'image'" value="image">按图片（美元 / 张）</option></select></label>
-                    <div v-if="pricing.billing_mode === 'token'" class="grid grid-cols-2 gap-4 sm:grid-cols-3"><label v-for="field in tokenPriceFields" :key="field.key" class="text-sm">{{ field.label }}<input v-model="pricing[field.key]" class="input mt-1" type="number" min="0" step="any" placeholder="沿用默认" /></label></div>
-                    <label v-else class="block text-sm">默认基础售价<input v-model="pricing.per_request_price" class="input mt-1 max-w-56" type="number" min="0" step="any" placeholder="有分档时可留空" /></label>
+                    <label class="block text-sm">计费方式<select v-model="pricing.billing_mode" class="input mt-1" @change="pricing.intervals = []"><option value="token">按用量（人民币 / 百万词元）</option><option value="per_request">按次（人民币 / 次）</option><option v-if="kind === 'image'" value="image">按图片（人民币 / 张）</option></select></label>
+                    <div v-if="pricing.billing_mode === 'token'" class="grid grid-cols-2 gap-4 sm:grid-cols-3"><label v-for="field in tokenPriceFields" :key="field.key" class="text-sm">{{ field.label }}<LedgerAmountInput v-model="pricing[field.key]" class="input mt-1" type="number" min="0" step="any" placeholder="沿用默认" /></label></div>
+                    <label v-else class="block text-sm">默认基础售价<LedgerAmountInput v-model="pricing.per_request_price" class="input mt-1 max-w-56" type="number" min="0" step="any" placeholder="有分档时可留空" /></label>
                     <details :open="pricing.intervals.length > 0"><summary class="cursor-pointer text-sm text-primary-600">分档价格 {{ pricing.intervals.length ? `（${pricing.intervals.length} 档）` : '（可选）' }}</summary><div class="mt-3 space-y-2 overflow-x-auto"><IntervalRow v-for="(interval, index) in pricing.intervals" :key="index" class="min-w-[600px]" :interval="interval" :mode="pricing.billing_mode" @update="pricing.intervals[index] = $event" @remove="pricing.intervals.splice(index, 1)" /><button class="btn btn-secondary text-xs" type="button" @click="addInterval">添加价格档位</button></div></details>
                   </div>
                 </template>
               </template>
             </section>
             <section v-if="activeTab === 'groups'" class="space-y-4">
-              <div><h3 class="font-semibold text-gray-900 dark:text-white">开放分组与费用预览</h3><p class="mt-1 text-xs text-gray-500">勾选分组并限定其可用规格。预览采用当前分组倍率；用户单独倍率、峰时倍率等以实际结算为准。</p></div>
+              <div><h3 class="font-semibold text-gray-900 dark:text-white">开放分组</h3><p class="mt-1 text-xs text-gray-500">勾选分组并限定其可用规格。实际售价由选定上游和计费管理中的规则确定。</p></div>
               <div v-for="group in eligibleGroups" :key="group.id" class="rounded-xl border border-gray-200 p-4 dark:border-dark-600">
-                <label class="flex flex-wrap items-center gap-2 text-sm"><input v-model="rules[group.id]!.enabled" type="checkbox" :disabled="group.status !== 'active'" /><span class="font-medium">{{ group.name }}</span><span class="text-xs text-gray-500">分组倍率 {{ group.rate_multiplier }}×{{ group.status !== 'active' ? ' · 分组已停用' : '' }}</span></label>
+                <label class="flex flex-wrap items-center gap-2 text-sm"><input v-model="rules[group.id]!.enabled" type="checkbox" :disabled="group.status !== 'active'" /><span class="font-medium">{{ group.name }}</span><span class="text-xs text-gray-500">账号授权倍率 {{ group.rate_multiplier }}×{{ group.status !== 'active' ? ' · 分组已停用' : '' }}</span></label>
                 <div v-if="kind === 'video' && rules[group.id]!.enabled" class="mt-4 grid gap-4 sm:grid-cols-2">
                   <div><p class="mb-2 text-xs text-gray-500">允许分辨率</p><label v-for="resolution in policy.resolutions" :key="resolution" class="mr-4 inline-flex items-center gap-2 text-sm"><input v-model="rules[group.id]!.resolutions" type="checkbox" :value="resolution" />{{ resolution }}</label></div>
                   <label class="text-sm">最长时长（秒）<input v-model.number="rules[group.id]!.max_duration" class="input mt-1 max-w-32" type="number" :min="policy.min_duration" :max="policy.max_duration" /></label>
@@ -78,7 +78,7 @@
         <h3 id="service-confirm-title" class="text-lg font-semibold">{{ confirmation.action === 'pause' ? '确认暂停这个范围的服务' : confirmation.action === 'draft' ? '确认保存草稿' : '确认应用模型配置' }}</h3>
         <p class="mt-3 text-sm text-gray-600 dark:text-gray-300">模型：{{ model }}</p><p class="mt-2 text-sm text-gray-600 dark:text-gray-300">范围：{{ selectedScopeLabel }}</p>
         <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">{{ confirmation.action === 'pause' ? '将停止此范围的新调用，已有视频任务仍可查询；未应用的价格和规格修改不会一起保存。' : confirmation.action === 'draft' ? '草稿不允许新调用，当前选择的配置将作为草稿保存。' : `应用后开放：${enabledGroupNames.join('、') || '无'}。未勾选分组将无法发起这个模型的新调用。` }}</p>
-        <p v-if="confirmation.action === 'apply' && initialPolicy.state === 'published'" class="mt-2 text-sm text-gray-600 dark:text-gray-300">已发布状态保持；新规格与价格用于后续调用。</p>
+        <p v-if="confirmation.action === 'apply' && initialPolicy.state === 'published'" class="mt-2 text-sm text-gray-600 dark:text-gray-300">已发布状态保持；新配置用于后续调用。</p>
         <p v-if="error" role="alert" class="mt-3 text-sm text-red-600">{{ error }}</p>
         <div class="mt-5 flex justify-end gap-3"><button class="btn btn-secondary" type="button" :disabled="saving" @click="confirmation = null">返回修改</button><button class="btn btn-primary" type="button" :disabled="saving" @click="save">{{ saving ? '应用中…' : '确认' }}</button></div>
       </section>
@@ -87,10 +87,13 @@
 </template>
 
 <script setup lang="ts">
+import { formatCnyFromLedger } from '@/utils/currency'
+import LedgerAmountInput from '@/components/common/LedgerAmountInput.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import channelsAPI, { type Channel, type ChannelModelPricing } from '@/api/admin/channels'
 import { getAllIncludingInactive } from '@/api/admin/groups'
+import { billingManagementAPI } from '@/api/admin/billingManagement'
 import type { Account, AdminGroup } from '@/types'
 import { defaultModelPolicy, videoModes, type ModelServicePolicy, type ModelServiceRule } from '@/types/modelService'
 import { extractApiErrorMessage } from '@/utils/apiError'
@@ -109,7 +112,8 @@ const localChannels = ref<Channel[]>([...props.channels])
 const groups = ref<AdminGroup[]>([])
 const selectedChannel = ref<number | ''>('')
 const activeTab = ref('specs')
-const tabs = [{ value: 'specs', label: '规格与价格' }, { value: 'groups', label: '开放分组' }, { value: 'sources', label: '上游来源' }]
+const simpleBillingEnabled = ref(true)
+const tabs = [{ value: 'specs', label: '服务规格' }, { value: 'groups', label: '开放分组' }, { value: 'sources', label: '上游来源' }]
 const policy = ref(defaultModelPolicy(props.model, props.platform, props.kind))
 const initialPolicy = ref(defaultModelPolicy(props.model, props.platform, props.kind))
 const scopeSnapshot = ref('')
@@ -149,13 +153,14 @@ function hasSourceForGroup(id: number): boolean { return (props.accounts || []).
 function legacyGroupOpen(group: AdminGroup): boolean { return group.status === 'active' && (props.kind === 'chat' || group.allow_image_generation) && (props.accounts || []).some(account => account.status === 'active' && account.schedulable !== false && (account.group_ids || account.groups?.map(item => item.id) || []).includes(group.id) && configuredModelOpen(currentChannel.value, props.model, props.platform, group.id, account.configured_models?.[props.model] || props.model)) }
 function groupMultiplier(group: AdminGroup): number { return props.kind === 'video' && group.video_rate_independent ? group.video_rate_multiplier : props.kind === 'image' && group.image_rate_independent ? group.image_rate_multiplier : group.rate_multiplier }
 function groupPreview(group: AdminGroup): string {
+  if (simpleBillingEnabled.value) return '按实际选定上游计费：API 使用统一倍率，账号授权使用分组倍率。'
   const multiplier = groupMultiplier(group)
   if (props.kind === 'video') {
     const rule = rules.value[group.id]
     const resolution = rule?.resolutions.find(value => policy.value.resolutions?.includes(value))
     const duration = Math.max(policy.value.min_duration || 4, Math.min(5, rule?.max_duration || 5, policy.value.max_duration || 15))
     if (!resolution || duration < (policy.value.min_duration || 4) || prices.value[resolution] == null) return '选择有效规格后显示费用预览。'
-    return `${resolution} · ${duration} 秒：$${Number((prices.value[resolution]! * duration * multiplier).toPrecision(10))}（基础价 × 时长 × ${multiplier}）`
+    return `${resolution} · ${duration} 秒：${formatCnyFromLedger(prices.value[resolution]! * duration * multiplier, 4)}（基础价 × 时长 × ${multiplier}）`
   }
   if (hasWildcardPrice.value || !customPricing.value) return '沿用现有系统／分组定价；具体费用以实际调用结算为准。'
   if (pricing.value.intervals.length) return `采用已配置分档价格 × ${multiplier}；具体费用由请求档位与用量决定。`
@@ -215,7 +220,7 @@ function prepare(action: 'apply' | 'draft' | 'pause') {
     if (Object.values(next.groups || {}).some(rule => rule.enabled && (!rule.resolutions.length || !rule.modes.length || !Number.isInteger(rule.max_duration) || rule.max_duration < next.min_duration! || rule.max_duration > next.max_duration! || rule.resolutions.some(value => !next.resolutions?.includes(value)) || rule.modes.some(value => !next.modes?.includes(value))))) { error.value = '开放分组的规格必须处于模型服务范围内。'; activeTab.value = 'groups'; return }
   }
   let nextPrice: ChannelModelPricing | null | undefined
-  if (action !== 'pause' && props.kind !== 'video' && !hasWildcardPrice.value) {
+  if (!simpleBillingEnabled.value && action !== 'pause' && props.kind !== 'video' && !hasWildcardPrice.value) {
     if (customPricing.value) {
       const values = [...tokenPriceFields.map(field => pricing.value[field.key]), pricing.value.per_request_price]
       if (values.some(value => value != null && value !== '' && (!Number.isFinite(Number(value)) || Number(value) < 0))) { error.value = '价格须为非负数字，留空表示沿用默认。'; activeTab.value = 'specs'; return }
@@ -242,5 +247,5 @@ async function save() {
   } catch (failure) { error.value = extractApiErrorMessage(failure, '应用模型配置失败') }
   finally { saving.value = false }
 }
-onMounted(async () => { try { groups.value = await getAllIncludingInactive(); if (candidateChannels.value.length === 1) { selectedChannel.value = candidateChannels.value[0]!.id; selectChannel() } } catch (failure) { error.value = extractApiErrorMessage(failure, '分组加载失败') } })
+onMounted(async () => { try { const [groupList, billingConfig] = await Promise.all([getAllIncludingInactive(), billingManagementAPI.getConfig()]); groups.value = groupList; simpleBillingEnabled.value = billingConfig.simple_billing_enabled !== false; if (candidateChannels.value.length === 1) { selectedChannel.value = candidateChannels.value[0]!.id; selectChannel() } } catch (failure) { error.value = extractApiErrorMessage(failure, '分组加载失败') } })
 </script>

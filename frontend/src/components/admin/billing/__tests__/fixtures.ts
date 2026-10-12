@@ -19,7 +19,7 @@ export function group(): AdminGroup {
 }
 
 export function config(overrides: Partial<BillingManagementConfig> = {}): BillingManagementConfig {
-  return { version: 4, usd_to_cny_rate: 7, exchange_rate_source: '采购结算', exchange_rate_effective_at: '2026-10-01T00:00:00Z', cost_profiles: [profile()], ...overrides }
+  return { version: 4, simple_billing_enabled: true, api_sale_multiplier: 1.4, usd_to_cny_rate: 6.2, exchange_rate_source: '固定站内换算', exchange_rate_effective_at: '2026-10-01T00:00:00Z', cost_profiles: [profile()], ...overrides }
 }
 
 export function preview(overrides: Partial<BillingPreview> = {}): BillingPreview {

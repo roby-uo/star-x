@@ -122,7 +122,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyOIDCConnectUserInfoIDPath:                 "",
 		SettingKeyOIDCConnectUserInfoUsernamePath:           "",
 		SettingKeyDefaultConcurrency:                        strconv.Itoa(s.cfg.Default.UserConcurrency),
-		SettingKeyDefaultBalance:                            strconv.FormatFloat(s.cfg.Default.UserBalance, 'f', 8, 64),
+		SettingKeyDefaultBalance:                            strconv.FormatFloat(s.cfg.Default.UserBalance, 'f', paymentLedgerPrecision, 64),
 		SettingKeyAffiliateRebateRate:                       strconv.FormatFloat(AffiliateRebateRateDefault, 'f', 8, 64),
 		SettingKeyAffiliateRebateFreezeHours:                strconv.Itoa(AffiliateRebateFreezeHoursDefault),
 		SettingKeyAffiliateRebateDurationDays:               strconv.Itoa(AffiliateRebateDurationDaysDefault),
@@ -1130,7 +1130,7 @@ func parseProviderDefaultGrantSettings(settings map[string]string, keys authSour
 }
 
 func writeProviderDefaultGrantUpdates(updates map[string]string, keys authSourceDefaultKeySet, settings ProviderDefaultGrantSettings) {
-	updates[keys.balance] = strconv.FormatFloat(settings.Balance, 'f', 8, 64)
+	updates[keys.balance] = strconv.FormatFloat(settings.Balance, 'f', paymentLedgerPrecision, 64)
 	updates[keys.concurrency] = strconv.Itoa(settings.Concurrency)
 
 	subscriptions := settings.Subscriptions

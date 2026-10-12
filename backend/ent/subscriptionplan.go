@@ -29,6 +29,10 @@ type SubscriptionPlan struct {
 	OriginalPrice *float64 `json:"original_price,omitempty"`
 	// Currency holds the value of the "currency" field.
 	Currency string `json:"currency,omitempty"`
+	// CashPriceCny holds the value of the "cash_price_cny" field.
+	CashPriceCny *float64 `json:"cash_price_cny,omitempty"`
+	// CashOriginalPriceCny holds the value of the "cash_original_price_cny" field.
+	CashOriginalPriceCny *float64 `json:"cash_original_price_cny,omitempty"`
 	// ValidityDays holds the value of the "validity_days" field.
 	ValidityDays int `json:"validity_days,omitempty"`
 	// ValidityUnit holds the value of the "validity_unit" field.
@@ -55,7 +59,7 @@ func (*SubscriptionPlan) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case subscriptionplan.FieldForSale:
 			values[i] = new(sql.NullBool)
-		case subscriptionplan.FieldPrice, subscriptionplan.FieldOriginalPrice:
+		case subscriptionplan.FieldPrice, subscriptionplan.FieldOriginalPrice, subscriptionplan.FieldCashPriceCny, subscriptionplan.FieldCashOriginalPriceCny:
 			values[i] = new(sql.NullFloat64)
 		case subscriptionplan.FieldID, subscriptionplan.FieldGroupID, subscriptionplan.FieldValidityDays, subscriptionplan.FieldSortOrder:
 			values[i] = new(sql.NullInt64)
@@ -120,6 +124,20 @@ func (_m *SubscriptionPlan) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field currency", values[i])
 			} else if value.Valid {
 				_m.Currency = value.String
+			}
+		case subscriptionplan.FieldCashPriceCny:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field cash_price_cny", values[i])
+			} else if value.Valid {
+				_m.CashPriceCny = new(float64)
+				*_m.CashPriceCny = value.Float64
+			}
+		case subscriptionplan.FieldCashOriginalPriceCny:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field cash_original_price_cny", values[i])
+			} else if value.Valid {
+				_m.CashOriginalPriceCny = new(float64)
+				*_m.CashOriginalPriceCny = value.Float64
 			}
 		case subscriptionplan.FieldValidityDays:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -224,6 +242,16 @@ func (_m *SubscriptionPlan) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("currency=")
 	builder.WriteString(_m.Currency)
+	builder.WriteString(", ")
+	if v := _m.CashPriceCny; v != nil {
+		builder.WriteString("cash_price_cny=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.CashOriginalPriceCny; v != nil {
+		builder.WriteString("cash_original_price_cny=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("validity_days=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ValidityDays))

@@ -216,11 +216,12 @@ func (p *ModelServicePolicy) ValidateVideo(input minimax.CreateVideoRequest) err
 }
 
 type VideoQuote struct {
-	Currency   string  `json:"currency"`
-	UnitPrice  float64 `json:"unit_price"`
-	Multiplier float64 `json:"multiplier"`
-	Total      float64 `json:"total"`
-	Version    string  `json:"version"`
+	SimpleBilling *SimpleBillingSnapshot `json:"simple_billing,omitempty"`
+	Currency      string                 `json:"currency"`
+	UnitPrice     float64                `json:"unit_price"`
+	Multiplier    float64                `json:"multiplier"`
+	Total         float64                `json:"total"`
+	Version       string                 `json:"version"`
 }
 
 func (s *OpenAIGatewayService) QuoteMiniMaxVideo(ctx context.Context, key *APIKey, input minimax.CreateVideoRequest) (*VideoQuote, error) {
@@ -236,6 +237,44 @@ func (s *OpenAIGatewayService) QuoteMiniMaxVideo(ctx context.Context, key *APIKe
 	}
 	if policy == nil && !GroupAllowsImageGeneration(key.Group) {
 		return nil, fmt.Errorf("该分组尚未开放视频生成")
+	}
+	if cfg, err := s.billingService.simpleBillingConfig(ctx); err != nil {
+		return nil, err
+	} else if cfg != nil && cfg.SimpleBillingEnabled {
+		if s.accountRepo == nil {
+			return nil, simplePriceError("缺少可核对的上游账号")
+		}
+		accounts, err := s.accountRepo.ListByGroup(ctx, *key.GroupID)
+		if err != nil {
+			return nil, err
+		}
+		var quote *VideoQuote
+		var versions []string
+		for i := range accounts {
+			account := &accounts[i]
+			if !account.IsActive() || !account.IsModelSupported(input.Model) {
+				continue
+			}
+			if _, ok := MiniMaxVideoBaseURL(account); !ok {
+				continue
+			}
+			candidate, err := s.QuoteMiniMaxVideoForAccount(ctx, key, account, input)
+			if err != nil {
+				return nil, err
+			}
+			if quote != nil && (math.Abs(quote.Total-candidate.Total) > 1e-10 || quote.Multiplier != candidate.Multiplier || math.Abs(quote.UnitPrice-candidate.UnitPrice) > 1e-12) {
+				return nil, simplePriceError("同分组视频账号有不同基准价，请拆分采购分组后发布")
+			}
+			quote = candidate
+			versions = append(versions, candidate.Version)
+		}
+		if quote == nil {
+			return nil, simplePriceError("此分组没有可确认价格的MiniMax视频账号")
+		}
+		slices.Sort(versions)
+		raw, _ := json.Marshal(versions)
+		quote.Version = HashUsageRequestPayload(raw)
+		return quote, nil
 	}
 	spec, _ := minimax.VideoModelSpecFor(input.Model)
 	price := spec.PricesUSD[input.Resolution]
@@ -256,6 +295,43 @@ func (s *OpenAIGatewayService) QuoteMiniMaxVideo(ctx context.Context, key *APIKe
 	q.Total = math.Round(q.Total*1e10) / 1e10
 	q.Version = HashUsageRequestPayload(data)
 	return q, nil
+}
+
+// QuoteMiniMaxVideoForAccount binds the accepted quote to the selected actual
+// supplier account before a reservation or paid upstream submission.
+func (s *OpenAIGatewayService) QuoteMiniMaxVideoForAccount(ctx context.Context, key *APIKey, account *Account, input minimax.CreateVideoRequest) (*VideoQuote, error) {
+	if key == nil || key.Group == nil {
+		return nil, simplePriceError("缺少分组")
+	}
+	if err := input.Validate(); err != nil {
+		return nil, err
+	}
+	policy, err := s.MiniMaxServicePolicy(ctx, key, input.Model)
+	if err != nil {
+		return nil, err
+	}
+	if err = policy.ValidateVideo(input); err != nil {
+		return nil, err
+	}
+	if policy == nil && !GroupAllowsImageGeneration(key.Group) {
+		return nil, fmt.Errorf("该分组尚未开放视频生成")
+	}
+	q, err := s.PrepareSimpleBilling(ctx, SimpleBillingInput{Account: account, Group: key.Group, Model: account.GetMappedModel(input.Model), Modality: "video", Resolution: input.Resolution})
+	if err != nil {
+		return nil, err
+	}
+	if q == nil {
+		return s.QuoteMiniMaxVideo(ctx, key, input)
+	}
+	cost, err := s.billingService.CalculateSimpleBilling(q, BillingPreviewInput{Model: q.Model, Modality: "video", Resolution: input.Resolution, DurationSeconds: float64(input.Duration), Requests: 1})
+	if err != nil {
+		return nil, err
+	}
+	unit := cost.TotalCost / float64(input.Duration)
+	quote := &VideoQuote{SimpleBilling: q, Currency: "USD", UnitPrice: unit, Multiplier: q.Multiplier, Total: math.Round(cost.ActualCost*1e10) / 1e10}
+	raw, _ := json.Marshal([]any{input.Model, input.Resolution, input.Duration, q.Hash, policy})
+	quote.Version = HashUsageRequestPayload(raw)
+	return quote, nil
 }
 
 func (s *OpenAIGatewayService) ValidateImageServiceRequest(ctx context.Context, key *APIKey, req *OpenAIImagesRequest) error {

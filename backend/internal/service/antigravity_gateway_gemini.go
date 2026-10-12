@@ -41,7 +41,7 @@ func WithForwardGeminiSession(groupID int64, sessionHash string) ForwardGeminiOp
 	}
 }
 
-func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Context, account *Account, originalModel string, action string, stream bool, body []byte, isStickySession bool, options ...ForwardGeminiOption) (*ForwardResult, error) {
+func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Context, account *Account, originalModel string, action string, stream bool, body []byte, isStickySession bool, options ...ForwardGeminiOption) (forwardedResult *ForwardResult, forwardErr error) {
 	startTime := time.Now()
 	forwardOpts := forwardGeminiOptions{}
 	for _, apply := range options {
@@ -91,6 +91,16 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 		return nil, s.writeGoogleError(c, http.StatusForbidden, fmt.Sprintf("model %s not in whitelist", originalModel))
 	}
 	billingModel := mappedModel
+	snapshot, pricingErr := prepareProtocolSimpleBilling(ctx, c, account, billingModel, body, imageSize)
+	if pricingErr != nil {
+		writeSimpleBillingPreflightError(c)
+		return nil, pricingErr
+	}
+	defer func() {
+		if forwardedResult != nil {
+			forwardedResult.SimpleBilling = snapshot
+		}
+	}()
 
 	// 获取 access_token
 	if s.tokenProvider == nil {
@@ -193,6 +203,11 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 			isModelNotFoundError(resp.StatusCode, respBody) {
 			fallbackModel := s.settingService.GetFallbackModel(ctx, PlatformAntigravity)
 			if fallbackModel != "" && fallbackModel != mappedModel {
+				fallbackSnapshot, fallbackPricingErr := prepareProtocolSimpleBilling(ctx, c, account, fallbackModel, body, imageSize)
+				if fallbackPricingErr != nil {
+					writeSimpleBillingPreflightError(c)
+					return nil, fallbackPricingErr
+				}
 				logger.LegacyPrintf("service.antigravity_gateway", "[Antigravity] Model not found (%s), retrying with fallback model %s (account: %s)", mappedModel, fallbackModel, account.Name)
 
 				fallbackWrapped, err := s.wrapV1InternalRequest(projectID, fallbackModel, injectedBody)
@@ -203,6 +218,7 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 						if err == nil && fallbackResp.StatusCode < 400 {
 							_ = resp.Body.Close()
 							resp = fallbackResp
+							billingModel, snapshot = fallbackModel, fallbackSnapshot
 						} else if fallbackResp != nil {
 							_ = fallbackResp.Body.Close()
 						}

@@ -22,6 +22,7 @@ type FrameConn interface {
 
 type Usage struct {
 	InputTokens              int
+	ImageInputTokens         int
 	OutputTokens             int
 	CacheCreationInputTokens int
 	CacheReadInputTokens     int
@@ -802,11 +803,24 @@ func parseUsageAndAccumulate(
 	if imageTokens == 0 {
 		imageTokens = usageResult.Get("completion_tokens_details.image_tokens").Int()
 	}
+	if imageTokens == 0 {
+		imageTokens = gjson.GetBytes(message, "response.tool_usage.image_gen.output_tokens_details.image_tokens").Int()
+	}
+	imageInputResult := usageResult.Get("input_tokens_details.image_tokens")
+	if !imageInputResult.Exists() {
+		imageInputResult = usageResult.Get("prompt_tokens_details.image_tokens")
+	}
+	if imageInputResult.Int() == 0 {
+		if hostedImageInput := gjson.GetBytes(message, "response.tool_usage.image_gen.input_tokens_details.image_tokens"); hostedImageInput.Exists() {
+			imageInputResult = hostedImageInput
+		}
+	}
 
 	inputTokens, inputOK := parseUsageIntField(inputResult, true)
 	outputTokens, outputOK := parseUsageIntField(outputResult, true)
 	cachedTokens, cachedOK := parseUsageIntField(cachedResult, false)
-	if !inputOK || !outputOK || !cachedOK {
+	imageInputTokens, imageInputOK := parseUsageIntField(imageInputResult, false)
+	if !inputOK || !outputOK || !cachedOK || !imageInputOK || imageInputTokens < 0 {
 		recordUsageParseFailure()
 		if onParseFailure != nil {
 			onParseFailure(eventType, usageRaw)
@@ -816,6 +830,7 @@ func parseUsageAndAccumulate(
 	}
 	parsedUsage := Usage{
 		InputTokens:              inputTokens,
+		ImageInputTokens:         imageInputTokens,
 		OutputTokens:             outputTokens,
 		CacheCreationInputTokens: openAICacheCreationTokensFromUsage(usageResult),
 		CacheReadInputTokens:     cachedTokens,
@@ -823,6 +838,7 @@ func parseUsageAndAccumulate(
 	}
 
 	state.usage.InputTokens += parsedUsage.InputTokens
+	state.usage.ImageInputTokens += parsedUsage.ImageInputTokens
 	state.usage.OutputTokens += parsedUsage.OutputTokens
 	state.usage.CacheCreationInputTokens += parsedUsage.CacheCreationInputTokens
 	state.usage.CacheReadInputTokens += parsedUsage.CacheReadInputTokens

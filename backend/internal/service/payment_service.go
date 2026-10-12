@@ -143,6 +143,7 @@ type RefundResult struct {
 }
 
 type DashboardStats struct {
+	Currency      string  `json:"currency"`
 	TodayAmount   float64 `json:"today_amount"`
 	TotalAmount   float64 `json:"total_amount"`
 	TodayCount    int     `json:"today_count"`

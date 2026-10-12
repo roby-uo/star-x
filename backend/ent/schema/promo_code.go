@@ -38,7 +38,7 @@ func (PromoCode) Fields() []ent.Field {
 			Unique().
 			Comment("优惠码"),
 		field.Float("bonus_amount").
-			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}).
+			SchemaType(map[string]string{dialect.Postgres: "decimal(24,12)"}).
 			Default(0).
 			Comment("赠送余额金额"),
 		field.Int("max_uses").

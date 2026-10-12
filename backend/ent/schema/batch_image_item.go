@@ -38,7 +38,7 @@ func (BatchImageItem) Fields() []ent.Field {
 		field.Int("image_count").Default(0),
 		field.String("error_code").Optional().Nillable().MaxLen(128),
 		field.String("error_message").Optional().Nillable().SchemaType(map[string]string{dialect.Postgres: "text"}),
-		field.Float("billed_amount").Optional().Nillable().SchemaType(map[string]string{dialect.Postgres: "decimal(20,10)"}),
+		field.Float("billed_amount").Optional().Nillable().SchemaType(map[string]string{dialect.Postgres: "decimal(24,12)"}),
 		field.Time("created_at").Immutable().Default(time.Now).SchemaType(map[string]string{dialect.Postgres: "timestamptz"}),
 		field.Time("indexed_at").Optional().Nillable().SchemaType(map[string]string{dialect.Postgres: "timestamptz"}),
 	}

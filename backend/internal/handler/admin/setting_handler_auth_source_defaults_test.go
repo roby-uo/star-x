@@ -192,7 +192,7 @@ func TestSettingHandler_UpdateSettings_PreservesOmittedAuthSourceDefaults(t *tes
 	handler.UpdateSettings(c)
 
 	require.Equal(t, http.StatusOK, rec.Code)
-	require.Equal(t, "12.75000000", repo.values[service.SettingKeyAuthSourceDefaultEmailBalance])
+	require.Equal(t, "12.750000000000", repo.values[service.SettingKeyAuthSourceDefaultEmailBalance])
 	require.Equal(t, "8", repo.values[service.SettingKeyAuthSourceDefaultEmailConcurrency])
 	require.Equal(t, `[{"group_id":31,"validity_days":15}]`, repo.values[service.SettingKeyAuthSourceDefaultEmailSubscriptions])
 	require.Equal(t, "true", repo.values[service.SettingKeyForceEmailOnThirdPartySignup])

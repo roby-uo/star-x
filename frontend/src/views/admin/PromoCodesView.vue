@@ -76,7 +76,7 @@
 
           <template #cell-bonus_amount="{ value }">
             <span class="text-sm font-medium text-gray-900 dark:text-white">
-              ${{ value.toFixed(2) }}
+              {{ formatCnyFromLedger(value, 2) }}
             </span>
           </template>
 
@@ -178,8 +178,8 @@
         </div>
         <div>
           <label class="input-label">{{ t('admin.promo.bonusAmount') }}</label>
-          <input
-            v-model.number="createForm.bonus_amount"
+          <LedgerAmountInput
+            v-model="createForm.bonus_amount"
             type="number"
             step="0.01"
             min="0"
@@ -253,8 +253,8 @@
         </div>
         <div>
           <label class="input-label">{{ t('admin.promo.bonusAmount') }}</label>
-          <input
-            v-model.number="editForm.bonus_amount"
+          <LedgerAmountInput
+            v-model="editForm.bonus_amount"
             type="number"
             step="0.01"
             min="0"
@@ -347,7 +347,7 @@
           </div>
           <div class="text-right">
             <span class="text-sm font-medium text-green-600 dark:text-green-400">
-              +${{ usage.bonus_amount.toFixed(2) }}
+              +{{ formatCnyFromLedger(usage.bonus_amount, 2) }}
             </span>
           </div>
         </div>
@@ -386,6 +386,8 @@
 </template>
 
 <script setup lang="ts">
+import LedgerAmountInput from '@/components/common/LedgerAmountInput.vue'
+import { formatCnyFromLedger } from '@/utils/currency'
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'

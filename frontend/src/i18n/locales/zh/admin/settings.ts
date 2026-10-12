@@ -295,9 +295,9 @@ export default {
       },
       platformQuota: {
         platform:    '平台',
-        daily:       '日限额 (USD)',
-        weekly:      '周限额 (USD)',
-        monthly:     '月限额 (USD, 30天滚动)',
+        daily:       '日限额 (CNY)',
+        weekly:      '周限额 (CNY)',
+        monthly:     '月限额 (CNY, 30天滚动)',
         placeholder: '不限',
       },
       claudeCode: {
@@ -551,6 +551,10 @@ export default {
         minAmount: '最低金额',
         maxAmount: '最高金额',
         dailyLimit: '每日限额',
+        cnyRechargeTitle: '人民币充值到账',
+        cnyRechargeHint: '支付金额直接按人民币入账；美元支付固定按 6.2 换算。赠送倍率只影响充值到账，不改变模型售价。',
+        rechargeBonusMultiplier: '充值赠送倍率',
+        cnyRechargePreview: '支付 {payment}，到账 {credit}',
         balanceRechargeMultiplier: '余额充值倍率',
         balanceRechargeMultiplierHint: '用户每支付 1 CNY 可获得多少 USD 余额',
         balanceRechargePreview: '预览：1 CNY = {usd} USD',

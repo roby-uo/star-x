@@ -22,7 +22,7 @@ describe('CostProfileEditor procurement rules', () => {
     const original = profile()
     const snapshot = JSON.parse(JSON.stringify(original))
     const wrapper = editor(original)
-    expect(wrapper.text()).toContain('API 密钥')
+    expect(wrapper.text()).toContain('API 接入')
     expect(wrapper.text()).toContain('账号授权')
     await field(wrapper, '方案名称').setValue('修改后的 API 采购')
     await field(wrapper, '采购原币', 'select').setValue('USD')
@@ -31,7 +31,9 @@ describe('CostProfileEditor procurement rules', () => {
 
     const saved = wrapper.emitted('save')?.[0]?.[0] as ReturnType<typeof profile>
     expect(saved).toMatchObject({ name: '修改后的 API 采购', currency: 'USD', discount_multiplier: 0.8, account_ids: [1], purchase_mode: 'payg' })
-    expect(saved.prices[0]).toMatchObject({ input_price: 2, output_price: 8, cache_read_price: 0, cache_write_price: 0 })
+    expect(saved.prices[0]?.input_price).toBeCloseTo(2 / 6.2)
+    expect(saved.prices[0]?.output_price).toBeCloseTo(8 / 6.2)
+    expect(saved.prices[0]).toMatchObject({ cache_read_price: 0, cache_write_price: 0 })
     expect(saved).not.toHaveProperty('rate_multiplier')
     expect(saved).not.toHaveProperty('balance_recharge_multiplier')
     expect(saved).not.toHaveProperty('credentials')
@@ -71,12 +73,13 @@ describe('CostProfileEditor procurement rules', () => {
     expect(wrapper.get('[role="alert"]').text()).toContain('版本冲突')
   })
 
-  it('records monthly costs separately and excludes abandoned per-call rules from the saved profile', async () => {
+  it('records monthly costs separately and retains an explicit account reference price', async () => {
     const wrapper = editor()
     await field(wrapper, '采购模式', 'select').setValue('subscription')
     await field(wrapper, '周期实付费用').setValue('199')
     await wrapper.get('form').trigger('submit')
-    expect(wrapper.emitted('save')?.[0]?.[0]).toMatchObject({ purchase_mode: 'subscription', period_cost: 199, prices: [] })
+    expect(wrapper.emitted('save')?.[0]?.[0]).toMatchObject({ purchase_mode: 'subscription', period_cost: 199 })
+    expect((wrapper.emitted('save')?.[0]?.[0] as ReturnType<typeof profile>).prices).toHaveLength(1)
   })
 
   it('preserves existing validity precision when only the profile name changes', async () => {
@@ -98,5 +101,17 @@ describe('CostProfileEditor procurement rules', () => {
     await wrapper.get('form').trigger('submit')
     const saved = wrapper.emitted('save')?.[0]?.[0] as ReturnType<typeof profile>
     expect(saved.prices[0]).toMatchObject({ modality: 'image', billing_unit: 'per_million_tokens', input_price: 2, output_price: 8, image_input_price: 2.4, image_output_price: 6.5 })
+  })
+
+  it('edits a dollar procurement price in yuan and preserves its source unit on save', async () => {
+    const original = profile({ currency: 'USD' })
+    const wrapper = editor(original)
+    expect(Number((field(wrapper, '输入（').element as HTMLInputElement).value)).toBeCloseTo(12.4)
+    await field(wrapper, '输入（').setValue('31')
+    await wrapper.get('form').trigger('submit')
+    const saved = wrapper.emitted('save')?.[0]?.[0] as ReturnType<typeof profile>
+    expect(saved.currency).toBe('USD')
+    expect(saved.prices[0]?.input_price).toBeCloseTo(5)
+    expect(original.prices[0]?.input_price).toBe(2)
   })
 })

@@ -49,7 +49,7 @@ function mountDialog(paymentConfig: Record<string, unknown> | null) {
 }
 
 describe('PlanEditDialog subscription CNY payment preview', () => {
-  it('shows CNY channel charge using the configured subscription rate and fee', async () => {
+  it('treats a new plan price as CNY and applies the cash fee without the legacy subscription exchange rate', async () => {
     const wrapper = mountDialog({
       subscription_usd_to_cny_rate: 7.15,
       recharge_fee_rate: 2.5,
@@ -58,12 +58,12 @@ describe('PlanEditDialog subscription CNY payment preview', () => {
     await wrapper.find('input[type="number"]').setValue('9.99')
 
     expect(wrapper.text()).toContain('preview')
-    expect(wrapper.text()).toContain('¥71.43')
+    expect(wrapper.text()).toContain('¥9.99')
     expect(wrapper.text()).toContain('fee 2.5')
-    expect(wrapper.text()).toContain('¥73.22')
+    expect(wrapper.text()).toContain('¥10.24')
   })
 
-  it('hides the preview when the subscription rate is not configured', async () => {
+  it('still quotes an explicit CNY price when no legacy subscription rate is configured', async () => {
     const wrapper = mountDialog({
       subscription_usd_to_cny_rate: 0,
       recharge_fee_rate: 2.5,
@@ -71,7 +71,8 @@ describe('PlanEditDialog subscription CNY payment preview', () => {
 
     await wrapper.find('input[type="number"]').setValue('9.99')
 
-    expect(wrapper.text()).not.toContain('preview')
+    expect(wrapper.text()).toContain('preview ¥9.99')
+    expect(wrapper.text()).toContain('fee 2.5 ¥10.24')
     expect(wrapper.text()).not.toContain('¥71.43')
   })
 })

@@ -40,7 +40,7 @@ func TestMediaTaskReservationIntegration(t *testing.T) {
 	db, err := sql.Open("postgres", parsed.String())
 	require.NoError(t, err)
 	defer db.Close()
-	_, err = db.ExecContext(ctx, `CREATE TABLE users(id BIGINT PRIMARY KEY,balance NUMERIC(20,10),frozen_balance NUMERIC(20,10) DEFAULT 0,deleted_at TIMESTAMPTZ,updated_at TIMESTAMPTZ);CREATE TABLE api_keys(id BIGINT PRIMARY KEY,quota NUMERIC(20,10),quota_used NUMERIC(20,10),deleted_at TIMESTAMPTZ);INSERT INTO users(id,balance) VALUES(1,1);INSERT INTO api_keys VALUES(1,10,0,NULL);`)
+	_, err = db.ExecContext(ctx, `CREATE TABLE users(id BIGINT PRIMARY KEY,balance NUMERIC(24,12),frozen_balance NUMERIC(24,12) DEFAULT 0,deleted_at TIMESTAMPTZ,updated_at TIMESTAMPTZ);CREATE TABLE api_keys(id BIGINT PRIMARY KEY,quota NUMERIC(24,12),quota_used NUMERIC(24,12),deleted_at TIMESTAMPTZ);INSERT INTO users(id,balance) VALUES(1,1);INSERT INTO api_keys VALUES(1,10,0,NULL);`)
 	require.NoError(t, err)
 	migration, err := os.ReadFile("../../migrations/185_media_tasks.sql")
 	require.NoError(t, err)

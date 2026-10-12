@@ -47,7 +47,7 @@ describe('BillingPreviewDialog estimate boundaries', () => {
     expect(result).toContain('未登记采购成本')
     expect(result).not.toContain(money(0))
     expect(result).not.toContain('扣除已配置采购成本后')
-    expect((wrapper.vm as any).receiptEstimate.margin).toBeNull()
+    expect(result).not.toContain('到账美元额度')
   })
 
   it('does not allocate a monthly procurement charge as a single-request margin', async () => {
@@ -56,20 +56,20 @@ describe('BillingPreviewDialog estimate boundaries', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
     expect(wrapper.get('[aria-label="算费结果"]').text()).toContain(money(199))
-    expect((wrapper.vm as any).receiptEstimate.margin).toBeNull()
+    expect(wrapper.text()).not.toContain('按充值比例试算收支')
   })
 
-  it('calculates a negative receipt margin for 100 yuan crediting 100 dollars and recomputes a changed assumption', async () => {
+  it('uses a supplied yuan amount directly and converts a legacy dollar amount only once', async () => {
+    post.mockResolvedValueOnce({ data: preview({ sale: { ...preview().sale, amount_cny: 2.7776 } }) })
     const wrapper = await dialog()
     await wrapper.get('form').trigger('submit')
     await flushPromises()
-    expect((wrapper.vm as any).receiptEstimate.income).toBeCloseTo(0.448)
-    expect((wrapper.vm as any).receiptEstimate.margin).toBeCloseTo(-1.552)
-    expect(wrapper.text()).toContain(money(-1.552))
-    await field(wrapper, '到账美元额度').setValue('20')
-    expect((wrapper.vm as any).receiptEstimate.income).toBeCloseTo(2.24)
-    expect((wrapper.vm as any).receiptEstimate.margin).toBeCloseTo(0.24)
-    expect(post).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).toContain(money(2.7776))
+    expect(wrapper.text()).not.toContain(money(2.7776, 'USD'))
+    expect(wrapper.text()).not.toContain('到账美元额度')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.text()).toContain(money(0.448, 'USD'))
   })
 
   it('ignores an old successful response after the form changes', async () => {
@@ -116,6 +116,19 @@ describe('BillingPreviewDialog estimate boundaries', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
     expect(post).toHaveBeenCalledWith('/admin/billing-management/preview', expect.objectContaining({ modality: 'image', model: 'gpt-image-2', input_tokens: 100, output_tokens: 80, image_input_tokens: 20, image_output_tokens: 40 }))
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('checks visual input pricing on a language model without adding tokens twice', async () => {
+    const wrapper = await dialog()
+    await field(wrapper, '未缓存输入 tokens').setValue('1000')
+    await field(wrapper, '其中图像输入 tokens').setValue('200')
+    post.mockRejectedValueOnce({ message: '图片输入基准价尚未确认' })
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/admin/billing-management/preview', expect.objectContaining({ modality: 'chat', input_tokens: 1000, image_input_tokens: 200 }))
+    expect(wrapper.get('[role="alert"]').text()).toContain('图片输入基准价尚未确认')
+    expect(wrapper.find('[aria-label="算费结果"]').exists()).toBe(false)
     expect(fetch).not.toHaveBeenCalled()
   })
 })

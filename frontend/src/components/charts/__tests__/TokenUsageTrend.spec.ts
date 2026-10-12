@@ -41,6 +41,8 @@ describe('TokenUsageTrend', () => {
     expect(callbacks.label({ dataset: { label: 'Input' }, raw: 10 })).toBe('Input: 10')
     expect(() => callbacks.footer([{ dataIndex: 0 }])).not.toThrow()
     expect(callbacks.footer([{ dataIndex: 0 }])).toBe('')
+    expect(wrapper.text()).not.toContain('$')
+    expect(wrapper.text()).not.toContain('¥')
     wrapper.unmount()
   })
 
@@ -51,6 +53,8 @@ describe('TokenUsageTrend', () => {
     const callbacks = wrapper.findComponent(Line).props('options').plugins.tooltip.callbacks
 
     expect(callbacks.footer([{ dataIndex: 0 }])).toBe('')
+    expect(wrapper.text()).not.toContain('$')
+    expect(wrapper.text()).not.toContain('¥')
     wrapper.unmount()
   })
 
@@ -60,7 +64,7 @@ describe('TokenUsageTrend', () => {
     })
     const callbacks = wrapper.findComponent(Line).props('options').plugins.tooltip.callbacks
 
-    expect(callbacks.footer([{ dataIndex: 0 }])).toBe('Actual: $8.76 | Standard: $9.87')
+    expect(callbacks.footer([{ dataIndex: 0 }])).toBe('Actual: ¥54.3120 | Standard: ¥61.1940')
     wrapper.unmount()
   })
 

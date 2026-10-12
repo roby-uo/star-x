@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
@@ -133,6 +134,9 @@ func (s *PaymentConfigService) ListPlansForSale(ctx context.Context) ([]*dbent.S
 }
 
 func (s *PaymentConfigService) CreatePlan(ctx context.Context, req CreatePlanRequest) (*dbent.SubscriptionPlan, error) {
+	if err := validatePlanCashPrice(req.CashPriceCNY, req.CashOriginalPriceCNY); err != nil {
+		return nil, err
+	}
 	if err := validatePlanRequired(req.Name, req.GroupID, req.Price, req.ValidityDays, req.ValidityUnit, req.OriginalPrice); err != nil {
 		return nil, err
 	}
@@ -141,6 +145,8 @@ func (s *PaymentConfigService) CreatePlan(ctx context.Context, req CreatePlanReq
 		return nil, err
 	}
 	b := s.entClient.SubscriptionPlan.Create().
+		SetNillableCashPriceCny(req.CashPriceCNY).
+		SetNillableCashOriginalPriceCny(req.CashOriginalPriceCNY).
 		SetGroupID(req.GroupID).SetName(req.Name).SetDescription(req.Description).
 		SetPrice(req.Price).SetCurrency(currency).SetValidityDays(req.ValidityDays).SetValidityUnit(req.ValidityUnit).
 		SetFeatures(req.Features).SetProductName(req.ProductName).
@@ -155,10 +161,19 @@ func (s *PaymentConfigService) CreatePlan(ctx context.Context, req CreatePlanReq
 // NOTE: This function exceeds 30 lines due to per-field nil-check patch update boilerplate
 // plus a validation guard for non-nil fields.
 func (s *PaymentConfigService) UpdatePlan(ctx context.Context, id int64, req UpdatePlanRequest) (*dbent.SubscriptionPlan, error) {
+	if err := validatePlanCashPrice(req.CashPriceCNY, req.CashOriginalPriceCNY); err != nil {
+		return nil, err
+	}
 	if err := validatePlanPatch(req); err != nil {
 		return nil, err
 	}
 	u := s.entClient.SubscriptionPlan.UpdateOneID(id)
+	if req.CashPriceCNY != nil {
+		u.SetCashPriceCny(*req.CashPriceCNY)
+	}
+	if req.CashOriginalPriceCNY != nil {
+		u.SetCashOriginalPriceCny(*req.CashOriginalPriceCNY)
+	}
 	if req.GroupID != nil {
 		u.SetGroupID(*req.GroupID)
 	}
@@ -200,6 +215,21 @@ func (s *PaymentConfigService) UpdatePlan(ctx context.Context, id int64, req Upd
 		u.SetSortOrder(*req.SortOrder)
 	}
 	return u.Save(ctx)
+}
+
+func validatePlanCashPrice(price, original *float64) error {
+	for _, value := range []*float64{price, original} {
+		if value == nil {
+			continue
+		}
+		if math.IsNaN(*value) || math.IsInf(*value, 0) || *value < 0 || math.Abs(*value*100-math.Round(*value*100)) > 1e-8 {
+			return infraerrors.BadRequest("PLAN_CASH_PRICE_INVALID", "CNY cash prices must be non-negative finite amounts with at most two decimal places")
+		}
+	}
+	if price != nil && *price <= 0 {
+		return infraerrors.BadRequest("PLAN_CASH_PRICE_INVALID", "CNY checkout price must be positive")
+	}
+	return nil
 }
 
 func (s *PaymentConfigService) DeletePlan(ctx context.Context, id int64) error {

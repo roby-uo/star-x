@@ -580,6 +580,11 @@ func (s *OpenAIGatewayService) forwardGrokChatCompletionsViaResponses(
 		return nil, policyErr
 	}
 	responsesBody = updatedBody
+	snapshot, pricingErr := s.prepareSimpleBillingTextForward(ctx, c, account, upstreamModel, responsesBody)
+	if pricingErr != nil {
+		writeSimpleBillingPreflightError(c)
+		return nil, pricingErr
+	}
 
 	token, _, err := s.getRequestCredential(ctx, c, account)
 	if err != nil {
@@ -638,6 +643,8 @@ func (s *OpenAIGatewayService) forwardGrokChatCompletionsViaResponses(
 		result, err = s.handleChatBufferedStreamingResponse(resp, c, account, originalModel, billingModel, upstreamModel, startTime)
 	}
 	if result != nil {
+		result.SimpleBilling = snapshot
+		result.ServiceTier = extractOpenAIServiceTierFromBody(responsesBody)
 		result.UpstreamEndpoint = grokChatResponsesEndpoint
 		result.ResponseHeaders = resp.Header.Clone()
 		if result.RequestID == "" {

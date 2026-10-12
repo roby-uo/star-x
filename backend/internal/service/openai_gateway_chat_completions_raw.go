@@ -58,7 +58,7 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 	account *Account,
 	body []byte,
 	defaultMappedModel string,
-) (*OpenAIForwardResult, error) {
+) (forwardedResult *OpenAIForwardResult, returnedErr error) {
 	startTime := time.Now()
 
 	// 1. Parse minimal fields needed for routing/billing
@@ -68,9 +68,6 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 		return nil, fmt.Errorf("missing model in request")
 	}
 	clientStream := gjson.GetBytes(body, "stream").Bool()
-
-	// 1b. Extract service tier from the raw body before any transformation.
-	serviceTier := extractOpenAIServiceTierFromBody(body)
 
 	// 2. Resolve model mapping (same as ForwardAsChatCompletions)
 	billingModel := resolveOpenAIForwardModel(account, originalModel, defaultMappedModel)
@@ -105,9 +102,24 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 		return nil, policyErr
 	}
 	upstreamBody = updatedBody
-	if isMiniMaxM3Account(account, upstreamModel) {
-		serviceTier = extractOpenAIServiceTierFromBody(upstreamBody)
+	serviceTier := extractOpenAIServiceTierFromBody(upstreamBody)
+	snapshot, pricingErr := s.prepareSimpleBillingTextForward(ctx, c, account, upstreamModel, upstreamBody)
+	if pricingErr != nil {
+		writeSimpleBillingPreflightError(c)
+		return nil, pricingErr
 	}
+	if snapshot != nil && account.Platform == PlatformGrok && shouldBridgeGrokComposerImageInputs(upstreamBody) {
+		// This bridge invokes a second model and merges its token usage with
+		// the Composer result. A single-model price snapshot cannot price it.
+		writeSimpleBillingPreflightError(c)
+		return nil, simplePriceError("跨模型图片描述桥接的独立计费尚未确认")
+	}
+	defer func() {
+		if forwardedResult != nil {
+			forwardedResult.SimpleBilling = snapshot
+			forwardedResult.ServiceTier = serviceTier
+		}
+	}()
 
 	// Grok Composer does not accept image_url parts directly, but Grok Build
 	// can describe the images first. Bridge only this exact failure mode.

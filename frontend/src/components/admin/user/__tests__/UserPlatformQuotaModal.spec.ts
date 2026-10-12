@@ -101,7 +101,7 @@ describe('UserPlatformQuotaModal', () => {
     // 5 platforms × 3 windows = 15 inputs
     expect(inputs.length).toBe(15)
     // 第一个 input 是 anthropic.daily = 10
-    expect((inputs[0].element as HTMLInputElement).value).toBe('10')
+    expect((inputs[0].element as HTMLInputElement).value).toBe('62')
   })
 
   it('保存提交完整 5 platform payload', async () => {
@@ -164,7 +164,7 @@ describe('UserPlatformQuotaModal', () => {
     // anthropic daily 应保持 10（未被清空）
     const inputs = w.findAll('input[type=number]')
     const dailyVal = (inputs[0].element as HTMLInputElement).value
-    expect(dailyVal).toBe('10')
+    expect(dailyVal).toBe('62')
     confirmSpy.mockRestore()
   })
 
