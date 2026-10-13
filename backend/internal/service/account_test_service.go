@@ -211,6 +211,9 @@ func (s *AccountTestService) TestAccountConnectionWithOptions(c *gin.Context, ac
 
 	// Route to platform-specific test method
 	if account.IsOpenAI() {
+		if options.MaxOutputTokens == 0 {
+			return s.testOpenAIAccountConnection(c, account, modelID, prompt, normalizeAccountTestMode(mode))
+		}
 		return s.testOpenAIAccountConnectionWithOptions(c, account, modelID, prompt, normalizeAccountTestMode(mode), options)
 	}
 	if options.MaxOutputTokens > 0 {
