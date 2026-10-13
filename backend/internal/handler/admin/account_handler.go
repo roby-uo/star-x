@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 	"net/http"
@@ -1103,9 +1104,10 @@ func (h *AccountHandler) Delete(c *gin.Context) {
 
 // TestAccountRequest represents the request body for testing an account
 type TestAccountRequest struct {
-	ModelID string `json:"model_id"`
-	Prompt  string `json:"prompt"`
-	Mode    string `json:"mode"`
+	ModelID         string `json:"model_id"`
+	Prompt          string `json:"prompt"`
+	Mode            string `json:"mode"`
+	MaxOutputTokens *int   `json:"max_output_tokens"`
 }
 
 type SyncFromCRSRequest struct {
@@ -1133,10 +1135,23 @@ func (h *AccountHandler) Test(c *gin.Context) {
 
 	var req TestAccountRequest
 	// Allow empty body, model_id is optional
-	_ = c.ShouldBindJSON(&req)
+	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+		response.BadRequest(c, "Invalid account test request")
+		return
+	}
+	if req.MaxOutputTokens != nil && (*req.MaxOutputTokens < 1 || *req.MaxOutputTokens > 64) {
+		response.BadRequest(c, "max_output_tokens must be between 1 and 64")
+		return
+	}
 
 	// Use AccountTestService to test the account with SSE streaming
-	if err := h.accountTestService.TestAccountConnection(c, accountID, req.ModelID, req.Prompt, req.Mode); err != nil {
+	var testErr error
+	if req.MaxOutputTokens != nil {
+		testErr = h.accountTestService.TestAccountConnectionWithOptions(c, accountID, req.ModelID, req.Prompt, req.Mode, service.AccountConnectionTestOptions{MaxOutputTokens: *req.MaxOutputTokens})
+	} else {
+		testErr = h.accountTestService.TestAccountConnection(c, accountID, req.ModelID, req.Prompt, req.Mode)
+	}
+	if testErr != nil {
 		// Error already sent via SSE, just log
 		return
 	}
@@ -2624,10 +2639,16 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 
 // SyncUpstreamModels handles syncing live supported models from an account's upstream.
 // POST /api/v1/admin/accounts/:id/models/sync-upstream
+// Optional client_version compares OpenAI OAuth model discovery using a specific Codex version.
 func (h *AccountHandler) SyncUpstreamModels(c *gin.Context) {
 	accountID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.BadRequest(c, "Invalid account ID")
+		return
+	}
+	clientVersion := c.Query("client_version")
+	if err := service.ValidateUpstreamModelsClientVersion(clientVersion); err != nil {
+		response.BadRequest(c, err.Error())
 		return
 	}
 
@@ -2642,7 +2663,7 @@ func (h *AccountHandler) SyncUpstreamModels(c *gin.Context) {
 		return
 	}
 
-	models, err := h.accountTestService.FetchUpstreamSupportedModels(c.Request.Context(), account)
+	models, err := h.accountTestService.FetchUpstreamSupportedModelsWithClientVersion(c.Request.Context(), account, clientVersion)
 	if err != nil {
 		var syncErr *service.UpstreamModelSyncError
 		if errors.As(err, &syncErr) {

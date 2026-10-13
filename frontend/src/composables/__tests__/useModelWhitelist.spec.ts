@@ -4,9 +4,20 @@ vi.mock('@/api/admin/accounts', () => ({
   getAntigravityDefaultModelMapping: vi.fn()
 }))
 
-import { buildModelMappingObject, getModelsByPlatform, splitModelMappingObject } from '../useModelWhitelist'
+import { buildModelMappingObject, getModelsByPlatform, getPresetMappingsByPlatform, splitModelMappingObject } from '../useModelWhitelist'
 
 describe('useModelWhitelist', () => {
+  it('GPT-6.1 Sol 保留精确型号并提供透传快捷映射', () => {
+    expect(getModelsByPlatform('openai')).toContain('gpt-6.1-sol')
+    expect(getModelsByPlatform('openai')).toContain('gpt-6-sol')
+    expect(getPresetMappingsByPlatform('openai')).toContainEqual(expect.objectContaining({
+      from: 'gpt-6.1-sol', to: 'gpt-6.1-sol'
+    }))
+    expect(buildModelMappingObject('whitelist', ['gpt-6.1-sol', 'gpt-6-sol'], [])).toEqual({
+      'gpt-6.1-sol': 'gpt-6.1-sol',
+      'gpt-6-sol': 'gpt-6-sol'
+    })
+  })
   it('openai 模型列表包含 GPT-5.4 官方快照', () => {
     const models = getModelsByPlatform('openai')
 

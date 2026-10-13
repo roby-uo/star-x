@@ -38,11 +38,13 @@ func setupAvailableModelsRouter(adminSvc service.AdminService) *gin.Engine {
 }
 
 type syncUpstreamHTTPUpstream struct {
-	resp *http.Response
-	err  error
+	resp    *http.Response
+	err     error
+	lastReq *http.Request
 }
 
 func (u *syncUpstreamHTTPUpstream) Do(req *http.Request, proxyURL string, accountID int64, accountConcurrency int) (*http.Response, error) {
+	u.lastReq = req
 	if u.err != nil {
 		return nil, u.err
 	}
@@ -323,4 +325,50 @@ func TestAccountHandlerSyncUpstreamModels_UpstreamErrorDoesNotExposeBody(t *test
 	require.Equal(t, http.StatusBadGateway, rec.Code)
 	require.Contains(t, rec.Body.String(), "Upstream model list request failed with HTTP 502")
 	require.NotContains(t, rec.Body.String(), "SECRET_TOKEN")
+}
+
+func TestAccountHandlerSyncUpstreamModels_ClientVersion(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		query       string
+		wantVersion string
+	}{
+		{name: "default", wantVersion: "0.146.0"},
+		{name: "explicit", query: "?client_version=0.147.0", wantVersion: "0.147.0"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := &availableModelsAdminService{
+				stubAdminService: newStubAdminService(),
+				account: service.Account{
+					ID: 46, Platform: service.PlatformOpenAI, Type: service.AccountTypeOAuth,
+					Credentials: map[string]any{"access_token": "openai-oauth-token"},
+				},
+			}
+			upstream := &syncUpstreamHTTPUpstream{resp: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"models":[{"slug":"gpt-6.1-sol"},{"slug":"gpt-6-sol"}]}`)),
+			}}
+			router := setupSyncUpstreamModelsRouter(svc, upstream)
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/46/models/sync-upstream"+tc.query, nil))
+			require.Equal(t, http.StatusOK, rec.Code)
+			require.Contains(t, rec.Body.String(), `"gpt-6.1-sol"`)
+			require.Contains(t, rec.Body.String(), `"gpt-6-sol"`)
+			require.Equal(t, "https://chatgpt.com/backend-api/codex/models", upstream.lastReq.URL.Scheme+"://"+upstream.lastReq.URL.Host+upstream.lastReq.URL.Path)
+			require.Equal(t, tc.wantVersion, upstream.lastReq.URL.Query().Get("client_version"))
+			require.Equal(t, tc.wantVersion, upstream.lastReq.Header.Get("Version"))
+			require.Contains(t, upstream.lastReq.Header.Get("User-Agent"), "codex_cli_rs/"+tc.wantVersion)
+		})
+	}
+}
+
+func TestAccountHandlerSyncUpstreamModels_InvalidClientVersionDoesNotRequestUpstream(t *testing.T) {
+	svc := &availableModelsAdminService{stubAdminService: newStubAdminService()}
+	upstream := &syncUpstreamHTTPUpstream{}
+	router := setupSyncUpstreamModelsRouter(svc, upstream)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/46/models/sync-upstream?client_version=https%3A%2F%2Fexample.com", nil))
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Contains(t, rec.Body.String(), "client_version must be a version")
+	require.Nil(t, upstream.lastReq)
 }

@@ -178,6 +178,29 @@ func createTestPayload(modelID string) (map[string]any, error) {
 // modelID is optional - if empty, defaults to claude.DefaultTestModel
 // mode is optional - "compact" routes OpenAI accounts to the /responses/compact probe path
 func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int64, modelID string, prompt string, mode string) error {
+	return s.TestAccountConnectionWithOptions(c, accountID, modelID, prompt, mode, AccountConnectionTestOptions{})
+}
+
+// AccountConnectionTestOptions permits an explicitly bounded text probe. Zero
+// preserves the existing test behavior; a nonzero limit must be between 1 and 64.
+type AccountConnectionTestOptions struct {
+	MaxOutputTokens int
+}
+
+func (options AccountConnectionTestOptions) validate() error {
+	if options.MaxOutputTokens < 0 || options.MaxOutputTokens > 64 {
+		return errors.New("max_output_tokens must be between 1 and 64 when specified")
+	}
+	return nil
+}
+
+// TestAccountConnectionWithOptions keeps a requested token limit on the actual
+// upstream request. Unsupported probe routes fail before any generation call;
+// an upstream rejection never retries without the requested limit.
+func (s *AccountTestService) TestAccountConnectionWithOptions(c *gin.Context, accountID int64, modelID string, prompt string, mode string, options AccountConnectionTestOptions) error {
+	if err := options.validate(); err != nil {
+		return s.sendErrorAndEnd(c, err.Error())
+	}
 	ctx := c.Request.Context()
 
 	// Get account
@@ -188,7 +211,10 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 
 	// Route to platform-specific test method
 	if account.IsOpenAI() {
-		return s.testOpenAIAccountConnection(c, account, modelID, prompt, normalizeAccountTestMode(mode))
+		return s.testOpenAIAccountConnectionWithOptions(c, account, modelID, prompt, normalizeAccountTestMode(mode), options)
+	}
+	if options.MaxOutputTokens > 0 {
+		return s.sendErrorAndEnd(c, "Bounded account tests require an OpenAI text Responses endpoint")
 	}
 
 	if account.IsGemini() {
@@ -502,6 +528,13 @@ func (s *AccountTestService) testBedrockAccountConnection(c *gin.Context, ctx co
 
 // testOpenAIAccountConnection tests an OpenAI account's connection
 func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account *Account, modelID string, prompt string, mode string) error {
+	return s.testOpenAIAccountConnectionWithOptions(c, account, modelID, prompt, mode, AccountConnectionTestOptions{})
+}
+
+func (s *AccountTestService) testOpenAIAccountConnectionWithOptions(c *gin.Context, account *Account, modelID string, prompt string, mode string, options AccountConnectionTestOptions) error {
+	if err := options.validate(); err != nil {
+		return s.sendErrorAndEnd(c, err.Error())
+	}
 	ctx := c.Request.Context()
 	mode = normalizeAccountTestMode(mode)
 
@@ -514,7 +547,13 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 	// Align test routing with gateway behavior: OpenAI accounts apply normal
 	// account model mapping, and compact mode applies compact-only mapping on top.
 	testModelID = account.GetMappedModel(testModelID)
+	if options.MaxOutputTokens > 0 && inferModelEndpointCapability(testModelID, PlatformOpenAI).IsGenerationModel() {
+		return s.sendErrorAndEnd(c, "Bounded account tests require a text model; image and video generation were not attempted")
+	}
 	if mode == AccountTestModeCompact {
+		if options.MaxOutputTokens > 0 {
+			return s.sendErrorAndEnd(c, "Bounded account tests do not support compact probes")
+		}
 		testModelID = resolveOpenAICompactForwardModel(account, testModelID)
 		return s.testOpenAICompactConnection(c, account, testModelID)
 	}
@@ -573,6 +612,9 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 			return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid base URL: %s", err.Error()))
 		}
 		if !openai_compat.ShouldUseResponsesAPI(account.Extra) {
+			if options.MaxOutputTokens > 0 {
+				return s.sendErrorAndEnd(c, "Bounded account tests require Responses API support; no Chat Completions fallback was attempted")
+			}
 			return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, normalizedBaseURL, authToken)
 		}
 		apiURL = buildOpenAIResponsesURL(normalizedBaseURL)
@@ -594,6 +636,18 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 		upstreamTestModelID = normalizeOpenAIModelForUpstream(credentialAccount, testModelID)
 	}
 	payload := createOpenAITestPayload(upstreamTestModelID, isOAuth)
+	if options.MaxOutputTokens > 0 {
+		testPrompt := strings.TrimSpace(prompt)
+		if testPrompt == "" {
+			testPrompt = "Reply OK only."
+		}
+		payload["input"] = []map[string]any{{
+			"role":    "user",
+			"content": []map[string]any{{"type": "input_text", "text": testPrompt}},
+		}}
+		payload["instructions"] = "Reply briefly."
+		payload["max_output_tokens"] = options.MaxOutputTokens
+	}
 	payloadBytes, _ := json.Marshal(payload)
 
 	// Send test_start event once. A task-invalid Agent Identity response may
@@ -668,13 +722,13 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		body = redactAgentIdentitySensitiveBodyForAccount(ctx, s.accountRepo, credentialAccount, body)
-		if !agentIdentityTaskRecoveryWasTried(ctx) && credentialAccount.IsOpenAIAgentIdentity() && isAgentIdentityTaskInvalidHTTPResponse(resp.StatusCode, body) {
+		if options.MaxOutputTokens == 0 && !agentIdentityTaskRecoveryWasTried(ctx) && credentialAccount.IsOpenAIAgentIdentity() && isAgentIdentityTaskInvalidHTTPResponse(resp.StatusCode, body) {
 			expectedTaskID := credentialAccount.GetCredential("task_id")
 			if err := ensureAgentIdentityTaskForAccount(ctx, s.accountRepo, s.agentIdentityWS, &s.agentIdentityTaskMu, credentialAccount, expectedTaskID); err != nil {
 				return s.sendErrorAndEnd(c, fmt.Sprintf("Agent Identity task recovery failed: %s", err.Error()))
 			}
 			c.Request = c.Request.WithContext(markAgentIdentityTaskRecoveryTried(ctx))
-			return s.testOpenAIAccountConnection(c, account, modelID, prompt, mode)
+			return s.testOpenAIAccountConnectionWithOptions(c, account, modelID, prompt, mode, options)
 		}
 		if resp.StatusCode == http.StatusTooManyRequests {
 			s.reconcileOpenAI429State(ctx, account, resp.Header, body)
@@ -688,6 +742,9 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 	}
 
 	// Process SSE stream
+	if options.MaxOutputTokens > 0 {
+		return s.processBoundedOpenAIStream(c, resp.Body, options.MaxOutputTokens)
+	}
 	return s.processOpenAIStream(c, resp.Body)
 }
 
@@ -1667,6 +1724,94 @@ func (s *AccountTestService) processOpenAIStream(c *gin.Context, body io.Reader)
 			return s.sendErrorAndEnd(c, errorMsg)
 		}
 	}
+}
+
+// processBoundedOpenAIStream reports only upstream model and usage evidence, not
+// the requested model. Reaching the explicit limit is distinguishable from an
+// unsupported model, and never triggers an unrestricted retry.
+func (s *AccountTestService) processBoundedOpenAIStream(c *gin.Context, body io.Reader, maxOutputTokens int) error {
+	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 4096), 2<<20)
+	reportedModel := ""
+	evidence := map[string]any{"max_output_tokens": maxOutputTokens}
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if !sseDataPrefix.MatchString(line) {
+			continue
+		}
+		jsonStr := sseDataPrefix.ReplaceAllString(line, "")
+		if jsonStr == "[DONE]" {
+			break
+		}
+		var data map[string]any
+		if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
+			continue
+		}
+		eventType, _ := data["type"].(string)
+		responseData, _ := data["response"].(map[string]any)
+		if model, ok := responseData["model"].(string); ok && strings.TrimSpace(model) != "" {
+			reportedModel = strings.TrimSpace(model)
+			evidence["upstream_model"] = reportedModel
+		}
+		if usage, ok := responseData["usage"].(map[string]any); ok {
+			for _, field := range []string{"input_tokens", "output_tokens", "total_tokens"} {
+				if value, ok := usage[field].(float64); ok {
+					evidence[field] = value
+				}
+			}
+		}
+		switch eventType {
+		case "response.created", "response.in_progress":
+			s.sendEvent(c, TestEvent{Type: "upstream_response", Model: reportedModel, Status: "in_progress", Data: evidence})
+		case "response.output_text.delta":
+			if delta, ok := data["delta"].(string); ok && delta != "" {
+				s.sendEvent(c, TestEvent{Type: "content", Text: delta})
+			}
+		case "response.completed", "response.done", "response.incomplete":
+			status, _ := responseData["status"].(string)
+			if eventType == "response.incomplete" || status == "incomplete" {
+				reason := "unknown"
+				if details, ok := responseData["incomplete_details"].(map[string]any); ok {
+					if value, ok := details["reason"].(string); ok && value != "" {
+						reason = value
+					}
+				}
+				evidence["incomplete_reason"] = reason
+				if reason == "max_output_tokens" {
+					s.sendEvent(c, TestEvent{Type: "test_complete", Model: reportedModel, Status: "limit_reached", Data: evidence, Error: "Bounded probe reached max_output_tokens; no unrestricted retry was attempted"})
+					return errors.New("bounded probe reached max_output_tokens")
+				}
+				s.sendEvent(c, TestEvent{Type: "upstream_response", Model: reportedModel, Status: "incomplete", Data: evidence})
+				return s.sendErrorAndEnd(c, "Bounded probe returned an incomplete response: "+reason)
+			}
+			if status != "" && status != "completed" {
+				s.sendEvent(c, TestEvent{Type: "upstream_response", Model: reportedModel, Status: status, Data: evidence})
+				return s.sendErrorAndEnd(c, "Bounded probe returned a non-completed response: "+status)
+			}
+			if count, ok := evidence["output_tokens"].(float64); ok && count > float64(maxOutputTokens) {
+				s.sendEvent(c, TestEvent{Type: "upstream_response", Model: reportedModel, Status: "limit_exceeded", Data: evidence})
+				return s.sendErrorAndEnd(c, "Upstream reported more output tokens than the requested limit")
+			}
+			s.sendEvent(c, TestEvent{Type: "test_complete", Model: reportedModel, Status: "completed", Data: evidence, Success: true})
+			return nil
+		case "response.failed", "error":
+			errorMsg := "Bounded OpenAI response failed"
+			errData, _ := data["error"].(map[string]any)
+			if nested, ok := responseData["error"].(map[string]any); ok {
+				errData = nested
+			}
+			if message, ok := errData["message"].(string); ok && message != "" {
+				errorMsg = message
+			}
+			s.sendEvent(c, TestEvent{Type: "upstream_response", Model: reportedModel, Status: "failed", Data: evidence})
+			return s.sendErrorAndEnd(c, errorMsg)
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return s.sendErrorAndEnd(c, "Bounded stream read error: "+err.Error())
+	}
+	s.sendEvent(c, TestEvent{Type: "upstream_response", Model: reportedModel, Status: "stream_ended", Data: evidence})
+	return s.sendErrorAndEnd(c, "Bounded stream ended before a completed or incomplete response")
 }
 
 // testOpenAIImageAPIKey tests OpenAI image generation using an API Key account.

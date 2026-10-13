@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -15,6 +16,18 @@ import (
 )
 
 const upstreamModelsBodyLimit int64 = 8 << 20
+
+var upstreamModelsClientVersionPattern = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
+
+// ValidateUpstreamModelsClientVersion accepts an empty default or a bounded
+// stable semantic version, never a URL or arbitrary query fragment.
+func ValidateUpstreamModelsClientVersion(clientVersion string) error {
+	clientVersion = strings.TrimSpace(clientVersion)
+	if clientVersion != "" && (len(clientVersion) > 32 || !upstreamModelsClientVersionPattern.MatchString(clientVersion)) {
+		return newUpstreamModelSyncConfigError("client_version must be a version in x.y.z format (maximum 32 characters)", nil)
+	}
+	return nil
+}
 
 // UpstreamModelSyncErrorKind classifies model sync failures for safe HTTP mapping.
 type UpstreamModelSyncErrorKind string
@@ -74,11 +87,23 @@ func newUpstreamModelSyncUpstreamError(message string, err error) error {
 
 // FetchUpstreamSupportedModels fetches the live model list from the account's upstream API format.
 func (s *AccountTestService) FetchUpstreamSupportedModels(ctx context.Context, account *Account) ([]string, error) {
+	return s.FetchUpstreamSupportedModelsWithClientVersion(ctx, account, "")
+}
+
+// FetchUpstreamSupportedModelsWithClientVersion allows an administrator to
+// compare Codex model discovery across client versions. The override applies
+// only to OpenAI OAuth discovery; upstream URLs and other account types retain
+// their existing behavior. An empty version uses the built-in probe version.
+func (s *AccountTestService) FetchUpstreamSupportedModelsWithClientVersion(ctx context.Context, account *Account, clientVersion string) ([]string, error) {
 	if s == nil {
 		return nil, newUpstreamModelSyncConfigError("Account test service is not configured", nil)
 	}
 	if account == nil {
 		return nil, newUpstreamModelSyncConfigError("Account is required", nil)
+	}
+	clientVersion = strings.TrimSpace(clientVersion)
+	if err := ValidateUpstreamModelsClientVersion(clientVersion); err != nil {
+		return nil, err
 	}
 
 	if account.Platform == PlatformAntigravity && account.Type != AccountTypeAPIKey {
@@ -89,7 +114,7 @@ func (s *AccountTestService) FetchUpstreamSupportedModels(ctx context.Context, a
 		return nil, newUpstreamModelSyncConfigError("Upstream HTTP client is not configured", nil)
 	}
 
-	req, err := s.buildUpstreamModelsRequest(ctx, account)
+	req, err := s.buildUpstreamModelsRequestWithClientVersion(ctx, account, clientVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -128,12 +153,19 @@ func (s *AccountTestService) FetchUpstreamSupportedModels(ctx context.Context, a
 }
 
 func (s *AccountTestService) buildUpstreamModelsRequest(ctx context.Context, account *Account) (*http.Request, error) {
+	return s.buildUpstreamModelsRequestWithClientVersion(ctx, account, "")
+}
+
+func (s *AccountTestService) buildUpstreamModelsRequestWithClientVersion(ctx context.Context, account *Account, clientVersion string) (*http.Request, error) {
 	switch {
 	case account.Platform == PlatformAntigravity:
 		return s.buildAntigravityAPIKeyModelsRequest(ctx, account)
 	case account.IsGrok():
 		return s.buildGrokUpstreamModelsRequest(ctx, account)
 	case account.IsOpenAI():
+		if account.IsOpenAIOAuth() {
+			return s.buildOpenAIOAuthUpstreamModelsRequestWithClientVersion(ctx, account, clientVersion)
+		}
 		return s.buildOpenAIUpstreamModelsRequest(ctx, account)
 	case account.IsGemini():
 		return s.buildGeminiUpstreamModelsRequest(ctx, account)
@@ -322,6 +354,10 @@ func (s *AccountTestService) buildOpenAIUpstreamModelsRequest(ctx context.Contex
 // OpenAI OAuth accounts use the ChatGPT Codex manifest, not the Platform API
 // /v1/models endpoint used by API-key accounts.
 func (s *AccountTestService) buildOpenAIOAuthUpstreamModelsRequest(ctx context.Context, account *Account) (*http.Request, error) {
+	return s.buildOpenAIOAuthUpstreamModelsRequestWithClientVersion(ctx, account, "")
+}
+
+func (s *AccountTestService) buildOpenAIOAuthUpstreamModelsRequestWithClientVersion(ctx context.Context, account *Account, clientVersion string) (*http.Request, error) {
 	credentialAccount, err := resolveCredentialAccount(ctx, s.accountRepo, account)
 	if err != nil {
 		return nil, newUpstreamModelSyncConfigError("Failed to resolve OpenAI account credentials", err)
@@ -330,7 +366,11 @@ func (s *AccountTestService) buildOpenAIOAuthUpstreamModelsRequest(ctx context.C
 		return nil, newUpstreamModelSyncUnsupportedError("OpenAI OAuth account is required for Codex model sync", nil)
 	}
 
-	modelsURL, err := buildCodexModelsManifestURL(chatgptCodexModelsURL, false, openAICodexProbeVersion)
+	overrideClientVersion := clientVersion != ""
+	if clientVersion == "" {
+		clientVersion = openAICodexProbeVersion
+	}
+	modelsURL, err := buildCodexModelsManifestURL(chatgptCodexModelsURL, false, clientVersion)
 	if err != nil {
 		return nil, newUpstreamModelSyncConfigError("Invalid OpenAI Codex model list URL", err)
 	}
@@ -357,12 +397,18 @@ func (s *AccountTestService) buildOpenAIOAuthUpstreamModelsRequest(ctx context.C
 	}
 
 	req.Header.Set("Accept", "application/json")
+	if overrideClientVersion {
+		req.Header.Set("User-Agent", strings.Replace(codexCLIUserAgent, codexCLIVersion, clientVersion, 1))
+	}
 	ensureCodexIdentityHeaders(req.Header)
 	if customUA := strings.TrimSpace(credentialAccount.GetOpenAIUserAgent()); customUA != "" {
 		req.Header.Set("User-Agent", customUA)
 	}
 	setOpenAIChatGPTAccountHeaders(req.Header, credentialAccount)
 	credentialAccount.ApplyHeaderOverrides(req.Header)
+	if overrideClientVersion {
+		req.Header.Set("Version", clientVersion)
+	}
 	enforceCodexIdentityHeaders(req.Header)
 	return req, nil
 }

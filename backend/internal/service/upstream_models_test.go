@@ -120,6 +120,11 @@ func TestExtractUpstreamModelIDs(t *testing.T) {
 			body: `{"models":[{"slug":"gpt-6-sol"},{"slug":"gpt-6-luna"}]}`,
 			want: []string{"gpt-6-luna", "gpt-6-sol"},
 		},
+		{
+			name: "codex decimal model version remains distinct",
+			body: `{"models":[{"slug":"gpt-6.1-sol"},{"slug":"gpt-6-sol"}]}`,
+			want: []string{"gpt-6-sol", "gpt-6.1-sol"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -167,6 +172,75 @@ func TestFetchUpstreamSupportedModelsParsesOpenAIOAuthManifest(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{"gpt-6-luna", "gpt-6-sol"}, models)
 	require.Equal(t, "Bearer openai-oauth-token", upstream.lastReq.Header.Get("Authorization"))
+}
+
+func TestFetchUpstreamSupportedModelsWithClientVersion_OpenAIOAuth(t *testing.T) {
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(`{"models":[{"slug":"gpt-6.1-sol"},{"slug":"gpt-6-sol"}]}`)),
+	}}
+	svc := &AccountTestService{httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+
+	models, err := svc.FetchUpstreamSupportedModelsWithClientVersion(context.Background(), &Account{
+		ID: 12, Platform: PlatformOpenAI, Type: AccountTypeOAuth,
+		Credentials: map[string]any{"access_token": "openai-oauth-token"},
+	}, "0.147.0")
+	require.NoError(t, err)
+	require.Equal(t, []string{"gpt-6-sol", "gpt-6.1-sol"}, models)
+	require.Equal(t, chatgptCodexModelsURL, upstream.lastReq.URL.Scheme+"://"+upstream.lastReq.URL.Host+upstream.lastReq.URL.Path)
+	require.Equal(t, "0.147.0", upstream.lastReq.URL.Query().Get("client_version"))
+	require.Equal(t, "0.147.0", upstream.lastReq.Header.Get("Version"))
+	require.Equal(t, strings.Replace(codexCLIUserAgent, codexCLIVersion, "0.147.0", 1), upstream.lastReq.Header.Get("User-Agent"))
+}
+
+func TestFetchUpstreamSupportedModelsWithClientVersion_DoesNotChangeAPIKeyDiscovery(t *testing.T) {
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(`{"data":[{"id":"gpt-6.1-sol"}]}`)),
+	}}
+	svc := &AccountTestService{httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+	models, err := svc.FetchUpstreamSupportedModelsWithClientVersion(context.Background(), &Account{
+		ID: 13, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
+		Credentials: map[string]any{"api_key": "openai-key", "base_url": "https://openai.example.com/v1"},
+	}, "0.147.0")
+	require.NoError(t, err)
+	require.Equal(t, []string{"gpt-6.1-sol"}, models)
+	require.Equal(t, "https://openai.example.com/v1/models", upstream.lastReq.URL.String())
+	require.Empty(t, upstream.lastReq.Header.Get("Version"))
+}
+
+func TestBuildUpstreamModelsRequestWithClientVersion_PreservesCustomUserAgent(t *testing.T) {
+	svc := &AccountTestService{cfg: upstreamModelSyncTestConfig()}
+	account := &Account{
+		Platform: PlatformOpenAI, Type: AccountTypeOAuth,
+		Credentials: map[string]any{
+			"access_token": "openai-oauth-token",
+			"user_agent":   "codex_cli_rs/0.148.0 (custom)",
+		},
+	}
+	req, err := svc.buildUpstreamModelsRequestWithClientVersion(context.Background(), account, "0.147.0")
+	require.NoError(t, err)
+	require.Equal(t, "0.147.0", req.URL.Query().Get("client_version"))
+	require.Equal(t, "0.147.0", req.Header.Get("Version"))
+	require.Equal(t, "codex_cli_rs/0.148.0 (custom)", req.Header.Get("User-Agent"))
+}
+
+func TestFetchUpstreamSupportedModelsWithClientVersion_RejectsInvalidVersion(t *testing.T) {
+	for _, version := range []string{"https://example.com", "0.147", "0.147.0&url=https://example.com", "01.147.0", "0.147.0-beta", strings.Repeat("1", 33) + ".0.0"} {
+		t.Run(version, func(t *testing.T) {
+			upstream := &httpUpstreamRecorder{}
+			svc := &AccountTestService{httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+			_, err := svc.FetchUpstreamSupportedModelsWithClientVersion(context.Background(), &Account{
+				Platform: PlatformOpenAI, Type: AccountTypeOAuth,
+				Credentials: map[string]any{"access_token": "openai-oauth-token"},
+			}, version)
+			var syncErr *UpstreamModelSyncError
+			require.ErrorAs(t, err, &syncErr)
+			require.Equal(t, UpstreamModelSyncErrorConfiguration, syncErr.Kind)
+			require.Nil(t, upstream.lastReq)
+		})
+	}
 }
 
 func TestBuildUpstreamModelsRequestsForAPIKeyAccounts(t *testing.T) {
